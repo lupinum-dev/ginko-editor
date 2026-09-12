@@ -6,7 +6,16 @@ import { dirname, join, resolve } from 'node:path'
 const release = JSON.parse(await readFile('release-artifacts/release.json', 'utf8'))
 const pkg = release.packages[0]
 const archive = resolve('release-artifacts', pkg.filename)
+const contentArchive = process.env.GINKO_CONTENT_TARBALL
+  ? resolve(process.env.GINKO_CONTENT_TARBALL)
+  : null
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
+
+if (!contentArchive) {
+  throw new Error(
+    'Set GINKO_CONTENT_TARBALL to the accepted Ginko Content archive until a version with the CMS parser helpers is published.',
+  )
+}
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -34,8 +43,8 @@ async function verifyDeclarations(consumer) {
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
   if (manifest.exports?.['./style.css'] !== './dist/style.css') throw new Error('The packed CSS export is missing.')
   const entryTypes = await readFile(join(packageRoot, 'dist', 'index.d.ts'), 'utf8')
-  if (!entryTypes.includes('GinkoEditorScaffold')) throw new Error('The packed public declaration is missing.')
-  await readFile(join(packageRoot, 'dist', 'GinkoEditorScaffold.vue.d.ts'), 'utf8')
+  if (!entryTypes.includes('GinkoEditor')) throw new Error('The packed public declaration is missing.')
+  await readFile(join(packageRoot, 'dist', 'GinkoEditor.vue.d.ts'), 'utf8')
 }
 
 async function verifyVueConsumer(consumer) {
@@ -45,7 +54,12 @@ async function verifyVueConsumer(consumer) {
       private: true,
       type: 'module',
       scripts: { build: 'vite build', typecheck: 'vue-tsc --noEmit' },
-      dependencies: { vue: '3.5.42' },
+      dependencies: {
+        '@tiptap/core': '3.31.3',
+        '@tiptap/pm': '3.31.3',
+        '@tiptap/vue-3': '3.31.3',
+        vue: '3.5.42',
+      },
       devDependencies: {
         '@types/node': '26.1.1',
         '@vitejs/plugin-vue': '6.0.6',
@@ -62,7 +76,7 @@ async function verifyVueConsumer(consumer) {
   )
   await write(
     join(consumer, 'App.vue'),
-    "<script setup lang=\"ts\">\nimport { GinkoEditorScaffold } from '@lupinum/ginko-editor'\n</script>\n\n<template><GinkoEditorScaffold>Vue consumer</GinkoEditorScaffold></template>\n",
+    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nconst source = ref('# Vue consumer\\n')\n</script>\n\n<template><GinkoEditor v-model=\"source\" /></template>\n",
   )
   await write(
     join(consumer, 'vite.config.ts'),
@@ -72,11 +86,11 @@ async function verifyVueConsumer(consumer) {
     join(consumer, 'tsconfig.json'),
     `${JSON.stringify({ compilerOptions: { lib: ['ESNext', 'DOM'], module: 'ESNext', moduleResolution: 'Bundler', strict: true, target: 'ESNext', types: ['node'] }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
   )
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive], consumer)
+  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  if (!(await containsCss(join(consumer, 'dist'), '.ginko-editor-scaffold'))) {
+  if (!(await containsCss(join(consumer, 'dist'), '.ginko-editor'))) {
     throw new Error('The Vue production build dropped the package CSS.')
   }
 }
@@ -88,7 +102,13 @@ async function verifyNuxtConsumer(consumer) {
       private: true,
       type: 'module',
       scripts: { build: 'nuxt build', prepare: 'nuxt prepare', typecheck: 'nuxt typecheck' },
-      dependencies: { nuxt: '4.5.2', vue: '3.5.42' },
+      dependencies: {
+        '@tiptap/core': '3.31.3',
+        '@tiptap/pm': '3.31.3',
+        '@tiptap/vue-3': '3.31.3',
+        nuxt: '4.5.2',
+        vue: '3.5.42',
+      },
       devDependencies: { typescript: '5.9.3', 'vue-tsc': '3.3.7' },
     }, null, 2)}\n`,
   )
@@ -98,15 +118,15 @@ async function verifyNuxtConsumer(consumer) {
   )
   await write(
     join(consumer, 'app.vue'),
-    "<script setup lang=\"ts\">\nimport { GinkoEditorScaffold } from '@lupinum/ginko-editor'\n</script>\n\n<template><GinkoEditorScaffold>Nuxt consumer</GinkoEditorScaffold></template>\n",
+    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nconst source = ref('# Nuxt consumer\\n')\n</script>\n\n<template><GinkoEditor v-model=\"source\" /></template>\n",
   )
   await write(join(consumer, 'tsconfig.json'), '{ "extends": "./.nuxt/tsconfig.json" }\n')
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive], consumer)
+  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
   run('npm', ['run', 'prepare'], consumer)
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  if (!(await containsCss(join(consumer, '.output'), '.ginko-editor-scaffold'))) {
+  if (!(await containsCss(join(consumer, '.output'), '.ginko-editor'))) {
     throw new Error('The Nuxt production build dropped the package CSS.')
   }
 }

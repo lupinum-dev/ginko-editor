@@ -9,10 +9,21 @@ pnpm dev
 ```
 
 The root publishes one Vue package. Vite builds the browser-safe ESM entry and
-extracts `dist/style.css`. `vue-tsc` emits the public declarations. Vue is a
-peer dependency. Consumers must import `@lupinum/ginko-editor/style.css`
-explicitly. Package certification builds isolated Vue and Nuxt applications
+extracts `dist/style.css`. `vue-tsc` emits the public declarations. Vue and the
+TipTap runtime are peer dependencies. The package imports only the browser-safe
+`@lupinum/ginko-content/cms-contract` entry and keeps it external. Consumers must
+import `@lupinum/ginko-editor/style.css` explicitly. Package certification builds isolated Vue and Nuxt applications
 from the generated archive; it does not use sibling aliases or source links.
+
+The accepted CMS editor remains the temporary integration copy until Step 5.
+The Editor package owns conversion, TipTap schema, mode switching, and editor UI.
+The CMS owns persistence, asset dialogs, and workflow state. Remove the temporary
+CMS copy when the CMS consumes the package; do not maintain both implementations.
+
+Until Ginko Content publishes the accepted CMS parser helpers, local release
+verification needs its inspected candidate archive in `GINKO_CONTENT_TARBALL`.
+This is a release gate, not a supported install workaround. Do not publish
+Ginko Editor against the older registry package with the same prerelease version.
 
 Use the local URL printed by the development server. Keep that session running
 while you work. Stop only processes you started. Keep temporary changes and

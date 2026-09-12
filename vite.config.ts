@@ -12,7 +12,11 @@ export default defineConfig({
       cssFileName: 'style',
     },
     rolldownOptions: {
-      external: ['vue'],
+      external: (id) =>
+        id === 'vue' ||
+        id.startsWith('@tiptap/') ||
+        id === '@lupinum/ginko-content' ||
+        id.startsWith('@lupinum/ginko-content/'),
     },
   },
 })

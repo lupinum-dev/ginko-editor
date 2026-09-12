@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { GinkoEditorScaffold } from '../src/index.js'
+import { GinkoEditor } from '../src/index.js'
 
 describe('package entry', () => {
-  it('exports the temporary Vue smoke component', () => {
-    expect(GinkoEditorScaffold).toBeTruthy()
+  it('exports the editor component', () => {
+    expect(GinkoEditor).toBeTruthy()
   })
 })

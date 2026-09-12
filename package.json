@@ -3,22 +3,41 @@
   "version": "0.1.0",
   "description": "A portable Vue editor for Ginko content.",
   "type": "module",
-  "sideEffects": ["**/*.css"],
+  "sideEffects": [
+    "**/*.css"
+  ],
   "license": "MIT",
   "author": "Lupinum OG <info@lupinum.com> (https://lupinum.com)",
   "homepage": "https://ginko-editor.lupinum.com",
-  "repository": { "type": "git", "url": "git+https://github.com/lupinum-dev/ginko-editor.git" },
-  "bugs": { "url": "https://github.com/lupinum-dev/ginko-editor/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lupinum-dev/ginko-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lupinum-dev/ginko-editor/issues"
+  },
   "packageManager": "pnpm@11.21.0",
-  "engines": { "node": "^22.14.0 || ^24.0.0 || ^26.0.0" },
+  "engines": {
+    "node": "^22.14.0 || ^24.0.0 || ^26.0.0"
+  },
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./style.css": "./dist/style.css"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "check:dependencies": "node scripts/check-dependency-policy.mjs",
     "audit:all": "pnpm audit",
@@ -37,11 +56,16 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@tiptap/core": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/vue-3": "3.31.3",
     "@types/node": "26.1.1",
     "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.10",
     "changelogen": "0.6.2",
     "eslint": "^10.4.1",
     "eslint-plugin-vue": "^10.9.0",
+    "jsdom": "^29.1.1",
     "pkg-pr-new": "0.0.87",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.59.1",
@@ -52,6 +76,21 @@
     "yaml": "2.9.0"
   },
   "peerDependencies": {
+    "@tiptap/core": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/vue-3": "3.31.3",
     "vue": "^3.5.0"
+  },
+  "dependencies": {
+    "@lupinum/ginko-content": "1.0.0-beta.7",
+    "@tiptap/extension-code-block": "3.31.3",
+    "@tiptap/extension-heading": "3.31.3",
+    "@tiptap/extension-placeholder": "3.31.3",
+    "@tiptap/extension-table": "3.31.3",
+    "@tiptap/extension-table-cell": "3.31.3",
+    "@tiptap/extension-table-header": "3.31.3",
+    "@tiptap/extension-table-row": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
+    "github-slugger": "^2.0.0"
   }
 }
