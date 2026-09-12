@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 is accepted for the local shared-contract foundation and Docs writing proof. Step 6A is now assigned; build and review the complete playground writing journey before 6B hardening and Step 5 consumer integration. Exact CMS + unpublished V2 Content package-consumer certification remains an explicit prerequisite to CMS adoption; the registry-compatible CMS development lane is not evidence for that tuple. Publication, deployment and production migrations remain unauthorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and the Step 6A Docs writing proof are accepted for local development. Step 6B is now assigned to harden the demonstrated interaction and complete its bounded keyboard, block-action, property and source-recovery requirements. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -266,7 +266,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
-| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A assigned | IN PROGRESS |
+| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A accepted, 6B assigned | IN PROGRESS |
 | 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof | TODO |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
@@ -2344,3 +2344,37 @@ reset.
 Step 6A is again **READY FOR REVIEW** by coordinator task
 `01a09564-7dee-70a1-828c-84dd6628054d`. Step 6B, Step 5, push, publication and
 deployment remain unassigned.
+
+#### 2026-09-12 — Reviewer accepts Step 6A; Step 6B assigned
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` accepts the corrected
+Step 6A writing proof at source commit `c6ca47fbe66dfbec8334817145c7948c77021109`
+(evidence commit `df0969e`). The reviewer reloaded the built playground and
+independently verified the three requested corrections through normal UI actions.
+
+Appearance changes followed by Tab reach Icon; typing in Icon followed by Tab
+reaches Title; committing Title reaches Save locally. Changing Assessed followed
+by Tab reaches the host Title. The selected-component inspector remains present,
+and the property changes reach preview. The focused authoring-editor suite passes
+all four tests, including the new focus regression.
+
+At a 390 by 844 viewport, both nested sm/lg column boxes compute `grid-column:
+1 / -1`, with equal widths about 247px and distinct vertical positions. The first
+column text is readable without the earlier word fragmentation. After resetting
+the viewport, the desktop spans remain 4 and 8 (about 164px/339px in the nested
+example). Opening desktop and mobile screenshots include the editor toolbar and
+writing content. The previous independently verified full journey remains the
+acceptance evidence for insertion, component editing, undo/redo, exact local
+save/reopen and unchanged incomplete source.
+
+The saved reviewer document is restored in Visual mode, the viewport override is
+reset, and the playground remains available. This accepts the bounded working
+proof, not full Step 6 hardening, host integration or release readiness.
+
+Assign Step 6B only, following its existing packet: preserve the proven experience,
+complete the initial keyboard/block-action/property/source behavior, remove
+unneeded experimental code, add focused observable-behavior regressions and run
+owning final checks once at handoff. Do not expand the component set, invent a
+root-insert API without demonstrated need, or start CMS/ChiliSkills adoption.
+Return Gate D for reviewer operation. Local corrective commits remain authorized;
+Step 5, push, publication, deployment and production migration remain unassigned.
