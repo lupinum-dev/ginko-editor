@@ -39,6 +39,18 @@ export function sanitizeImageUrl(url: string): null | string {
   return null
 }
 
+/** Browser-only display URLs returned by an explicit host asset provider. */
+export function sanitizeResolvedImageUrl(url: string): null | string {
+  const safe = sanitizeImageUrl(url)
+  if (safe) return safe
+  const value = url.trim()
+  try {
+    return new URL(value).protocol === 'blob:' ? value : null
+  } catch {
+    return null
+  }
+}
+
 export function cleanSpanProps(attrs?: Record<string, unknown> | null) {
   const props: Record<string, string> = {}
   if (isValidAttr(attrs?.style as string)) props.style = String(attrs!.style).trim()

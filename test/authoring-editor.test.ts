@@ -582,7 +582,7 @@ describe('editor-specific authoring kits', () => {
         authoringKit: kit,
         modelValue: source,
         assetProvider: {
-          buildUrl: () => 'https://assets.example.test/resolved.png',
+          buildUrl: () => 'blob:https://editor.example.test/resolved',
           parseUrl: () => null,
         },
       },
@@ -591,7 +591,7 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       const image = wrapper.get('img')
-      expect(image.attributes('src')).toBe('https://assets.example.test/resolved.png')
+      expect(image.attributes('src')).toBe('blob:https://editor.example.test/resolved')
       expect(image.attributes('src')).not.toContain('asset_123')
       wrapper.vm.editor!.chain()
         .setTextSelection(wrapper.vm.editor!.state.doc.content.size)

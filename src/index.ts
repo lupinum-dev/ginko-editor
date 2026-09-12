@@ -16,6 +16,7 @@ export type {
   AssetProvider,
   EditorAssetRequest,
   EditorFlushResult,
+  GinkoEditorHandle,
   VideoInfo,
 } from './types'
 export type { ConversionErrorPayload, ConversionRecoveredPayload } from './lib/conversionPipeline'

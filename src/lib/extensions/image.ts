@@ -2,7 +2,7 @@ import type { CommandProps } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 
 import type { JsonRecord } from '../../types'
-import { sanitizeImageUrl } from '../props'
+import { sanitizeImageUrl, sanitizeResolvedImageUrl } from '../props'
 
 export interface ImageOptions {
   allowBase64: boolean
@@ -104,7 +104,8 @@ export const Image = Node.create<ImageOptions>({
 
     const rawSrc = String(props.src || '')
     const resolvedSrc = this.options.resolveSrc?.(props)
-    const displaySrc = sanitizeImageUrl(rawSrc) ?? sanitizeImageUrl(String(resolvedSrc || ''))
+    const displaySrc =
+      sanitizeImageUrl(rawSrc) ?? sanitizeResolvedImageUrl(String(resolvedSrc || ''))
     if (displaySrc) {
       attrs.src = displaySrc
     }

@@ -31,6 +31,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   enableDebug?: boolean
   enableFiles?: boolean
+  enableImageMetadata?: boolean
   enableVideo?: boolean
   fileOutput?: 'markdown' | 'mdc'
   imageOutput?: 'markdown' | 'mdc'
@@ -47,6 +48,7 @@ const props = withDefaults(defineProps<{
   disabled: false,
   enableDebug: false,
   enableFiles: true,
+  enableImageMetadata: false,
   enableVideo: true,
   fileOutput: 'mdc',
   imageOutput: 'mdc',
@@ -62,6 +64,7 @@ const emit = defineEmits<{
   'request-file': [request: EditorAssetRequest<Partial<AssetInfo>>]
   'request-image': [request: EditorAssetRequest<Partial<AssetInfo>>]
   'request-image-metadata': [assetId: string]
+  'pending-change': [pending: boolean]
   'request-video': [request: EditorAssetRequest<VideoInfo>]
   'update:modelValue': [value: string]
 }>()
@@ -200,14 +203,13 @@ const selectedImage = computed(() => {
   const properties = selection.node.attrs.props as Record<string, unknown> | undefined
   const source = typeof properties?.src === 'string' ? properties.src : ''
   const parsed = source ? resolvedAssetProvider.value.parseUrl(source) : null
-  const storedIdentity = /^[a-z0-9]{20,40}$|^[a-z0-9]+;[a-z_]+$/i.test(source) ? source : ''
   return {
     assetId:
       typeof properties?.id === 'string' && properties.id
         ? properties.id
         : typeof parsed?.id === 'string' && parsed.id
           ? parsed.id
-          : storedIdentity,
+          : '',
     filename: typeof properties?.filename === 'string' ? properties.filename : '',
   }
 })
@@ -700,7 +702,7 @@ function canMutateVisualContent(featureEnabled = true) {
 function insertImageAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent()) return false
-  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src: asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title, width: asset.width }
+  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src: asset.id || asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title, width: asset.width }
   if (instance.isActive('image')) instance.chain().focus().updateAttributes('image', { props: payload }).run()
   else instance.chain().focus().setImage(payload).run()
   return true
@@ -709,7 +711,7 @@ function insertImageAsset(asset: Partial<AssetInfo>): boolean {
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent(props.enableFiles)) return false
-  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src: asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title || asset.filename, type: asset.mimeType }
+  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src: asset.id || asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title || asset.filename, type: asset.mimeType }
   if (instance.isActive('file')) instance.chain().focus().updateAttributes('file', { props: payload }).run()
   else instance.chain().focus().setFile(payload).run()
   return true
@@ -778,6 +780,9 @@ watch(() => props.modelValue, (value, previous) => {
   clearPropertyDrafts()
   void loadSource(value)
 })
+watch(hasPendingVisualChanges, (pending) => emit('pending-change', pending), {
+  flush: 'sync',
+})
 watch(() => props.disabled, (disabled) => editor.value?.setEditable(!disabled))
 watch(() => props.authoringKit, () => {
   clearPropertyDrafts()
@@ -804,6 +809,7 @@ const statusLabel = computed(() => {
 defineExpose({
   editor,
   flush,
+  hasPendingChanges: () => hasPendingVisualChanges.value,
   insertFileAsset,
   insertImageAsset,
   insertVideo,
@@ -952,7 +958,7 @@ defineExpose({
           Replace
         </button>
         <button
-          v-if="selectedImage.assetId"
+          v-if="enableImageMetadata && selectedImage.assetId"
           type="button"
           @click="requestSelectedImageMetadata"
         >

@@ -50,6 +50,12 @@ export type EditorFlushResult =
   | { emitted: boolean; ok: true }
   | { error: import('./lib/conversionTypes').ConversionErrorPayload; ok: false }
 
+export interface GinkoEditorHandle {
+  flush: () => Promise<EditorFlushResult>
+  hasPendingChanges: () => boolean
+  removeSelectedMedia: () => boolean
+}
+
 export interface VideoInfo {
   src: string
   title?: string

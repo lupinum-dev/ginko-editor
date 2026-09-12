@@ -124,8 +124,12 @@ describe('GinkoEditor browser journey', () => {
   it('flushes a pending edit before the host closes the component', async () => {
     const wrapper = await mountEditor('Original\n', 120)
     wrapper.vm.editor?.commands.insertContent(' pending')
+    expect(wrapper.vm.hasPendingChanges()).toBe(true)
+    expect(wrapper.emitted('pending-change')?.at(-1)).toEqual([true])
     const result = await wrapper.vm.flush()
     expect(result).toEqual({ emitted: true, ok: true })
+    expect(wrapper.vm.hasPendingChanges()).toBe(false)
+    expect(wrapper.emitted('pending-change')?.at(-1)).toEqual([false])
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('pending')
     const emissions = wrapper.emitted('update:modelValue')!
     wrapper.unmount()
@@ -189,6 +193,7 @@ describe('GinkoEditor browser journey', () => {
     const wrapper = mount(GinkoEditor, {
       attachTo: document.body,
       props: {
+        enableImageMetadata: true,
         assetProvider: {
           buildUrl: () => '/resolved.png',
           parseUrl: () => null,
@@ -219,6 +224,21 @@ describe('GinkoEditor browser journey', () => {
     await clickButton(wrapper, 'Replace')
     const request = wrapper.emitted('request-image')?.at(-1)?.[0] as EditorAssetRequest<Partial<AssetInfo>>
     expect(request.complete({ alt: 'Replacement', id: 'asset_456', url: '/replacement.png' })).toBe(true)
+    await wrapper.vm.flush()
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('asset_456')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).not.toContain('/replacement.png')
+  })
+
+  it('hides image metadata when the host does not support that action', async () => {
+    const wrapper = await mountEditor('')
+    expect(wrapper.vm.insertImageAsset({ id: 'asset_123', filename: 'diagram.png' })).toBe(true)
+    let imagePosition = -1
+    wrapper.vm.editor!.state.doc.descendants((node, position) => {
+      if (imagePosition < 0 && node.type.name === 'image') imagePosition = position
+    })
+    wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Metadata')).toBe(false)
   })
 
   it('keeps block separation when a markdown file is inserted before a heading', async () => {
