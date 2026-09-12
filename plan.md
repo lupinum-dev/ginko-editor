@@ -2310,3 +2310,37 @@ Return the running corrected desktop and 390px example for reviewer operation.
 The review document is restored in Visual mode and saved as the local demo draft;
 viewport overrides are reset. Local corrective commits remain authorized; push,
 publication, Step 6B and Step 5 remain unassigned.
+
+#### 2026-09-12 — Step 6A browser corrections ready for re-review
+
+Corrective implementation `c6ca47f` removes the unconditional editor-focus
+command after property transactions. The selected component remains selected,
+while the browser now follows the natural inspector order: Tab from Information
+Appearance reaches Icon, Tab from Icon reaches Title, and Tab from the
+learning-objective Assessed checkbox reaches its Title. The focused
+authoring-editor regression exercises text, select and toggle transactions,
+asserts that each active form control retains focus during the update, and
+confirms that the selected-block inspector remains mounted.
+
+The narrow playground override now matches the specificity of both `sm` and
+`lg` desktop rules. In the reviewer's nested Information → Layout document at
+the 390 by 844 viewport, both column rectangles are 247 px wide at the same
+64 px left coordinate and occur on separate rows (tops 40 and 130); the document
+client and scroll widths both remain 375 px after browser chrome. Resetting the
+viewport preserves the asymmetric desktop column widths. The more compact page
+heading places the desktop editor toolbar and editable content in the opening
+screen; at 390 px the heading, concise journey help, editor header, toolbar and
+start of the current content all appear in the opening viewport.
+
+The focused regression passes with four authoring-editor tests. Targeted lint,
+Editor type checking and the Editor production build pass. The refreshed Docs
+candidate passes Nuxt type checking. A fresh browser tab after candidate
+preparation has no warning or error logs; transient Vite reload messages from
+the candidate directory replacement were isolated to the prior development tab
+and are not current runtime failures. The complete reviewer document is restored
+in Visual mode in the deliverable tab, and the responsive viewport override is
+reset.
+
+Step 6A is again **READY FOR REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. Step 6B, Step 5, push, publication and
+deployment remain unassigned.
