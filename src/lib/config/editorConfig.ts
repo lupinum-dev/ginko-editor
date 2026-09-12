@@ -92,7 +92,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       videoOutput: options.videoOutput,
     }),
     ...(enableDebug ? [EditorDebug] : []),
-    Element,
+    Element.configure({ getAuthoringKit: options.getAuthoringKit }),
     Slot,
     InlineElement,
     CodeBlock.configure({

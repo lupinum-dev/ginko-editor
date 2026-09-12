@@ -1,372 +1,411 @@
 <script setup lang="ts">
-defineOptions({ name: 'EditorPlaygroundPage' })
-
-import ContentBodyRenderer from '@lupinum/ginko-content/body-renderer'
-import {
-  parseMdcBody,
-  validatePublicMarkdownAst,
-  type ParseMdcBodyResult,
-} from '@lupinum/ginko-content/cms-contract'
-import { GinkoEditor, type EditorFlushResult } from '@lupinum/ginko-editor'
-import type { AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import HostNote from '../components/HostNote.vue'
-import LearningObjective from '../components/LearningObjective.vue'
+import { onBeforeRouteLeave } from 'vue-router'
+import { useHead } from '#imports'
+import { validatePublicMarkdownAst } from '@lupinum/ginko-content/cms-contract'
+import { GinkoEditor, type GinkoEditorHandle, type EditorAssetRequest, type AssetInfo } from '@lupinum/ginko-editor'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isolatedAuthoringKit, playgroundAuthoringKit } from '../playground/contracts'
+import PlaygroundPreview from '../components/PlaygroundPreview.vue'
 
-const incompleteSource = '# Recovery stays safe\n\n<learning-objective title="Incomplete">\nThis tag is intentionally left open.\n'
-const localDraftKey = 'ginko-editor:docs-playground:draft:v1'
-const source = ref('')
+defineOptions({ name: 'EditorPlaygroundPage' })
+useHead({ title: 'Writing playground · Ginko Editor' })
+const example = '# A little structure. A lot of possibility.\n\nGood documents make room for the important things. Start with a thought, give it a shape, and make it your own.\n\n<info title="Make yourself at home" appearance="tint">\nEverything on this page is editable. Type **/** on a new line to add a block, or select some text to format it.\n</info>\n\n## From an idea to a clear page\n\n- Write naturally, with Markdown shortcuts.\n- Add a callout, columns, or a learning objective.\n- See the actual components in the live preview.\n\n> The best tool gets out of the way of your next thought.\n\n'
+const source = ref(example)
+const editor = ref<GinkoEditorHandle>()
+const view = ref<'write' | 'split' | 'preview'>('split')
+const showLibrary = ref(false)
+const showChecks = ref(false)
+const previousDocument = ref<string | null>(null)
 const isolatedSource = ref(isolatedAuthoringKit.recipes[0]?.source ?? '')
-const editor = ref<{ flush: () => Promise<EditorFlushResult> }>()
-const recoverySource = ref('')
-const localDraftAvailable = ref(false)
-const localDraftStatus = ref('This browser only. Nothing is uploaded.')
+const draftKey = 'ginko-editor:docs-playground:draft:v1'
+const draftStatus = ref('Only in this browser')
+const ready = ref(false)
+const pending = ref(false)
+const imageDialog = ref<InstanceType<typeof globalThis.HTMLDialogElement>>()
+const imageUrl = ref('')
+const imageAlt = ref('')
+const imageError = ref('')
+let imageRequest: EditorAssetRequest<Partial<AssetInfo>> | undefined
+function requestImage(request: EditorAssetRequest<Partial<AssetInfo>>) {
+  imageRequest = request
+  imageUrl.value = ''
+  imageAlt.value = ''
+  imageError.value = ''
+  imageDialog.value?.showModal()
+}
+function insertImage() {
+  try {
+    const url = imageUrl.value.trim()
+    const validation = validatePublicMarkdownAst({ type: 'root', children: [{ type: 'element', tag: 'img', props: { src: url, alt: imageAlt.value }, children: [] }] }, playgroundAuthoringKit.policy)
+    if (!url || !validation.ok) throw new Error('Use a public HTTPS image URL or a path such as /image.png.')
+    if (!imageRequest?.complete({ url, alt: imageAlt.value })) throw new Error('The document changed. Select your insertion point and try again.')
+    imageRequest = undefined
+    imageDialog.value?.close()
+  } catch (cause) { imageError.value = cause instanceof Error ? cause.message : 'Check the image URL.' }
+}
+function cancelImage() { imageRequest?.complete(null); imageRequest = undefined; imageDialog.value?.close() }
+let saveTimer: ReturnType<typeof globalThis.setTimeout>
+const wordCount = computed(() => source.value.trim().split(/\s+/).filter(Boolean).length)
+const examples = computed(() => playgroundAuthoringKit.recipes)
 
 onMounted(() => {
-  localDraftAvailable.value = globalThis.localStorage.getItem(localDraftKey) !== null
+  try {
+    const saved = globalThis.localStorage.getItem(draftKey)
+    if (saved !== null) { source.value = saved; draftStatus.value = 'Local draft restored' }
+  } catch { draftStatus.value = 'Browser storage unavailable' }
+  ready.value = true
 })
-
-async function saveLocalDraft() {
+watch(source, () => {
+  if (!ready.value) return
+  draftStatus.value = 'Saving locally…'
+  globalThis.clearTimeout(saveTimer)
+  saveTimer = globalThis.setTimeout(saveDraft, 500)
+})
+function saveDraft() {
+  try { globalThis.localStorage.setItem(draftKey, source.value); draftStatus.value = 'Saved in this browser' }
+  catch { draftStatus.value = 'Could not save locally. Copy your Markdown to keep it.' }
+}
+async function replaceDocument(value: string) {
   const result = await editor.value?.flush()
-  if (result && !result.ok) {
-    localDraftStatus.value = 'Fix the source warning before saving.'
-    return
+  if (result && !result.ok) { draftStatus.value = 'Fix the source warning before changing documents.'; return false }
+  previousDocument.value = source.value
+  source.value = value
+  view.value = 'split'
+  showLibrary.value = false
+  return true
+}
+async function undoReplacement() {
+  if (previousDocument.value === null) return
+  const previous = previousDocument.value
+  if (await replaceDocument(previous)) previousDocument.value = null
+}
+async function setView(value: typeof view.value) {
+  if (value === 'preview') {
+    const result = await editor.value?.flush()
+    if (result && !result.ok) return
   }
-  globalThis.localStorage.setItem(localDraftKey, source.value)
-  localDraftAvailable.value = true
-  localDraftStatus.value = 'Saved in this browser.'
+  view.value = value
 }
-
-function reopenLocalDraft() {
-  const draft = globalThis.localStorage.getItem(localDraftKey)
-  if (draft === null) {
-    localDraftStatus.value = 'No local demo draft is saved yet.'
-    return
-  }
-  source.value = draft
-  localDraftStatus.value = 'Reopened the local demo draft.'
-}
-
-function clearDocument() {
-  source.value = ''
-  localDraftStatus.value = 'Started a new empty document.'
-}
-
-function loadIncompleteSource() {
-  recoverySource.value = source.value
-  source.value = incompleteSource
-}
-
-function recoverSource() {
-  source.value = recoverySource.value
-}
-
-function useCanonicalPreview(markdown: Readonly<{ value: string }>, kit: AuthoringKitV1) {
-  const body = shallowRef<ParseMdcBodyResult['body'] | null>(null)
-  const error = ref<string | null>(null)
-  const state = ref<'current' | 'parsing' | 'stale'>('parsing')
-  let revision = 0
-  let timer: ReturnType<typeof globalThis.setTimeout> | undefined
-
-  watch(() => markdown.value, (value) => {
-    revision += 1
-    const currentRevision = revision
-    if (timer) globalThis.clearTimeout(timer)
-    state.value = 'parsing'
-    timer = globalThis.setTimeout(async () => {
-      try {
-        const parsed = await parseMdcBody(value, { autoClose: false })
-        const validation = validatePublicMarkdownAst(parsed.body, kit.policy)
-        if (!validation.ok) {
-          const issue = validation.issues[0]
-          throw new Error(`Source is outside policy (${issue?.code} at ${issue?.path.join('.')}).`)
-        }
-        if (currentRevision !== revision) return
-        body.value = validation.value
-        error.value = null
-        state.value = 'current'
-      } catch (cause) {
-        if (currentRevision !== revision) return
-        error.value = cause instanceof Error ? cause.message : 'The source could not be parsed.'
-        state.value = 'stale'
-      }
-    }, 120)
-  }, { immediate: true })
-
-  onBeforeUnmount(() => {
-    revision += 1
-    if (timer) globalThis.clearTimeout(timer)
-  })
-  return { body, error, state }
-}
-
-const { body: previewBody, error: previewError, state: previewState } = useCanonicalPreview(source, playgroundAuthoringKit)
-const { body: isolatedPreviewBody, error: isolatedPreviewError, state: isolatedPreviewState } = useCanonicalPreview(isolatedSource, isolatedAuthoringKit)
-const previewComponents = {
-  column: 'MdcColumn',
-  info: 'MdcInfo',
-  layout: 'MdcLayout',
-  'learning-objective': LearningObjective,
-}
-const isolatedPreviewComponents = { 'host-note': HostNote }
-const previewRenderError = ref<string | null>(null)
-const isolatedRenderError = ref<string | null>(null)
-const previewRenderKey = ref(0)
-const isolatedRenderKey = ref(0)
-
-watch(previewBody, () => {
-  previewRenderError.value = null
-  previewRenderKey.value += 1
+onBeforeRouteLeave(async () => {
+  const result = await editor.value?.flush()
+  if (result && !result.ok) return false
+  saveDraft()
 })
-watch(isolatedPreviewBody, () => {
-  isolatedRenderError.value = null
-  isolatedRenderKey.value += 1
-})
-
-const previewDisplayState = computed(() => previewRenderError.value ? 'stale' : previewState.value)
-const isolatedDisplayState = computed(() => isolatedRenderError.value ? 'stale' : isolatedPreviewState.value)
-const previewDisplayError = computed(() => previewRenderError.value ?? previewError.value)
-const isolatedDisplayError = computed(() => isolatedRenderError.value ?? isolatedPreviewError.value)
-
-function renderErrorMessage(cause: unknown) {
-  return cause instanceof Error ? cause.message : 'The rendered preview failed.'
+function protectPendingChanges(event: InstanceType<typeof globalThis.BeforeUnloadEvent>) {
+  if (pending.value) { event.preventDefault(); event.returnValue = '' }
+  else saveOnExit()
 }
+function saveOnExit() { if (ready.value && !pending.value) saveDraft() }
+onMounted(() => { globalThis.addEventListener('pagehide', saveOnExit); globalThis.addEventListener('beforeunload', protectPendingChanges) })
+onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); globalThis.removeEventListener('pagehide', saveOnExit); globalThis.removeEventListener('beforeunload', protectPendingChanges) })
 </script>
 
 <template>
-  <main class="playground-page">
-    <header class="playground-intro">
-      <p class="playground-kicker">
-        Live package playground
-      </p>
-      <h1>Shape the content. See the real page.</h1>
-      <p>Start empty, add structured blocks, and inspect the canonical Markdown whenever you need it. The preview uses the built Ginko packages and real Docs components.</p>
-    </header>
-
-    <section
-      aria-labelledby="main-playground-title"
-      class="playground-section"
-    >
-      <div class="playground-section__header">
-        <div>
-          <h2 id="main-playground-title">
-            A complete authoring journey
-          </h2>
-          <p>In the empty editor, type <kbd>/note</kbd> and press <kbd>Enter</kbd>. Use <strong>+ Insert</strong> for touch or pointer input.</p>
-        </div>
+  <main
+    id="main-content"
+    class="writing-workspace"
+  >
+    <header class="workspace-heading">
+      <div class="workspace-breadcrumb">
+        <img
+          class="workspace-mark"
+          src="/icon.svg"
+          alt=""
+        ><span>Ginko Editor</span><span aria-hidden="true">/</span><strong>Playground</strong>
+      </div>
+      <div class="workspace-actions">
         <button
-          class="playground-new"
           type="button"
-          @click="clearDocument"
+          :aria-expanded="showLibrary"
+          @click="showLibrary = !showLibrary"
         >
-          New empty document
+          <span aria-hidden="true">▦</span> Block library
+        </button>
+        <button
+          type="button"
+          @click="replaceDocument('')"
+        >
+          <span aria-hidden="true">+</span> New page
         </button>
       </div>
+    </header>
 
-      <div class="playground-grid">
-        <div class="playground-panel">
-          <div class="playground-panel__label">
-            <span>Canonical authoring surface</span><span>In memory</span>
-          </div>
-          <GinkoEditor
-            ref="editor"
-            v-model="source"
-            :authoring-kit="playgroundAuthoringKit"
-            aria-label="Main playground editor"
-            placeholder="Start writing, or type / for blocks…"
-          />
-          <section
-            class="playground-local"
-            aria-labelledby="local-draft-title"
-          >
-            <div>
-              <h3 id="local-draft-title">
-                Local demo draft
-              </h3>
-              <p role="status">
-                {{ localDraftStatus }}
-              </p>
-            </div>
-            <div class="playground-local__actions">
-              <button
-                type="button"
-                @click="saveLocalDraft"
-              >
-                Save locally
-              </button>
-              <button
-                type="button"
-                :disabled="!localDraftAvailable"
-                @click="reopenLocalDraft"
-              >
-                Reopen
-              </button>
-              <button
-                type="button"
-                @click="loadIncompleteSource"
-              >
-                Try incomplete source
-              </button>
-              <button
-                v-if="previewDisplayState === 'stale' && recoverySource !== source"
-                type="button"
-                @click="recoverSource"
-              >
-                Recover last valid source
-              </button>
-            </div>
-          </section>
-        </div>
+    <div class="workspace-subheading">
+      <div><h1>A space to think, write, and build.</h1><p>Your content. Real components. One uninterrupted writing flow.</p></div>
+      <div
+        class="workspace-views"
+        role="group"
+        aria-label="Workspace view"
+      >
+        <button
+          v-for="mode in (['write', 'split', 'preview'] as const)"
+          :key="mode"
+          type="button"
+          :aria-pressed="view === mode"
+          @click="setView(mode)"
+        >
+          {{ { write: 'Write', split: 'Split view', preview: 'Preview' }[mode] }}
+        </button>
+      </div>
+    </div>
 
-        <div class="playground-panel playground-panel--preview">
-          <div class="playground-panel__label">
-            <span>Real Docs preview</span>
-            <span
-              role="status"
-              :data-state="previewDisplayState"
-            >{{ previewDisplayState }}</span>
+    <section
+      v-if="showLibrary"
+      class="block-library"
+      aria-label="Block library"
+    >
+      <div class="library-heading">
+        <div><h2>A good starting point.</h2><p>These are the actual components your readers will see.</p></div><button
+          type="button"
+          aria-label="Close block library"
+          @click="showLibrary = false"
+        >
+          ×
+        </button>
+      </div>
+      <div class="library-grid">
+        <article
+          v-for="recipe in examples"
+          :key="recipe.id"
+          class="library-card"
+        >
+          <div class="library-card-preview">
+            <PlaygroundPreview
+              :source="recipe.source"
+              :kit="playgroundAuthoringKit"
+              compact
+            />
           </div>
-          <div
-            v-if="previewDisplayError"
-            class="playground-error"
-            role="alert"
-          >
-            Preview is stale. {{ previewDisplayError }} Your source is unchanged.
-          </div>
-          <div
-            class="playground-preview content-prose"
-            :aria-busy="previewDisplayState === 'parsing'"
-          >
-            <NuxtErrorBoundary
-              v-if="previewBody"
-              :key="previewRenderKey"
-              @error="previewRenderError = renderErrorMessage($event)"
+          <div class="library-card-footer">
+            <strong>{{ recipe.label }}</strong><button
+              type="button"
+              @click="replaceDocument(recipe.source)"
             >
-              <ContentBodyRenderer
-                :body="previewBody"
-                :policy="playgroundAuthoringKit.policy"
-                :components="previewComponents"
-                :prose="true"
-              />
-            </NuxtErrorBoundary>
-            <p
-              v-else
-              class="playground-empty"
-            >
-              Your rendered page will appear here.
-            </p>
+              Try example <span aria-hidden="true">↗</span>
+            </button>
           </div>
-        </div>
+        </article>
       </div>
     </section>
 
-    <section
-      aria-labelledby="isolation-title"
-      class="playground-section playground-section--quiet"
+    <div
+      v-if="previousDocument !== null"
+      class="document-notice"
+      role="status"
     >
-      <div class="playground-section__header">
-        <div>
-          <p class="playground-kicker">
-            Isolation check
-          </p>
-          <h2 id="isolation-title">
-            A different editor, a different kit
-          </h2>
-          <p>This editor accepts only its local <code>host-note</code>. Main-editor registrations do not leak into it.</p>
+      <span>Page changed. Your previous document is still available.</span><button
+        type="button"
+        @click="undoReplacement"
+      >
+        Undo
+      </button>
+    </div>
+
+    <div
+      class="document-workspace"
+      :data-view="view"
+    >
+      <section
+        v-show="view !== 'preview'"
+        class="document-panel document-panel--editor"
+        aria-label="Writing canvas"
+      >
+        <div class="panel-heading">
+          <span><span class="panel-dot" /> Writing canvas</span><span class="panel-hint">Type / to add a block</span>
         </div>
-      </div>
-      <div class="playground-grid playground-grid--quiet">
-        <div class="playground-panel">
-          <GinkoEditor
-            v-model="isolatedSource"
-            :authoring-kit="isolatedAuthoringKit"
-            aria-label="Isolated kit editor"
+        <GinkoEditor
+          v-if="ready"
+          ref="editor"
+          v-model="source"
+          :authoring-kit="playgroundAuthoringKit"
+          :enable-files="false"
+          :enable-video="false"
+          image-output="markdown"
+          aria-label="Main playground editor"
+          placeholder="Write something, or type / for blocks…"
+          @request-image="requestImage"
+          @pending-change="pending = $event"
+        >
+          <template #recipe-preview="{ recipe }">
+            <PlaygroundPreview
+              :source="recipe.source"
+              :kit="playgroundAuthoringKit"
+              compact
+            />
+          </template>
+        </GinkoEditor>
+      </section>
+      <section
+        v-show="view !== 'write'"
+        class="document-panel document-panel--preview"
+        aria-label="Rendered page preview"
+      >
+        <div class="panel-heading">
+          <span><span class="panel-dot panel-dot--live" /> Live preview</span><span class="panel-hint">What your readers see</span>
+        </div>
+        <div class="reader-page">
+          <PlaygroundPreview
+            :source="source"
+            :kit="playgroundAuthoringKit"
           />
         </div>
-        <div class="playground-panel">
-          <div class="playground-panel__label">
-            <span>Isolated preview</span>
-            <span
-              role="status"
-              :data-state="isolatedDisplayState"
-            >{{ isolatedDisplayState }}</span>
-          </div>
-          <div
-            v-if="isolatedDisplayError"
-            class="playground-error"
-            role="alert"
+      </section>
+    </div>
+
+    <footer class="workspace-footer">
+      <span role="status"><span class="save-dot" />{{ pending ? 'Updating document…' : draftStatus }}</span><span>{{ wordCount }} source words <span aria-hidden="true">·</span> Markdown + components</span>
+    </footer>
+    <div class="workspace-help">
+      <span><kbd>/</kbd> insert blocks <span aria-hidden="true">·</span> <kbd>Ctrl/⌘</kbd><kbd>Z</kbd> undo <span aria-hidden="true">·</span> Select a block to edit its properties</span><button
+        type="button"
+        @click="replaceDocument(example)"
+      >
+        Load welcome page
+      </button>
+    </div>
+
+    <dialog
+      ref="imageDialog"
+      class="image-dialog"
+      aria-labelledby="image-dialog-title"
+      @cancel="cancelImage"
+    >
+      <form @submit.prevent="insertImage">
+        <div class="library-heading">
+          <div>
+            <h2 id="image-dialog-title">
+              Add an image
+            </h2><p>Give your readers something to see.</p>
+          </div><button
+            type="button"
+            aria-label="Close image dialog"
+            @click="cancelImage"
           >
-            Preview is stale. {{ isolatedDisplayError }} Your source is unchanged.
-          </div>
-          <div
-            class="playground-preview content-prose"
-            :aria-busy="isolatedDisplayState === 'parsing'"
-          >
-            <NuxtErrorBoundary
-              v-if="isolatedPreviewBody"
-              :key="isolatedRenderKey"
-              @error="isolatedRenderError = renderErrorMessage($event)"
-            >
-              <ContentBodyRenderer
-                :body="isolatedPreviewBody"
-                :policy="isolatedAuthoringKit.policy"
-                :components="isolatedPreviewComponents"
-                :prose="true"
-              />
-            </NuxtErrorBoundary>
-          </div>
+            ×
+          </button>
         </div>
+        <label>Image URL<input
+          v-model="imageUrl"
+          type="text"
+          inputmode="url"
+          required
+          placeholder="https://example.com/image.jpg"
+          autofocus
+        ></label>
+        <label>Description<input
+          v-model="imageAlt"
+          placeholder="Describe the image for someone who cannot see it"
+        ></label>
+        <p
+          v-if="imageError"
+          role="alert"
+        >
+          {{ imageError }}
+        </p>
+        <div class="image-dialog-actions">
+          <button
+            type="button"
+            @click="cancelImage"
+          >
+            Cancel
+          </button><button type="submit">
+            Insert image
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <section class="integration-checks">
+      <button
+        type="button"
+        :aria-expanded="showChecks"
+        @click="showChecks = !showChecks"
+      >
+        Integration checks <span aria-hidden="true">{{ showChecks ? '−' : '+' }}</span>
+      </button>
+      <div
+        v-if="showChecks"
+        class="checks-content"
+      >
+        <h2>An independent authoring kit</h2><p>This second editor accepts only its own host note. Registrations stay local to each editor.</p><GinkoEditor
+          v-model="isolatedSource"
+          :authoring-kit="isolatedAuthoringKit"
+          aria-label="Isolated kit editor"
+        /><PlaygroundPreview
+          :source="isolatedSource"
+          :kit="isolatedAuthoringKit"
+        />
       </div>
     </section>
   </main>
 </template>
 
 <style scoped>
-.playground-page { width: min(100% - 2rem, 92rem); margin: 0 auto; padding: clamp(1.75rem, 4vw, 3.25rem) 0; }
-.playground-intro { max-width: 58rem; margin-bottom: clamp(1.75rem, 3vw, 2.5rem); }
-.playground-intro h1 { max-width: 18ch; margin: .3rem 0 .7rem; font-size: clamp(2.15rem, 4vw, 3.5rem); line-height: 1; letter-spacing: -.045em; }
-.playground-intro > p:last-child { max-width: 42rem; font-size: 1.05rem; line-height: 1.65; }
-.playground-intro > p:last-child, .playground-section__header p { margin: 0; color: var(--muted-foreground); }
-.playground-kicker { margin: 0; color: var(--primary); font-size: .72rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
-.playground-section { border-top: 1px solid var(--border); padding: 1.75rem 0 4rem; }
-.playground-section--quiet { padding-bottom: 0; }
-.playground-section__header { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
-.playground-section__header > div { max-width: 48rem; }
-.playground-section__header h2 { margin: 0 0 .35rem; font-size: clamp(1.25rem, 2vw, 1.55rem); letter-spacing: -.02em; }
-.playground-section__header kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: .3rem; background: var(--muted); padding: .05rem .3rem; color: var(--foreground); font: .82em/1.4 ui-monospace, monospace; }
-.playground-new, .playground-local button { min-height: 2.5rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--card); color: var(--foreground); padding: .45rem .75rem; font: 600 .82rem/1.2 inherit; cursor: pointer; }
-.playground-new:hover, .playground-local button:hover { background: var(--muted); }
-.playground-new:focus-visible, .playground-local button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.playground-local button:disabled { cursor: not-allowed; opacity: .5; }
-.playground-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(22rem, .95fr); gap: clamp(1rem, 2vw, 1.5rem); align-items: start; }
-.playground-panel { min-width: 0; }
-.playground-panel--preview { position: sticky; top: 1rem; }
-.playground-panel__label { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; color: var(--muted-foreground); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.playground-panel__label [data-state='current'] { color: var(--success); }
-.playground-panel__label [data-state='stale'] { color: var(--destructive); }
-.playground-preview { min-height: 30rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--card); padding: clamp(1.15rem, 3vw, 2rem); }
-.playground-empty { margin: 8rem auto 0; color: var(--muted-foreground); text-align: center; }
-.playground-error { margin-bottom: .5rem; border: 1px solid color-mix(in oklab, var(--destructive) 35%, var(--border)); border-radius: .5rem; background: color-mix(in oklab, var(--destructive) 8%, var(--card)); padding: .65rem .75rem; color: var(--foreground); font-size: .82rem; }
-.playground-local { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .75rem; border: 1px solid var(--border); border-radius: .65rem; background: color-mix(in oklab, var(--card) 88%, var(--muted)); padding: .75rem; }
-.playground-local h3, .playground-local p { margin: 0; }
-.playground-local h3 { font-size: .82rem; }
-.playground-local p { color: var(--muted-foreground); font-size: .72rem; }
-.playground-local__actions { display: flex; flex-wrap: wrap; justify-content: end; gap: .4rem; }
-.playground-section--quiet .ginko-editor, .playground-section--quiet .playground-preview { min-height: auto; }
-.playground-grid--quiet { opacity: .88; }
-:deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout']) { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .75rem; }
-:deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column']) { grid-column: span 6; }
-:deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='sm']) { grid-column: span 4; }
-:deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='lg']) { grid-column: span 8; }
-@media (max-width: 800px) {
-  .playground-section__header, .playground-local { align-items: stretch; flex-direction: column; }
-  .playground-grid { grid-template-columns: 1fr; }
-  .playground-panel--preview { position: static; }
-  .playground-preview { min-height: 18rem; }
-  .playground-local__actions { justify-content: start; }
-  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column']),
-  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='sm']),
-  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='lg']) { grid-column: 1 / -1; }
-}
+.writing-workspace { max-width: 1500px; margin-inline: auto; padding: 0 clamp(1rem, 3vw, 3rem) 3rem; color: var(--foreground); }
+.writing-workspace button { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 36px; border: 1px solid transparent; border-radius: .4rem; background: transparent; padding: .4rem .7rem; font: inherit; font-size: .8rem; cursor: pointer; }
+.writing-workspace button:hover { background: var(--muted); }
+.writing-workspace button:focus-visible { outline-offset: 3px; }
+.workspace-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
+.workspace-breadcrumb, .workspace-actions { display: flex; align-items: center; gap: .7rem; font-size: .8rem; }
+.workspace-breadcrumb { color: var(--muted-foreground); }
+.workspace-breadcrumb strong { color: var(--foreground); font-weight: 500; }
+.workspace-mark { width: 29px; height: 29px; border-radius: .5rem; }
+.workspace-actions button:last-child { border-color: var(--border); }
+.workspace-subheading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 2rem 0 1.5rem; }
+.workspace-subheading h1 { font-size: clamp(1.3rem, 2.4vw, 1.8rem); letter-spacing: -.035em; font-weight: 600; margin: 0 0 .4rem; line-height: 1.25; }
+.workspace-subheading p { margin: 0; color: var(--muted-foreground); font-size: .85rem; }
+.workspace-views { display: flex; gap: .15rem; padding: .2rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--muted); flex-shrink: 0; }
+.workspace-views button { min-height: 30px; white-space: nowrap; }
+.workspace-views button[aria-pressed='true'] { background: var(--card); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.document-workspace { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: .7rem; background: var(--card); }
+.document-workspace[data-view='write'], .document-workspace[data-view='preview'] { grid-template-columns: 1fr; }
+.document-panel { min-width: 0; }
+.document-panel--preview { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--card) 97%, var(--foreground)); border-radius: 0 .7rem .7rem 0; }
+[data-view='preview'] .document-panel--preview { border-left: 0; border-radius: .7rem; }
+.panel-heading { height: 43px; display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid var(--border); padding-inline: 1rem; font-size: .72rem; color: var(--muted-foreground); }
+.panel-heading > span:first-child { display: flex; align-items: center; gap: .45rem; font-weight: 550; color: var(--foreground); }
+.panel-dot, .save-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-foreground); }
+.panel-dot--live, .save-dot { background: #6b9872; }
+.reader-page { max-width: 48rem; min-height: 660px; margin-inline: auto; padding: clamp(1.5rem, 3.5vw, 3rem); }
+.document-panel :deep(.ginko-editor) { border: 0; border-radius: 0 0 .7rem .7rem; }
+.document-panel :deep(.ginko-editor__header) { padding: .35rem .6rem; border-bottom: 0; }
+.document-panel :deep(.ginko-editor__status) { display: none; }
+.document-panel :deep(.ginko-editor__header) { grid-template-columns: 1fr auto; }
+.document-panel :deep(.ginko-editor__modes button) { font-size: .73rem; min-height: 30px; }
+.document-panel :deep(.ginko-editor__insert-trigger) { font-size: .78rem; }
+.document-panel :deep(.ginko-editor__toolbar) { padding-block: .2rem; }
+.document-panel :deep(.ginko-editor__surface) { padding: clamp(1.5rem, 3.5vw, 3rem); }
+.document-panel :deep(.ProseMirror) { min-height: 510px; font-size: 15px; line-height: 1.75; }
+.document-panel :deep(.ginko-editor__source) { min-height: 660px; padding: 2rem; line-height: 1.9; }
+.document-panel :deep(.ProseMirror div[data-type='element'][tag='info']) { background: color-mix(in srgb, #79a284 10%, var(--card)); border-color: color-mix(in srgb, #79a284 25%, var(--border)); }
+.document-panel :deep(.ProseMirror div[data-type='element'][tag='layout']) { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; background: transparent; }
+.document-panel :deep(.ProseMirror div[data-type='element'][tag='column']) { padding: 1.8rem .75rem .75rem; background: transparent; }
+.document-panel :deep(.ProseMirror div[data-type='element'] p) { margin: .35rem 0; }
+.workspace-footer { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem .2rem; color: var(--muted-foreground); font-size: .7rem; }
+.workspace-footer > span:first-child { display: flex; align-items: center; gap: .4rem; }
+.workspace-help { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: var(--muted-foreground); font-size: .72rem; }
+.workspace-help kbd { display: inline-block; min-width: 17px; border: 1px solid var(--border); border-radius: .25rem; padding: .05rem .2rem; margin-inline: .1rem; text-align: center; font: inherit; }
+.block-library { border: 1px solid var(--border); border-radius: .7rem; padding: 1.2rem; margin-bottom: 1.5rem; background: var(--card); }
+.library-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
+.library-heading h2 { margin: 0 0 .3rem; font-size: 1rem; }
+.library-heading p { margin: 0; font-size: .8rem; color: var(--muted-foreground); }
+.library-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.library-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: .5rem; min-width: 0; }
+.library-card-preview { padding: 1rem; flex: 1; min-height: 160px; }
+.library-card-footer { display: flex; align-items: center; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--border); padding: .5rem .6rem .5rem .9rem; font-size: .8rem; }
+.library-card-footer strong { font-weight: 550; }
+.document-notice { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .75rem; margin-bottom: .75rem; border: 1px solid var(--border); border-radius: .5rem; font-size: .8rem; }
+.document-notice button { text-decoration: underline; }
+.image-dialog { width: min(30rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--card); color: var(--foreground); box-shadow: 0 20px 80px rgb(0 0 0 / .25); }
+.image-dialog::backdrop { background: rgb(0 0 0 / .4); }
+.image-dialog label { display: grid; gap: .5rem; font-size: .8rem; margin: 1.2rem 0; }
+.image-dialog input { width: 100%; border: 1px solid var(--border); border-radius: .4rem; padding: .7rem; background: var(--background); color: var(--foreground); }
+.image-dialog-actions { display: flex; gap: .5rem; justify-content: end; }
+.image-dialog-actions button:last-child { background: var(--foreground); color: var(--background); }
+.integration-checks { border-top: 1px solid var(--border); margin-top: 2rem; }
+.integration-checks > button { width: 100%; justify-content: space-between; color: var(--muted-foreground); padding: 1rem 0; }
+.checks-content { max-width: 50rem; padding-block: 1rem; }
+.checks-content h2 { font-size: 1.1rem; }
+.checks-content > p { font-size: .85rem; margin-bottom: 1rem; color: var(--muted-foreground); }
+@media (max-width: 850px) { .workspace-subheading { align-items: start; flex-direction: column; } .document-workspace { grid-template-columns: 1fr; } .document-panel--preview { border-left: 0; border-top: 1px solid var(--border); } .reader-page { min-height: 320px; } .library-grid { grid-template-columns: 1fr; } .library-card-preview { min-height: 100px; } .workspace-help { align-items: start; flex-direction: column; gap: .4rem; } }
+@media (max-width: 500px) { .workspace-heading { align-items: start; flex-direction: column; gap: .7rem; } .workspace-actions { width: 100%; justify-content: space-between; } .panel-hint { display: none; } .workspace-footer { flex-direction: column; gap: .4rem; } .writing-workspace button { min-height: 40px; } .document-panel :deep(.ginko-editor__surface) { padding: 1.2rem; } .document-panel :deep(.ProseMirror div[data-type='element'][tag='layout']) { grid-template-columns: 1fr; } }
 </style>

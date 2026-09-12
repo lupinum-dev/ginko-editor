@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/vue-3'
-import { ref, useId } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useId } from 'vue'
 
 defineProps<{
   editor: Editor
@@ -16,22 +16,36 @@ const emit = defineEmits<{
 
 const showMore = ref(false)
 const moreId = useId()
+const toolbarRoot = ref<InstanceType<typeof globalThis.HTMLElement>>()
+function dismiss(event: globalThis.PointerEvent) {
+  if (event.target instanceof globalThis.Node && !toolbarRoot.value?.contains(event.target)) showMore.value = false
+}
+function escape(event: globalThis.KeyboardEvent) {
+  if (event.key !== 'Escape' || !showMore.value) return
+  showMore.value = false
+  toolbarRoot.value?.querySelector<globalThis.HTMLButtonElement>('.ginko-editor__toolbar-more-trigger')?.focus()
+}
+onMounted(() => globalThis.document.addEventListener('pointerdown', dismiss))
+onBeforeUnmount(() => globalThis.document.removeEventListener('pointerdown', dismiss))
 </script>
 
 <template>
   <div
+    ref="toolbarRoot"
     class="ginko-editor__toolbar"
     aria-label="Rich text formatting tools"
+    @keydown="escape"
   >
     <div
       class="ginko-editor__toolbar-primary"
-      role="toolbar"
+      role="group"
       aria-label="Text formatting"
     >
       <button
         type="button"
         aria-label="Undo"
-        title="Undo"
+        title="Undo (⌘/Ctrl Z)"
+        :disabled="!editor.can().undo()"
         @click="editor.chain().focus().undo().run()"
       >
         ↶
@@ -39,7 +53,8 @@ const moreId = useId()
       <button
         type="button"
         aria-label="Redo"
-        title="Redo"
+        title="Redo (⌘/Ctrl Shift Z)"
+        :disabled="!editor.can().redo()"
         @click="editor.chain().focus().redo().run()"
       >
         ↷
@@ -52,6 +67,7 @@ const moreId = useId()
         type="button"
         :aria-pressed="editor.isActive('bold')"
         aria-label="Bold"
+        title="Bold (⌘/Ctrl B)"
         @click="editor.chain().focus().toggleBold().run()"
       >
         <strong>B</strong>
@@ -60,6 +76,7 @@ const moreId = useId()
         type="button"
         :aria-pressed="editor.isActive('italic')"
         aria-label="Italic"
+        title="Italic (⌘/Ctrl I)"
         @click="editor.chain().focus().toggleItalic().run()"
       >
         <em>I</em>
@@ -92,7 +109,7 @@ const moreId = useId()
       v-if="showMore"
       :id="moreId"
       class="ginko-editor__toolbar-more"
-      role="toolbar"
+      role="group"
       aria-label="More formatting"
     >
       <button
@@ -179,6 +196,7 @@ const moreId = useId()
 .ginko-editor__toolbar-primary { display: flex; min-width: 0; align-items: center; gap: .15rem; overflow-x: auto; }
 .ginko-editor__toolbar button { min-height: 2.25rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; cursor: pointer; padding: .35rem .6rem; white-space: nowrap; }
 .ginko-editor__toolbar button:hover, .ginko-editor__toolbar button[aria-pressed='true'] { background: var(--ginko-muted); }
+.ginko-editor__toolbar button:disabled { opacity: .35; cursor: default; }
 .ginko-editor__toolbar button:focus-visible { outline-offset: 2px; }
 .ginko-editor__toolbar-divider { align-self: stretch; border-inline-start: 1px solid var(--ginko-border); margin: .2rem .2rem; }
 .ginko-editor__toolbar-more-trigger { flex: 0 0 auto; }

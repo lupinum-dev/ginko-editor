@@ -20,6 +20,7 @@ import type {
   VideoInfo,
 } from './types'
 import GinkoToolbar from './ui/GinkoToolbar.vue'
+import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
 
 defineOptions({ name: 'GinkoEditor' })
 
@@ -92,6 +93,14 @@ type BrowserEvent = InstanceType<typeof globalThis.Event>
 
 const insertSearch = ref<BrowserInputElement>()
 const insertMenuId = useId()
+const editorRoot = ref<InstanceType<typeof globalThis.HTMLElement>>()
+const insertMenu = ref<InstanceType<typeof globalThis.HTMLElement>>()
+let menuResizeObserver: InstanceType<typeof globalThis.ResizeObserver> | undefined
+watch(insertMenu, (element) => {
+  menuResizeObserver?.disconnect()
+  if (element) menuResizeObserver?.observe(element)
+})
+const insertPosition = ref({ left: '8px', top: '48px', maxHeight: '420px' })
 const componentSettingsId = useId()
 const propertyDrafts = ref<Record<string, string>>({})
 const propertyErrors = ref<Record<string, string>>({})
@@ -138,10 +147,10 @@ const editor = useEditor({
 
 const filteredRecipes = computed(() => {
   const query = insertQuery.value.trim().toLocaleLowerCase()
-  const recipes = props.authoringKit?.recipes ?? []
+  const recipes = [...(props.authoringKit?.recipes ?? []), ...writingRecipes]
   if (!query) return recipes
   return recipes.filter((recipe) =>
-    [recipe.id, recipe.label, ...(recipe.keywords ?? [])]
+    [recipe.id, recipe.label, recipe.description ?? '', ...(recipe.keywords ?? [])]
       .join(' ')
       .toLocaleLowerCase()
       .includes(query),
@@ -294,6 +303,34 @@ function valueFromOption(options: readonly JsonValue[], value: string): JsonValu
   return options.find((option) => String(option) === value)
 }
 
+const activeRecipe = computed(() => filteredRecipes.value[insertIndex.value])
+watch([insertQuery, activeRecipe], () => { void nextTick(positionInsertMenu) })
+
+function positionInsertMenu() {
+  const instance = editor.value
+  const root = editorRoot.value
+  if (!instance || !root || !insertMenuOpen.value) return
+  const bounds = root.getBoundingClientRect()
+  const anchor = insertMenuOrigin.value === 'slash'
+    ? instance.view.coordsAtPos(insertSelection?.from ?? instance.state.selection.from)
+    : { left: bounds.left + 12, bottom: bounds.top + 48, top: bounds.top + 48 }
+  const below = globalThis.innerHeight - anchor.bottom - 20
+  const above = anchor.top - 20
+  const opensAbove = below < 240 && above > below
+  const available = Math.max(160, Math.min(440, opensAbove ? above : below))
+  const height = Math.min(insertMenu.value?.getBoundingClientRect().height || available, available)
+  const top = opensAbove ? Math.max(12, anchor.top - height - 8) : anchor.bottom + 8
+  insertPosition.value = {
+    left: `${Math.max(8 - bounds.left, Math.min(anchor.left, globalThis.innerWidth - (insertMenu.value?.getBoundingClientRect().width || 320) - 12) - bounds.left)}px`,
+    top: `${top - bounds.top}px`,
+    maxHeight: `${available}px`,
+  }
+}
+
+function dismissOutside(event: globalThis.PointerEvent) {
+  if (insertMenuOpen.value && event.target instanceof globalThis.Node && !insertMenu.value?.contains(event.target) && !(event.target instanceof globalThis.Element && event.target.closest('.ginko-editor__insert-trigger'))) closeInsertMenu(false)
+}
+
 function canOpenSlashMenu(instance: TiptapEditor) {
   const { selection } = instance.state
   if (!selection.empty || selection.$from.parent.type.name !== 'paragraph') return false
@@ -302,23 +339,25 @@ function canOpenSlashMenu(instance: TiptapEditor) {
 
 async function openInsertMenu(origin: 'button' | 'slash') {
   const instance = editor.value
-  if (!instance || !props.authoringKit?.recipes.length || !canMutateVisualContent()) return
+  if (!instance || !canMutateVisualContent()) return
   insertSelection = { from: instance.state.selection.from, to: instance.state.selection.to }
   insertMenuOrigin.value = origin
   insertQuery.value = ''
   insertIndex.value = 0
   insertError.value = null
   insertMenuOpen.value = true
-  if (origin === 'button') {
-    await nextTick()
-    insertSearch.value?.focus()
-  }
+  const openingSelection = insertSelection
+  await nextTick()
+  if (!insertMenuOpen.value || insertSelection !== openingSelection) return
+  positionInsertMenu()
+  insertSearch.value?.focus()
 }
 
 function restoreInsertSelection(selection = insertSelection) {
   const instance = editor.value
   if (!instance || !selection) return
-  instance.chain().setTextSelection(selection).focus().run()
+  instance.chain().setTextSelection(selection).run()
+  instance.view.focus()
 }
 
 function closeInsertMenu(restore = true) {
@@ -327,13 +366,14 @@ function closeInsertMenu(restore = true) {
   insertQuery.value = ''
   insertError.value = null
   insertSelection = undefined
-  if (restore) void nextTick(() => restoreInsertSelection(selection))
+  if (restore) restoreInsertSelection(selection)
 }
 
 function moveInsertSelection(offset: number) {
   const count = filteredRecipes.value.length
   if (!count) return
   insertIndex.value = (insertIndex.value + offset + count) % count
+  void nextTick(() => insertMenu.value?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }))
 }
 
 function parentComponentTag(instance: TiptapEditor): string | undefined {
@@ -349,7 +389,7 @@ function parentComponentTag(instance: TiptapEditor): string | undefined {
 
 function placementError(instance: TiptapEditor, document: JSONContent): string | undefined {
   const kit = props.authoringKit
-  if (!kit) return 'No authoring kit is available.'
+  if (!kit) return undefined
   const parent = parentComponentTag(instance)
   const parentPolicy = parent ? kit.policy.components[parent] : undefined
   for (const node of document.content ?? []) {
@@ -463,7 +503,15 @@ function protectComponentBoundary(instance: TiptapEditor, event: BrowserKeyboard
 
 async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
   const instance = editor.value
-  if (!recipe || !instance || !insertSelection || !props.authoringKit || insertBusy.value) return
+  if (!recipe || !instance || !insertSelection || insertBusy.value) return
+  const documentAtStart = instance.state.doc
+  const selectionAtStart = insertSelection
+  if (isImageRecipe(recipe)) {
+    restoreInsertSelection()
+    closeInsertMenu(false)
+    requestImage()
+    return
+  }
   insertBusy.value = true
   insertError.value = null
   try {
@@ -473,6 +521,7 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
       instance.schema,
       props.authoringKit,
     )
+    if (disposed || !insertMenuOpen.value || insertSelection !== selectionAtStart || instance.state.doc !== documentAtStart || !canMutateVisualContent()) return
     if (!prepared.ok || !prepared.value) {
       insertError.value = 'This block cannot be prepared safely.'
       return
@@ -485,12 +534,18 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
     const content = prepared.value.content ?? []
     instance.chain().setTextSelection(insertSelection).focus().insertContent(content).run()
     closeInsertMenu(false)
+    instance.view.focus()
   } finally {
     insertBusy.value = false
   }
 }
 
 function handleInsertKeys(event: BrowserKeyboardEvent) {
+  if (event.isComposing) return false
+  if (event.key === 'Tab') {
+    closeInsertMenu(false)
+    return false
+  }
   if (event.key === 'Escape') {
     event.preventDefault()
     closeInsertMenu()
@@ -571,6 +626,7 @@ function clearFailure(traceId: string) {
 }
 
 async function loadSource(value: string, options: { initial?: boolean; switchToVisual?: boolean } = {}) {
+  closeInsertMenu(false)
   cancelPendingUpdate()
   const currentRevision = revision
   rawContent.value = value
@@ -801,8 +857,18 @@ watch(() => props.authoringKit, () => {
   })()
 })
 
-onMounted(() => { void loadSource(props.modelValue, { initial: true }) })
+onMounted(() => {
+  if (globalThis.ResizeObserver) menuResizeObserver = new globalThis.ResizeObserver(positionInsertMenu)
+  void loadSource(props.modelValue, { initial: true })
+  globalThis.document.addEventListener('pointerdown', dismissOutside)
+  globalThis.addEventListener('resize', positionInsertMenu)
+  globalThis.addEventListener('scroll', positionInsertMenu, true)
+})
 onBeforeUnmount(() => {
+  globalThis.document.removeEventListener('pointerdown', dismissOutside)
+  globalThis.removeEventListener('resize', positionInsertMenu)
+  globalThis.removeEventListener('scroll', positionInsertMenu, true)
+  menuResizeObserver?.disconnect()
   disposed = true
   cancelPendingUpdate()
   editor.value?.destroy()
@@ -829,13 +895,14 @@ defineExpose({
 
 <template>
   <div
+    ref="editorRoot"
     class="ginko-editor"
     :data-mode="viewMode"
     :data-invalid="conversionError ? 'true' : undefined"
   >
     <div class="ginko-editor__header">
       <button
-        v-if="authoringKit?.recipes.length && viewMode === 'visual'"
+        v-if="viewMode === 'visual'"
         class="ginko-editor__insert-trigger"
         type="button"
         :aria-controls="insertMenuId"
@@ -875,8 +942,10 @@ defineExpose({
     </div>
     <div
       v-if="insertMenuOpen"
-      :id="insertMenuId"
+      ref="insertMenu"
       class="ginko-editor__insert-menu"
+      :class="{ 'ginko-editor__insert-menu--preview': activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview'] }"
+      :style="insertPosition"
       @keydown="handleInsertSearchKeydown"
     >
       <label class="ginko-editor__insert-search">
@@ -885,27 +954,41 @@ defineExpose({
         <input
           ref="insertSearch"
           v-model="insertQuery"
-          :readonly="insertMenuOrigin === 'slash'"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          :aria-controls="insertMenuId"
+          :aria-activedescendant="activeRecipe ? `${insertMenuId}-${insertIndex}` : undefined"
           autocomplete="off"
           placeholder="Search blocks"
         >
       </label>
       <div
+        :id="insertMenuId"
         class="ginko-editor__insert-results"
         role="listbox"
         aria-label="Available blocks"
       >
         <button
           v-for="(recipe, index) in filteredRecipes"
-          :key="recipe.id"
+          :id="`${insertMenuId}-${index}`"
+          :key="`${index}-${recipe.id}`"
+          tabindex="-1"
           type="button"
           role="option"
           :aria-selected="index === insertIndex"
           @mouseenter="insertIndex = index"
           @click="insertRecipe(recipe)"
         >
-          <strong>{{ recipe.label }}</strong>
-          <span v-if="recipe.keywords?.length">{{ recipe.keywords.join(' · ') }}</span>
+          <span
+            class="ginko-editor__recipe-symbol"
+            aria-hidden="true"
+          >{{ recipeSymbol(recipe) }}</span>
+          <span class="ginko-editor__recipe-text"><strong>{{ recipe.label }}</strong><small>{{ recipe.description || (recipe.keywords?.length ? `/${recipe.keywords[0]}` : `Insert ${recipe.label.toLocaleLowerCase()}`) }}</small></span>
+          <span
+            v-if="index === insertIndex"
+            aria-hidden="true"
+          >↵</span>
         </button>
         <p
           v-if="filteredRecipes.length === 0"
@@ -913,6 +996,15 @@ defineExpose({
         >
           No matching blocks.
         </p>
+      </div>
+      <div
+        v-if="activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview']"
+        class="ginko-editor__recipe-preview"
+      >
+        <slot
+          name="recipe-preview"
+          :recipe="activeRecipe"
+        />
       </div>
       <p
         v-if="insertError"
@@ -922,8 +1014,7 @@ defineExpose({
         {{ insertError }}
       </p>
       <p class="ginko-editor__insert-help">
-        <span v-if="insertMenuOrigin === 'slash'">Keep typing to search.</span>
-        Arrow keys choose, Enter inserts, Escape closes.
+        <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> insert</span><span><kbd>esc</kbd> close</span>
       </p>
     </div>
     <div
@@ -1094,7 +1185,7 @@ defineExpose({
 </template>
 
 <style scoped>
-.ginko-editor { --ginko-border: #d6d6d6; --ginko-bg: #fff; --ginko-muted: #f5f5f5; --ginko-muted-text: #666; --ginko-text: #171717; position: relative; overflow: hidden; border: 1px solid var(--ginko-border); border-radius: .85rem; background: var(--ginko-bg); color: var(--ginko-text); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.ginko-editor { --ginko-border: var(--border, #e5e5e3); --ginko-bg: var(--card, #fff); --ginko-muted: var(--muted, #f3f3f1); --ginko-muted-text: var(--muted-foreground, #6f6f6b); --ginko-text: var(--foreground, #292925); position: relative; overflow: visible; border: 1px solid var(--ginko-border); border-radius: .85rem; background: var(--ginko-bg); color: var(--ginko-text); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
 .ginko-editor button { min-height: 2.25rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; cursor: pointer; padding: .35rem .65rem; white-space: nowrap; }
 .ginko-editor button:hover, .ginko-editor button[aria-pressed='true'] { background: var(--ginko-muted); }
 .ginko-editor button:focus-visible, .ginko-editor input:focus-visible, .ginko-editor select:focus-visible, .ginko-editor textarea:focus-visible { outline-offset: 2px; }
@@ -1104,26 +1195,46 @@ defineExpose({
 .ginko-editor__modes { display: flex; gap: .2rem; }
 .ginko-editor__status { color: var(--ginko-muted-text); font-size: .78rem; white-space: nowrap; }
 .ginko-editor__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.ginko-editor__insert-menu { position: relative; z-index: 15; display: grid; gap: .45rem; border-bottom: 1px solid var(--ginko-border); background: color-mix(in srgb, var(--ginko-bg) 96%, var(--ginko-text)); padding: .65rem; }
-.ginko-editor__insert-search { display: flex; align-items: center; gap: .4rem; border: 1px solid var(--ginko-border); border-radius: .55rem; background: var(--ginko-bg); padding-inline: .7rem; font: 600 1rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.ginko-editor__insert-search:focus-within { outline: 2px solid currentColor; outline-offset: 1px; }
-.ginko-editor__insert-search input { min-width: 0; flex: 1; border: 0; background: transparent; color: inherit; padding-block: .65rem; font: 400 .9rem/1.3 ui-sans-serif, system-ui, sans-serif; outline: 0; }
-.ginko-editor__insert-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .35rem; }
-.ginko-editor__insert-results button { display: grid; gap: .1rem; border: 1px solid transparent; background: var(--ginko-bg); text-align: start; }
-.ginko-editor__insert-results button[aria-selected='true'] { border-color: currentColor; background: var(--ginko-muted); }
-.ginko-editor__insert-results button span { color: var(--ginko-muted-text); font-size: .72rem; font-weight: 400; }
-.ginko-editor__insert-empty, .ginko-editor__insert-error, .ginko-editor__insert-help { margin: 0; }
-.ginko-editor__insert-empty { color: var(--ginko-muted-text); padding: .45rem; }
-.ginko-editor__insert-error { color: #8a2e1b; }
-.ginko-editor__insert-help { color: var(--ginko-muted-text); font-size: .75rem; }
+/* The menu overlays the page without changing the writer's document geometry. */
+.ginko-editor__insert-menu { position: absolute; z-index: 50; display: flex; flex-direction: column; width: min(320px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--ginko-border); border-radius: .75rem; background: var(--ginko-bg); box-shadow: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06); padding: .35rem; }
+@media (min-width: 700px) {
+  .ginko-editor__insert-menu--preview { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; width: min(620px, calc(100vw - 24px)); }
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-search, .ginko-editor__insert-menu--preview .ginko-editor__insert-results, .ginko-editor__insert-menu--preview .ginko-editor__insert-help, .ginko-editor__insert-menu--preview .ginko-editor__insert-error { grid-column: 1; }
+  .ginko-editor__insert-menu--preview .ginko-editor__recipe-preview { display: flex; align-items: safe center; min-width: 0; grid-column: 2; grid-row: 1 / 5; max-height: none; margin: -.35rem -.35rem -.35rem .35rem; padding: 1.1rem; border-top: 0; border-left: 1px solid var(--ginko-border); background: color-mix(in srgb, var(--ginko-bg) 97%, var(--ginko-text)); }
+}
+.ginko-editor__insert-search { display: flex; align-items: center; gap: .65rem; border-bottom: 1px solid var(--ginko-border); margin: 0 .35rem .35rem; padding: .2rem .35rem .55rem; color: var(--ginko-muted-text); }
+.ginko-editor__insert-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ginko-text); padding: .4rem 0; font: inherit; }
+.ginko-editor__insert-search:focus-within { border-bottom-color: var(--ginko-muted-text); }
+.ginko-editor__insert-results { overflow-y: auto; overscroll-behavior: contain; min-height: 48px; flex: 1 1 auto; }
+.ginko-editor__insert-results button { display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 57px; padding: .5rem; text-align: start; white-space: normal; }
+.ginko-editor__insert-results button[aria-selected='true'] { background: var(--ginko-muted); }
+.ginko-editor__recipe-symbol { display: grid; place-items: center; flex: 0 0 35px; height: 35px; border: 1px solid var(--ginko-border); border-radius: .4rem; background: var(--ginko-bg); font: 500 16px/1 ui-sans-serif, system-ui, sans-serif; }
+.ginko-editor__recipe-text { display: grid; gap: .1rem; flex: 1; }
+.ginko-editor__recipe-text strong { font-size: .85rem; font-weight: 550; }
+.ginko-editor__recipe-text small { font-size: .73rem; color: var(--ginko-muted-text); line-height: 1.4; }
+.ginko-editor__recipe-preview { flex: 0 0 auto; max-height: 150px; overflow: auto; border-top: 1px solid var(--ginko-border); padding: .7rem; }
+.ginko-editor__insert-empty, .ginko-editor__insert-error { margin: 0; padding: .75rem; font-size: .85rem; }
+.ginko-editor__insert-empty { color: var(--ginko-muted-text); }
+.ginko-editor__insert-error { color: #b54a35; }
+.ginko-editor__insert-help { display: flex; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--ginko-border); margin: .3rem 0 0; padding: .55rem .35rem .15rem; color: var(--ginko-muted-text); font-size: .68rem; }
+.ginko-editor__insert-help kbd { font: inherit; margin-inline-end: .2rem; }
 .ginko-editor__warning { display: grid; gap: .15rem; border-bottom: 1px solid #e4a11b; background: #fff8e6; padding: .65rem .8rem; color: #5c4300; }
 .ginko-editor__surface { padding: clamp(1rem, 3vw, 1.75rem); }
 .ginko-editor__surface :deep(.ProseMirror) { max-width: 46rem; min-height: 22rem; margin-inline: auto; outline: none; font-size: 1rem; line-height: 1.7; }
+.ginko-editor__surface :deep(.ProseMirror p.mdc-editor-empty:first-child::before) { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--ginko-muted-text); }
+.ginko-editor__surface :deep(.ProseMirror h1) { font-size: 2rem; font-weight: 650; }
+.ginko-editor__surface :deep(.ProseMirror h2) { font-size: 1.5rem; font-weight: 650; }
+.ginko-editor__surface :deep(.ProseMirror h3) { font-size: 1.2rem; font-weight: 650; }
+.ginko-editor__surface :deep(.ProseMirror ul) { list-style: disc; padding-inline-start: 1.5rem; }
+.ginko-editor__surface :deep(.ProseMirror ol) { list-style: decimal; padding-inline-start: 1.5rem; }
+.ginko-editor__surface :deep(.ProseMirror blockquote) { border-inline-start: 3px solid var(--ginko-text); padding-inline-start: 1rem; margin-inline: 0; }
+.ginko-editor__surface :deep(.ProseMirror pre) { background: var(--ginko-muted); border-radius: .5rem; padding: 1rem; overflow-x: auto; }
 .ginko-editor__surface :deep(.ProseMirror > :first-child) { margin-top: 0; }
 .ginko-editor__surface :deep(.ProseMirror > * + *) { margin-block-start: 1em; }
 .ginko-editor__surface :deep(.ProseMirror h1), .ginko-editor__surface :deep(.ProseMirror h2), .ginko-editor__surface :deep(.ProseMirror h3) { line-height: 1.2; letter-spacing: -.02em; }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='element']) { position: relative; min-width: 0; border: 1px solid var(--ginko-border); border-radius: .7rem; background: color-mix(in srgb, var(--ginko-bg) 96%, var(--ginko-text)); padding: 2.15rem .9rem .9rem; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='element']::before) { position: absolute; inset-block-start: .55rem; inset-inline-start: .75rem; content: attr(tag); color: var(--ginko-muted-text); font: 650 .68rem/1. ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-transform: uppercase; }
+.ginko-editor__surface :deep(.ProseMirror div[data-type='element']::before) { position: absolute; inset-block-start: .55rem; inset-inline-start: .75rem; content: attr(data-label); color: var(--ginko-muted-text); font: 650 .68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-transform: uppercase; }
+.ginko-editor__surface :deep(.ProseMirror div[data-type='element'][data-title]::before) { content: attr(data-title); font-family: inherit; font-size: .83rem; text-transform: none; letter-spacing: normal; color: var(--ginko-text); }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']) { position: relative; min-height: 3.5rem; border: 1px dashed var(--ginko-border); border-radius: .5rem; padding: 1.8rem .7rem .5rem; }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']::before) { position: absolute; inset-block-start: .45rem; inset-inline-start: .6rem; content: attr(name); color: var(--ginko-muted-text); font-size: .68rem; font-weight: 650; text-transform: uppercase; }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='element'].ProseMirror-selectednode) { outline: 2px solid var(--ginko-text); outline-offset: 2px; }

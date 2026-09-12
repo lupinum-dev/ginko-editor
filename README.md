@@ -63,6 +63,16 @@ switch to Markdown source. `flush()` emits the latest converted source but does
 not persist it; the host still owns and must await its save operation.
 The editor does not import Nuxt, the CMS, Convex, or an application router.
 
+## Writing and component previews
+
+Type `/` on a new paragraph or use **Insert** to search writing blocks. Native
+Markdown blocks work without an authoring kit; host kits add component recipes.
+Recipes can include a short `description` and search `keywords`.
+
+The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its source
+with Ginko Content and their own components. The menu handles selection, focus,
+viewport placement, and insertion. The package does not depend on host renderers.
+
 ## Documentation
 
 The proposed documentation address is

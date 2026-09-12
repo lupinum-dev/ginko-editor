@@ -1,9 +1,11 @@
 import type { Content } from '@tiptap/core'
 import { InputRule, mergeAttributes, Node } from '@tiptap/core'
 
+import type { AuthoringKitV1 } from '../../authoring'
 import type { JsonRecord } from '../../types'
 
 export interface ElementOptions {
+  getAuthoringKit?: () => AuthoringKitV1 | undefined
   HTMLAttributes: JsonRecord
 }
 
@@ -104,6 +106,11 @@ export const Element = Node.create<ElementOptions>({
 
   renderHTML({ HTMLAttributes }) {
     const mergedAttributes = mergeAttributes(HTMLAttributes, { 'data-type': 'element' })
+    const tag = typeof mergedAttributes.tag === 'string' ? mergedAttributes.tag : ''
+    const metadata = this.options.getAuthoringKit?.()?.authoring[tag]
+    mergedAttributes['data-label'] = metadata?.label ?? tag
+    const title = mergedAttributes.props?.title
+    if (typeof title === 'string' && title.trim()) mergedAttributes['data-title'] = title
     mergedAttributes.props = JSON.stringify(mergedAttributes.props || {})
     return ['div', mergedAttributes, 0]
   },

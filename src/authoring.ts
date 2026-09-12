@@ -43,6 +43,8 @@ export type ComponentAuthoringMetadataV1<
 }
 
 export interface AuthoringRecipeV1 {
+  /** Short explanation shown while choosing a block. */
+  description?: string
   id: string
   keywords?: readonly string[]
   label: string
