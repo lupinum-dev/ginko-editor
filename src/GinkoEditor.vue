@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
+import { closeHistory } from '@tiptap/pm/history'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 
@@ -81,10 +84,13 @@ const insertError = ref<string | null>(null)
 const insertBusy = ref(false)
 type BrowserInputElement = InstanceType<typeof globalThis.HTMLInputElement>
 type BrowserKeyboardEvent = InstanceType<typeof globalThis.KeyboardEvent>
+type BrowserEvent = InstanceType<typeof globalThis.Event>
 
 const insertSearch = ref<BrowserInputElement>()
 const insertMenuId = useId()
 const componentSettingsId = useId()
+const propertyDrafts = ref<Record<string, string>>({})
+const propertyErrors = ref<Record<string, string>>({})
 let insertSelection: { from: number; to: number } | undefined
 
 const outputOptions = computed(() => ({
@@ -109,6 +115,7 @@ const editor = useEditor({
     enableFiles: props.enableFiles,
     enableVideo: props.enableVideo,
     fileOutput: props.fileOutput,
+    getAuthoringKit: () => props.authoringKit,
     imageOutput: props.imageOutput,
     placeholder: props.placeholder,
     showMarkdownMarkers: props.showMarkdownMarkers,
@@ -142,7 +149,7 @@ watch(filteredRecipes, () => {
 
 function currentElement(instance: TiptapEditor, trackedRevision = 0) {
   const selection = instance.state.selection as typeof instance.state.selection & {
-    node?: { attrs: Record<string, unknown>; type: { name: string } }
+    node?: ProseMirrorNode
   }
   if (selection.node?.type.name === 'element') {
     return { node: selection.node, pos: selection.from, trackedRevision }
@@ -191,7 +198,7 @@ function updateSelectedProp(name: string, value: JsonValue | undefined) {
   if (!instance || !selected || props.disabled) return
   const current = (selected.node.attrs.props ?? {}) as Record<string, JsonValue>
   const next = { ...current }
-  if (value === undefined || value === '') delete next[name]
+  if (value === undefined) delete next[name]
   else next[name] = value
   instance.view.dispatch(
     instance.state.tr.setNodeMarkup(selected.pos, undefined, {
@@ -199,6 +206,39 @@ function updateSelectedProp(name: string, value: JsonValue | undefined) {
       props: next,
     }),
   )
+}
+
+function propertyDraftKey(name: string) {
+  const selected = selectedComponent.value
+  return selected ? `${selected.pos}:${selected.tag}:${name}` : name
+}
+
+function propertyInputValue(name: string) {
+  const draft = propertyDrafts.value[propertyDraftKey(name)]
+  return draft ?? String(selectedPropValue(name) ?? '')
+}
+
+function updateNumberProp(name: string, event: BrowserEvent) {
+  const target = event.target as BrowserInputElement
+  const key = propertyDraftKey(name)
+  const raw = target.value
+  propertyDrafts.value[key] = raw
+  if (!raw.trim()) {
+    delete propertyErrors.value[key]
+    updateSelectedProp(name, undefined)
+    return
+  }
+  const value = Number(raw)
+  if (!Number.isFinite(value)) {
+    propertyErrors.value[key] = 'Enter a valid number.'
+    return
+  }
+  delete propertyErrors.value[key]
+  updateSelectedProp(name, value)
+}
+
+function propertyError(name: string) {
+  return propertyErrors.value[propertyDraftKey(name)]
 }
 
 function valueFromOption(options: readonly JsonValue[], value: string): JsonValue | undefined {
@@ -226,18 +266,19 @@ async function openInsertMenu(origin: 'button' | 'slash') {
   }
 }
 
-function restoreInsertSelection() {
+function restoreInsertSelection(selection = insertSelection) {
   const instance = editor.value
-  if (!instance || !insertSelection) return
-  instance.chain().setTextSelection(insertSelection).focus().run()
+  if (!instance || !selection) return
+  instance.chain().setTextSelection(selection).focus().run()
 }
 
 function closeInsertMenu(restore = true) {
+  const selection = insertSelection
   insertMenuOpen.value = false
   insertQuery.value = ''
   insertError.value = null
-  if (restore) restoreInsertSelection()
   insertSelection = undefined
+  if (restore) void nextTick(() => restoreInsertSelection(selection))
 }
 
 function moveInsertSelection(offset: number) {
@@ -247,8 +288,14 @@ function moveInsertSelection(offset: number) {
 }
 
 function parentComponentTag(instance: TiptapEditor): string | undefined {
-  const selected = currentElement(instance)
-  return typeof selected?.node.attrs.tag === 'string' ? selected.node.attrs.tag : undefined
+  const resolved = instance.state.selection.$from
+  for (let depth = resolved.depth; depth > 0; depth -= 1) {
+    const node = resolved.node(depth)
+    if (node.type.name === 'element' && typeof node.attrs.tag === 'string') {
+      return node.attrs.tag
+    }
+  }
+  return undefined
 }
 
 function placementError(instance: TiptapEditor, document: JSONContent): string | undefined {
@@ -269,6 +316,100 @@ function placementError(instance: TiptapEditor, document: JSONContent): string |
     }
   }
   return undefined
+}
+
+function selectedSibling(offset: -1 | 1) {
+  const instance = editor.value
+  const selected = selectedComponent.value
+  if (!instance || !selected) return undefined
+  const resolved = instance.state.doc.resolve(selected.pos)
+  const index = resolved.index()
+  const siblingIndex = index + offset
+  if (siblingIndex < 0 || siblingIndex >= resolved.parent.childCount) return undefined
+  return resolved.parent.child(siblingIndex)
+}
+
+function moveSelectedComponent(offset: -1 | 1) {
+  const instance = editor.value
+  const selected = selectedComponent.value
+  const sibling = selectedSibling(offset)
+  if (!instance || !selected || !sibling || props.disabled) return
+  const target = offset < 0
+    ? selected.pos - sibling.nodeSize
+    : selected.pos + sibling.nodeSize
+  const tr = instance.state.tr.delete(
+    selected.pos,
+    selected.pos + selected.node.nodeSize,
+  )
+  tr.insert(target, selected.node)
+  tr.setSelection(NodeSelection.create(tr.doc, target))
+  instance.view.dispatch(closeHistory(tr))
+  instance.commands.focus()
+}
+
+function duplicateSelectedComponent() {
+  const instance = editor.value
+  const selected = selectedComponent.value
+  if (!instance || !selected || props.disabled) return
+  const target = selected.pos + selected.node.nodeSize
+  const tr = instance.state.tr.insert(target, selected.node.copy(selected.node.content))
+  tr.setSelection(NodeSelection.create(tr.doc, target))
+  instance.view.dispatch(closeHistory(tr))
+  instance.commands.focus()
+}
+
+function deleteSelectedComponent() {
+  const instance = editor.value
+  const selected = selectedComponent.value
+  if (!instance || !selected || props.disabled) return
+  const tr = instance.state.tr.delete(selected.pos, selected.pos + selected.node.nodeSize)
+  instance.view.dispatch(closeHistory(tr))
+  instance.commands.focus()
+}
+
+function handleComponentShortcut(event: BrowserKeyboardEvent) {
+  if (!event.altKey || !selectedComponent.value) return false
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveSelectedComponent(event.key === 'ArrowUp' ? -1 : 1)
+    return true
+  }
+  if (event.shiftKey && event.key.toLocaleLowerCase() === 'd') {
+    event.preventDefault()
+    duplicateSelectedComponent()
+    return true
+  }
+  return false
+}
+
+function isAtComponentBoundary(instance: TiptapEditor, direction: 'end' | 'start') {
+  const selection = instance.state.selection
+  if (!selection.empty) return false
+  const resolved = selection.$from
+  for (let depth = resolved.depth - 1; depth > 0; depth -= 1) {
+    if (resolved.node(depth).type.name !== 'element') continue
+    for (let childDepth = depth + 1; childDepth <= resolved.depth; childDepth += 1) {
+      const parent = resolved.node(childDepth - 1)
+      const index = resolved.index(childDepth - 1)
+      if (direction === 'start' && index !== 0) return false
+      if (direction === 'end' && index !== parent.childCount - 1) return false
+    }
+    return direction === 'start'
+      ? resolved.parentOffset === 0
+      : resolved.parentOffset === resolved.parent.content.size
+  }
+  return false
+}
+
+function protectComponentBoundary(instance: TiptapEditor, event: BrowserKeyboardEvent) {
+  const direction = event.key === 'Backspace'
+    ? 'start'
+    : event.key === 'Delete'
+      ? 'end'
+      : undefined
+  if (!direction || !isAtComponentBoundary(instance, direction)) return false
+  event.preventDefault()
+  return true
 }
 
 async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
@@ -322,6 +463,8 @@ function handleInsertKeys(event: BrowserKeyboardEvent) {
 function handleEditorKeydown(event: BrowserKeyboardEvent) {
   const instance = editor.value
   if (!instance || event.isComposing) return
+  if (protectComponentBoundary(instance, event)) return
+  if (handleComponentShortcut(event)) return
   if (!insertMenuOpen.value) {
     if (event.key !== '/' || !canOpenSlashMenu(instance)) return
     event.preventDefault()
@@ -742,7 +885,7 @@ defineExpose({
         />
       </div>
       <section
-        v-if="selectedComponent?.fields.length"
+        v-if="selectedComponent"
         class="ginko-editor__inspector"
         :aria-labelledby="componentSettingsId"
       >
@@ -757,7 +900,10 @@ defineExpose({
             {{ selectedComponent.description }}
           </p>
         </div>
-        <div class="ginko-editor__fields">
+        <div
+          v-if="selectedComponent.fields.length"
+          class="ginko-editor__fields"
+        >
           <label
             v-for="item in selectedComponent.fields"
             :key="item.name"
@@ -785,12 +931,57 @@ defineExpose({
             </select>
             <input
               v-else
-              :type="item.field.control === 'number' ? 'number' : 'text'"
-              :value="String(selectedPropValue(item.name) ?? '')"
-              @change="updateSelectedProp(item.name, item.field.control === 'number' ? Number(($event.target as HTMLInputElement).value) : ($event.target as HTMLInputElement).value)"
+              type="text"
+              :inputmode="item.field.control === 'number' ? 'decimal' : undefined"
+              :value="item.field.control === 'number' ? propertyInputValue(item.name) : String(selectedPropValue(item.name) ?? '')"
+              @input="item.field.control === 'number' ? updateNumberProp(item.name, $event) : undefined"
+              @change="item.field.control === 'number' ? undefined : updateSelectedProp(item.name, ($event.target as HTMLInputElement).value)"
             >
             <small v-if="item.field.help">{{ item.field.help }}</small>
+            <small
+              v-if="propertyError(item.name)"
+              class="ginko-editor__field-error"
+              role="alert"
+            >
+              {{ propertyError(item.name) }}
+            </small>
           </label>
+        </div>
+        <div
+          class="ginko-editor__block-actions"
+          role="group"
+          aria-label="Selected block actions"
+        >
+          <button
+            type="button"
+            aria-keyshortcuts="Alt+ArrowUp"
+            :disabled="!selectedSibling(-1)"
+            @click="moveSelectedComponent(-1)"
+          >
+            Move up
+          </button>
+          <button
+            type="button"
+            aria-keyshortcuts="Alt+ArrowDown"
+            :disabled="!selectedSibling(1)"
+            @click="moveSelectedComponent(1)"
+          >
+            Move down
+          </button>
+          <button
+            type="button"
+            aria-keyshortcuts="Alt+Shift+D"
+            @click="duplicateSelectedComponent"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            class="ginko-editor__delete"
+            @click="deleteSelectedComponent"
+          >
+            Delete
+          </button>
         </div>
       </section>
     </template>
@@ -853,6 +1044,11 @@ defineExpose({
 .ginko-editor__fields input:not([type='checkbox']), .ginko-editor__fields select { box-sizing: border-box; width: 100%; min-height: 2.5rem; border: 1px solid var(--ginko-border); border-radius: .45rem; background: var(--ginko-bg); color: var(--ginko-text); padding: .45rem .6rem; font: inherit; font-size: .875rem; font-weight: 400; }
 .ginko-editor__fields input[type='checkbox'] { width: 1.25rem; height: 1.25rem; margin: .35rem 0; }
 .ginko-editor__fields small { font-weight: 400; }
+.ginko-editor__field-error { color: #8a2e1b; }
+.ginko-editor__block-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem; border-top: 1px solid var(--ginko-border); padding-top: .75rem; }
+.ginko-editor__block-actions button { border: 1px solid var(--ginko-border); background: var(--ginko-bg); }
+.ginko-editor__block-actions button:disabled { cursor: not-allowed; opacity: .45; }
+.ginko-editor__block-actions .ginko-editor__delete { margin-inline-start: auto; color: #8a2e1b; }
 .ginko-editor__source { box-sizing: border-box; display: block; width: 100%; min-height: 280px; resize: vertical; border: 0; background: var(--ginko-bg); color: var(--ginko-text); padding: 1rem; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline: none; }
 @media (max-width: 34rem) {
   .ginko-editor button { min-height: 2.75rem; }

@@ -1,8 +1,13 @@
 import { Extension, type Editor, type JSONContent } from '@tiptap/core'
-import type { Slice } from '@tiptap/pm/model'
+import { Fragment, Slice } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
-import { convertMarkdownToTiptapDoc } from '../conversionPipeline'
+import type { AuthoringKitV1 } from '../../authoring'
+import {
+  convertMarkdownToTiptapDoc,
+  convertTiptapDocToMarkdown,
+  validateMarkdownForAuthoring,
+} from '../conversionPipeline'
 import { editorDebug } from '../debug'
 import { stringifyMdcSync } from '../markdown'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
@@ -10,6 +15,7 @@ import { tiptapToMDCSync } from '../tiptapToMdc'
 
 export interface MarkdownClipboardOptions extends TiptapToMDCOptions {
   enabled: boolean
+  getAuthoringKit?: () => AuthoringKitV1 | undefined
 }
 
 const markdownClipboardPluginKey = new PluginKey('markdownClipboard')
@@ -44,7 +50,7 @@ export const MarkdownClipboard = Extension.create<MarkdownClipboardOptions>({
               return writeMarkdownClipboard(view.state.selection.content(), event, this.options)
             },
             paste: (view, event) => {
-              return handleMarkdownPaste(this.editor, event)
+              return handleMarkdownPaste(this.editor, event, this.options)
             },
           },
         },
@@ -135,7 +141,7 @@ function writeMarkdownClipboard(slice: Slice, event: Event, options: TiptapToMDC
   return true
 }
 
-function handleMarkdownPaste(editor: Editor, event: Event) {
+function handleMarkdownPaste(editor: Editor, event: Event, options: MarkdownClipboardOptions) {
   const clipboardEvent = event as ClipboardEvent
   const markdown = extractMarkdownFromClipboard(clipboardEvent)
   if (!markdown) {
@@ -143,7 +149,7 @@ function handleMarkdownPaste(editor: Editor, event: Event) {
   }
 
   clipboardEvent.preventDefault()
-  void applyMarkdownPaste(editor, markdown, clipboardEvent)
+  void applyMarkdownPaste(editor, markdown, clipboardEvent, options)
   return true
 }
 
@@ -187,7 +193,12 @@ function detectClipboardSource(event: ClipboardEvent) {
   return event.clipboardData?.types?.includes('text/markdown') ? 'text/markdown' : 'text/plain'
 }
 
-async function applyMarkdownPaste(editor: Editor, markdown: string, event: ClipboardEvent) {
+async function applyMarkdownPaste(
+  editor: Editor,
+  markdown: string,
+  event: ClipboardEvent,
+  options: MarkdownClipboardOptions,
+) {
   try {
     const result = await convertMarkdownToTiptapDoc(markdown)
     if (!result.ok || !result.value) {
@@ -197,13 +208,22 @@ async function applyMarkdownPaste(editor: Editor, markdown: string, event: Clipb
       return
     }
 
-    const selection = editor.state.selection
     const content = result.value.content ?? [{ type: 'paragraph' }]
-    editor
-      .chain()
-      .focus()
-      .insertContentAt({ from: selection.from, to: selection.to }, content)
-      .run()
+    const before = editor.state
+    const fragment = Fragment.fromArray(content.map(node => editor.schema.nodeFromJSON(node)))
+    const transaction = before.tr.replaceSelection(new Slice(fragment, 0, 0))
+    const authoringKit = options.getAuthoringKit?.()
+    if (authoringKit) {
+      const candidate = await convertTiptapDocToMarkdown(transaction.doc.toJSON(), options)
+      if (!candidate.ok || candidate.value === undefined) return
+      const issue = await validateMarkdownForAuthoring(candidate.value, authoringKit)
+      if (issue) {
+        editorDebug.warn('Markdown clipboard paste rejected by authoring policy', { issue })
+        return
+      }
+    }
+    if (!before.doc.eq(editor.state.doc) || !before.selection.eq(editor.state.selection)) return
+    editor.view.dispatch(transaction.scrollIntoView())
     editorDebug.log('Markdown clipboard paste applied', {
       length: markdown.length,
       nodeCount: content.length,

@@ -8,6 +8,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { ref } from 'vue'
 
 import type { AssetProvider, JsonRecord } from '../../types'
+import type { AuthoringKitV1 } from '../../authoring'
 import { editorDebug } from '../debug'
 import {
   Binding,
@@ -40,6 +41,7 @@ export interface CreateEditorExtensionsOptions {
   enableVideo: boolean
   fileOutput: 'markdown' | 'mdc'
   imageOutput: 'markdown' | 'mdc'
+  getAuthoringKit?: () => AuthoringKitV1 | undefined
   placeholder?: string
   showMarkdownMarkers: boolean
   videoOutput: 'html' | 'mdc'
@@ -85,6 +87,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       enableDebug,
       enabled: true,
       fileOutput: options.fileOutput,
+      getAuthoringKit: options.getAuthoringKit,
       imageOutput: options.imageOutput,
       videoOutput: options.videoOutput,
     }),
