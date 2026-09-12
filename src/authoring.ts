@@ -186,8 +186,8 @@ function validateComponent(
 }
 
 function freezeJson<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value)
+  if (value && typeof value === 'object') {
+    if (!Object.isFrozen(value)) Object.freeze(value)
     Object.values(value as Record<string, unknown>).forEach(freezeJson)
   }
   return value
@@ -225,6 +225,9 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
   }
 
   assertUnique(source.recipes.map(({ id }) => id), 'recipes')
+  // Validation crosses an async parser boundary. Consume the input now so
+  // callers cannot change the contract while its recipes are being checked.
+  freezeJson(source)
   for (const recipe of source.recipes) {
     if (!recipe.label.trim()) fail(`recipe "${recipe.id}" has an empty label.`)
     if (recipe.keywords) assertUnique(recipe.keywords, `recipe "${recipe.id}".keywords`)

@@ -2,7 +2,7 @@ import type { CommandProps } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 
 import type { JsonRecord } from '../../types'
-import { sanitizeImageUrl, sanitizeResolvedImageUrl } from '../props'
+import { readStoredMediaProps, sanitizeImageUrl, sanitizeResolvedImageUrl } from '../props'
 
 export interface ImageOptions {
   allowBase64: boolean
@@ -47,7 +47,7 @@ export const Image = Node.create<ImageOptions>({
     return {
       props: {
         default: {},
-        parseHTML: (element) => ({
+        parseHTML: (element) => readStoredMediaProps(element) ?? ({
           alt: element.getAttribute('alt') || '',
           class: element.getAttribute('class') || '',
           filename: element.getAttribute('data-filename') || '',
@@ -93,6 +93,10 @@ export const Image = Node.create<ImageOptions>({
   parseHTML() {
     return [
       {
+        tag: 'img[data-ginko-props]',
+        getAttrs: element => readStoredMediaProps(element) ? null : false,
+      },
+      {
         tag: this.options.allowBase64 ? 'img[src]' : 'img[src]:not([src^="data:"])',
       },
     ]
@@ -103,6 +107,7 @@ export const Image = Node.create<ImageOptions>({
     const attrs: Record<string, string> = {}
 
     const rawSrc = String(props.src || '')
+    attrs['data-ginko-props'] = JSON.stringify(props)
     const resolvedSrc = this.options.resolveSrc?.(props)
     const displaySrc =
       sanitizeImageUrl(rawSrc) ?? sanitizeResolvedImageUrl(String(resolvedSrc || ''))

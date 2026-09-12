@@ -189,7 +189,9 @@ export function createTableCellNode(
     normalizedChildren = [{ children, props: {}, tag: 'p', type: 'element' } as MDCElement]
   }
 
-  return createTipTapNodeFn(node, type, { children: normalizedChildren })
+  const style = typeof node.props?.style === 'string' ? node.props.style : ''
+  const align = /(?:^|;)\s*text-align:\s*(left|center|right)\s*(?:;|$)/i.exec(style)?.[1]?.toLowerCase()
+  return createTipTapNodeFn(node, type, { attrs: { align }, children: normalizedChildren })
 }
 
 /**
@@ -207,7 +209,7 @@ export function createPreNode(
   const tiptapNode = createTipTapNodeFn(node, 'codeBlock', {
     attrs: {
       filename: node.props?.filename,
-      language: node.props?.language || 'text',
+      language: node.props?.language ?? null,
     },
   })
 

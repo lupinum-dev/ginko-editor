@@ -15,10 +15,10 @@ TipTap runtime are peer dependencies. The package imports only the browser-safe
 import `@lupinum/ginko-editor/style.css` explicitly. Package certification builds isolated Vue and Nuxt applications
 from the generated archive; it does not use sibling aliases or source links.
 
-The accepted CMS editor remains the temporary integration copy until Step 5.
-The Editor package owns conversion, TipTap schema, mode switching, and editor UI.
-The CMS owns persistence, asset dialogs, and workflow state. Remove the temporary
-CMS copy when the CMS consumes the package; do not maintain both implementations.
+The CMS integration consumes the shared Editor package. The Editor package owns
+conversion, TipTap schema, mode switching, and editor UI. The CMS owns
+persistence, asset dialogs, and workflow state. Authenticated CMS acceptance and
+release certification remain separate gates in `plan.md`.
 
 Hosts must await the component's `flush()` method before closing an editor or
 replacing its document. A successful flush only updates `v-model`; the host must

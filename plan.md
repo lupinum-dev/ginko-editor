@@ -2735,3 +2735,27 @@ An authenticated session was requested instead of exposing the password in the
 task. Code corrections and package checks do not waive this browser requirement.
 Gate C is not accepted, and Step 7 remains unassigned. Completed source changes
 are committed locally; no push, publication or deployment occurred.
+
+
+### In-depth correction review — 2026-09-13
+
+The coordinator completed independent API, conversion and playground reviews and
+fixed all actionable findings. Visual mode retains edits when serialization
+fails; asynchronous asset/paste operations reject stale ownership; authoring
+inputs are frozen before validation; typed component properties and canonical
+media metadata survive native HTML copy. Content now owns safe quoted/typed
+inline-component serialization. Media insertion capabilities are explicit in
+Editor, CMS and ChiliSkills, including the additive `enableImages` option.
+
+Editor `pnpm verify` passed all 110 tests, lint, types, library and documentation
+builds. Content full verification passed, including 15 server end-to-end tests;
+the final parser correction passed the refreshed 1,375-test core suite and source
+types/lint. CMS `pnpm check` passed 1,281 tests (one existing skipped), formatting,
+static checks and types. ChiliSkills pilot tests (2), types and lint passed.
+Content's Vue-only IDE metadata generation was verified separately after fixing
+a pre-existing silent generator failure. Final packaged-consumer and browser
+evidence is recorded in the follow-up below.
+
+This review does not waive the authenticated CMS save/reload acceptance gate
+described above. No release, deployment or remote backend change is authorized
+by these local verification results.

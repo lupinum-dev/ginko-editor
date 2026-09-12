@@ -32,6 +32,8 @@ const BLOCK_NODE_TYPES = new Set([
   'video',
 ])
 
+const SUPPORTED_MARKS = new Set(['bold', 'code', 'italic', 'strike', 'link'])
+
 function issue(
   code: string,
   message: string,
@@ -87,6 +89,11 @@ function validateNode(
   }
 
   if (node.type === 'text') {
+    for (const mark of node.marks ?? []) {
+      if (!SUPPORTED_MARKS.has(mark.type)) {
+        issues.push(issue('unknown_mark_type', `Unsupported text formatting "${mark.type}"`, { depth, parentType }))
+      }
+    }
     if (typeof node.text !== 'string') {
       issues.push(
         issue('invalid_text_node', 'Text node is missing string text', { depth, parentType }),

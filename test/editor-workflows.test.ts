@@ -153,6 +153,7 @@ describe('GinkoEditor browser journey', () => {
     expect(wrapper.emitted('request-image')).toHaveLength(1)
     const request = wrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     expect(request.complete(null)).toBe(false)
+    expect(request.complete({ url: '/too-late.png' })).toBe(false)
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
@@ -363,9 +364,17 @@ describe('GinkoEditor browser journey', () => {
 
     await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
     await flushPromises()
-    expect(wrapper.attributes('data-mode')).toBe('raw')
-    expect(wrapper.get('textarea').element.value).toBe('<Badge>\nLast safe value\n</Badge>\n')
+    expect(wrapper.attributes('data-mode')).toBe('visual')
+    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(editor.state.doc.firstChild?.attrs.props.unsupported).toBeTypeOf('function')
+    await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
+    expect(editor.state.doc.firstChild?.attrs.props.unsupported).toBeTypeOf('function')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+    editor.commands.undo()
+    expect((await wrapper.vm.flush()).ok).toBe(true)
+    expect(wrapper.vm.hasPendingChanges()).toBe(false)
+    expect(editor.state.doc.firstChild?.attrs.props.unsupported).toBeUndefined()
 
     await wrapper.setProps({ modelValue: '# Recovered externally\n' })
     await waitFor(() => wrapper.vm.editor?.getText().includes('Recovered externally') === true)

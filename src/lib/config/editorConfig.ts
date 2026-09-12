@@ -10,6 +10,7 @@ import { ref } from 'vue'
 import type { AssetProvider, JsonRecord } from '../../types'
 import type { AuthoringKitV1 } from '../../authoring'
 import { editorDebug } from '../debug'
+import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import {
   Binding,
   CodeBlock,
@@ -42,17 +43,23 @@ export interface CreateEditorExtensionsOptions {
   fileOutput: 'markdown' | 'mdc'
   imageOutput: 'markdown' | 'mdc'
   getAuthoringKit?: () => AuthoringKitV1 | undefined
+  getOutputOptions?: () => TiptapToMDCOptions
+  canPaste?: () => boolean
+  onPasteError?: (message: string | undefined) => void
   placeholder?: string
   showMarkdownMarkers: boolean
   videoOutput: 'html' | 'mdc'
 }
 
 export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
+  const resolveAsset = (props: JsonRecord) => {
+    const src = typeof props.src === 'string' ? props.src : undefined
+    const id = typeof props.id === 'string' ? props.id : undefined
+    return options.assetProvider?.buildUrl({ id: id ?? src, url: src })
+  }
   const {
     codeBlockTheme,
     enableDebug,
-    enableFiles,
-    enableVideo,
     placeholder,
     showMarkdownMarkers,
   } = options
@@ -61,6 +68,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
     StarterKit.configure({
       codeBlock: false,
       heading: false,
+      underline: false,
       link: {
         HTMLAttributes: {
           target: null,
@@ -88,6 +96,9 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       enabled: true,
       fileOutput: options.fileOutput,
       getAuthoringKit: options.getAuthoringKit,
+      getOutputOptions: options.getOutputOptions,
+      canPaste: options.canPaste,
+      onPasteError: options.onPasteError,
       imageOutput: options.imageOutput,
       videoOutput: options.videoOutput,
     }),
@@ -98,18 +109,9 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
     CodeBlock.configure({
       theme: codeBlockTheme,
     }),
-    Image.configure({
-      resolveSrc: (props: JsonRecord) => {
-        const src = typeof props.src === 'string' ? props.src : undefined
-        const id = typeof props.id === 'string' ? props.id : undefined
-        return options.assetProvider?.buildUrl({
-          id: id ?? src,
-          url: src,
-        })
-      },
-    }),
-    ...(enableVideo ? [Video] : []),
-    ...(enableFiles ? [File] : []),
+    Image.configure({ resolveSrc: resolveAsset }),
+    Video,
+    File.configure({ resolveSrc: resolveAsset }),
     Binding,
     SpanStyle,
   ]

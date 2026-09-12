@@ -101,8 +101,7 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
 </script>
 
 <template>
-  <main
-    id="main-content"
+  <div
     class="writing-workspace"
   >
     <header class="workspace-heading">
@@ -323,12 +322,15 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
         Integration checks <span aria-hidden="true">{{ showChecks ? '−' : '+' }}</span>
       </button>
       <div
-        v-if="showChecks"
+        v-show="showChecks"
         class="checks-content"
       >
         <h2>An independent authoring kit</h2><p>This second editor accepts only its own host note. Registrations stay local to each editor.</p><GinkoEditor
           v-model="isolatedSource"
           :authoring-kit="isolatedAuthoringKit"
+          :enable-images="false"
+          :enable-files="false"
+          :enable-video="false"
           aria-label="Isolated kit editor"
         /><PlaygroundPreview
           :source="isolatedSource"
@@ -336,7 +338,7 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
         />
       </div>
     </section>
-  </main>
+  </div>
 </template>
 
 <style scoped>

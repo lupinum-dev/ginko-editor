@@ -15,7 +15,7 @@ declare module '@tiptap/core' {
   }
 }
 
-const INLINE_ELEMENT_INPUT_RULE_FIND = /(?:^|\s)(:([a-z-]+)(?:\[([^\]]*)\])?(?:\{[^}]*\})?)\s/i
+const INLINE_ELEMENT_INPUT_RULE_FIND = /(?:^|\s)(:([a-z-]+)(?:\[([^\]]*)\])?)\s$/i
 
 export const InlineElement = Node.create<InlineElementOptions>({
   name: 'inline-element',

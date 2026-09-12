@@ -3,7 +3,7 @@
 <p align="center">A portable Vue editor for Ginko content.</p>
 
 > [!WARNING]
-> This package is not published yet. The documented API is the Step 3 release candidate.
+> This package is not published yet. The documented API is the current local release candidate.
 
 ## Why use Ginko Editor?
 
@@ -41,7 +41,7 @@ const source = ref('# Hello\n')
 </script>
 
 <template>
-  <GinkoEditor v-model="source" />
+  <GinkoEditor v-model="source" :enable-images="false" :enable-files="false" :enable-video="false" />
 </template>
 ```
 
@@ -52,14 +52,20 @@ available in the Markdown textarea.
 The host owns persistence and asset selection. Listen for `request-image`,
 `request-file`, or `request-video`, then call the event request's `complete`
 method after the user selects an asset. Pass `null` when selection is cancelled.
-The completion returns `false` if its document or selection is no longer current.
+Each request can complete once. Cancellation is permanent. Completion returns
+`false` if nothing was applied, including an empty asset source or a changed
+document, selection, mode, or editability. Set `enable-images`, `enable-files`,
+and `enable-video` to `false` for pickers your host does not provide. These flags
+control insertion actions; existing media remains readable and removable.
 Only the latest emitted value is recognized as a normal `v-model` echo. After an
 external replacement, the current external source remains authoritative; hosts
 should not replay older editor emissions as intentional replacements.
 Before closing the editor or replacing its document, await the exposed `flush()`
 method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
-result means conversion failed: keep the editor open so the user can recover or
-switch to Markdown source. `flush()` emits the latest converted source but does
+result means conversion failed: keep the editor open so the user can correct
+the document or use Undo. A failed flush blocks switching to Markdown, which
+would otherwise replace pending visual edits with older source. `flush()` emits
+the latest converted source but does
 not persist it; the host still owns and must await its save operation.
 The editor does not import Nuxt, the CMS, Convex, or an application router.
 
@@ -72,6 +78,13 @@ Recipes can include a short `description` and search `keywords`.
 The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its source
 with Ginko Content and their own components. The menu handles selection, focus,
 viewport placement, and insertion. The package does not depend on host renderers.
+
+Copy uses the editor's native rich text and plain text clipboard formats.
+Markdown paste uses Content's parser and the same fidelity checks as opening a
+document. An unsupported paste leaves the document unchanged and explains why.
+`createAuthoringKit` consumes and freezes its input before asynchronous recipe
+validation. Pass a fresh object if the application must keep an editable draft
+of the configuration.
 
 ## Documentation
 

@@ -42,7 +42,7 @@ export interface AssetProvider {
 }
 
 export interface EditorAssetRequest<T> {
-  /** Apply a confirmed result. Returns false when the request is stale or cancelled. */
+  /** Complete once. Null cancels permanently; false means nothing was applied. */
   complete: (value: T | null) => boolean
 }
 

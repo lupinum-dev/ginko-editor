@@ -5,6 +5,7 @@ import { onBeforeUnmount, onMounted, ref, useId } from 'vue'
 defineProps<{
   editor: Editor
   enableFiles: boolean
+  enableImages: boolean
   enableVideo: boolean
 }>()
 
@@ -168,6 +169,7 @@ onBeforeUnmount(() => globalThis.document.removeEventListener('pointerdown', dis
         Divider
       </button>
       <button
+        v-if="enableImages"
         type="button"
         @click="emit('request-image')"
       >

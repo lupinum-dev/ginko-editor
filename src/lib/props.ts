@@ -1,4 +1,4 @@
-import type { JsonValue } from '../types'
+import type { JsonRecord, JsonValue } from '../types'
 
 export function isValidAttr(value?: null | string) {
   if (!value) {
@@ -12,7 +12,7 @@ export function isValidAttr(value?: null | string) {
   return lower !== 'null' && lower !== 'undefined'
 }
 
-export function sanitizeImageUrl(url: string): null | string {
+export function sanitizeAssetUrl(url: string): null | string {
   const value = url.trim()
   if (!value) {
     return null
@@ -21,8 +21,7 @@ export function sanitizeImageUrl(url: string): null | string {
   if (
     value.startsWith('./') ||
     value.startsWith('../') ||
-    value.startsWith('/') ||
-    value.startsWith('data:image/')
+    value.startsWith('/')
   ) {
     return value
   }
@@ -39,15 +38,40 @@ export function sanitizeImageUrl(url: string): null | string {
   return null
 }
 
-/** Browser-only display URLs returned by an explicit host asset provider. */
-export function sanitizeResolvedImageUrl(url: string): null | string {
-  const safe = sanitizeImageUrl(url)
+export function sanitizeImageUrl(url: string): null | string {
+  return url.trim().startsWith('data:image/') ? url.trim() : sanitizeAssetUrl(url)
+}
+
+export function sanitizeResolvedAssetUrl(url: string): null | string {
+  const safe = sanitizeAssetUrl(url)
   if (safe) return safe
   const value = url.trim()
   try {
     return new URL(value).protocol === 'blob:' ? value : null
   } catch {
     return null
+  }
+}
+
+/** Browser-only display URLs returned by an explicit host asset provider. */
+export function sanitizeResolvedImageUrl(url: string): null | string {
+  return sanitizeImageUrl(url) ?? sanitizeResolvedAssetUrl(url)
+}
+
+/** Preserve canonical media metadata across native rich-text clipboard HTML. */
+export function readStoredMediaProps(element: { getAttribute: (name: string) => string | null }): JsonRecord | undefined {
+  const source = element.getAttribute('data-ginko-props')
+  if (!source) return undefined
+  try {
+    const value: unknown = JSON.parse(source, (_key: string, entry: unknown) => {
+      if (typeof entry === 'number' && !Number.isFinite(entry)) throw new TypeError('Non-finite media property')
+      return entry
+    })
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+    // JSON parsing supplies JSON values; the reviver rejects non-finite numbers.
+    return value as JsonRecord
+  } catch {
+    return undefined
   }
 }
 

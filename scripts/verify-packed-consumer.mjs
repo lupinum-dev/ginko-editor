@@ -84,7 +84,29 @@ async function verifyVueConsumer(consumer) {
   )
   await write(
     join(consumer, 'App.vue'),
-    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nimport { createAuthoringKit } from '@lupinum/ginko-editor/authoring'\nconst source = ref('# Vue consumer\\n')\nconst authoringKit = await createAuthoringKit({ version: 1, implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default'] } }, policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, authoring: { note: { label: 'Note' } }, recipes: [{ id: 'note', label: 'Note', source: '<note>\\nText\\n</note>' }] })\n</script>\n\n<template><GinkoEditor v-model=\"source\" :authoring-kit=\"authoringKit\" /></template>\n",
+    `<script setup lang="ts">
+import { onMounted, ref, shallowRef } from 'vue'
+import { GinkoEditor, type GinkoEditorHandle } from '@lupinum/ginko-editor'
+import { createAuthoringKit, type AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
+const source = ref('# Vue consumer\\n')
+const editor = ref<GinkoEditorHandle>()
+const authoringKit = shallowRef<AuthoringKitV1>()
+const error = ref('')
+onMounted(async () => {
+  authoringKit.value = await createAuthoringKit({ version: 1, implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default'] } }, policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, authoring: { note: { label: 'Note' } }, recipes: [{ id: 'note', label: 'Note', description: 'Useful context', source: '<note>\\nText\\n</note>' }] })
+})
+async function flush() {
+  const result = await editor.value?.flush()
+  error.value = result?.ok === false ? result.error.message : ''
+}
+</script>
+<template>
+  <GinkoEditor v-if="authoringKit" ref="editor" v-model="source" :authoring-kit="authoringKit" :enable-images="true" :enable-files="false" :enable-video="false" @request-image="request => request.complete(null)">
+    <template #recipe-preview="{ recipe }"><p>{{ recipe.description ?? recipe.label }}</p></template>
+  </GinkoEditor>
+  <button @click="flush">Flush changes</button><p>{{ error }}</p>
+</template>
+`,
   )
   await write(
     join(consumer, 'vite.config.ts'),

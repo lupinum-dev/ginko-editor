@@ -20,7 +20,7 @@ export const CodeBlock = TiptapCodeBlock.extend<CodeBlockOptions>({
         default: null,
       },
       language: {
-        default: 'text',
+        default: null,
       },
     }
   },

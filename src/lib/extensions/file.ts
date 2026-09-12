@@ -2,10 +2,12 @@ import type { CommandProps } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 
 import type { JsonRecord } from '../../types'
+import { readStoredMediaProps, sanitizeAssetUrl, sanitizeResolvedAssetUrl } from '../props'
 
 export interface FileOptions {
   HTMLAttributes: JsonRecord
   inline: boolean
+  resolveSrc?: (props: JsonRecord) => string | null | undefined
 }
 
 export interface SetFileOptions {
@@ -34,7 +36,7 @@ export const File = Node.create<FileOptions>({
     return {
       props: {
         default: {},
-        parseHTML: (element) => ({
+        parseHTML: (element) => readStoredMediaProps(element) ?? ({
           filename: element.getAttribute('data-filename') || '',
           id: element.getAttribute('data-file-id') || '',
           size: element.getAttribute('data-size') || '',
@@ -81,13 +83,18 @@ export const File = Node.create<FileOptions>({
   },
 
   parseHTML() {
-    return [{ tag: 'a[data-type="file"]' }]
+    // Recognize our file node before the generic anchor mark on paste without
+    // changing the schema's default block type.
+    return [{ tag: 'a[data-type="file"]', priority: 1100 }]
   },
 
   renderHTML({ node }) {
     const props = node.attrs.props || {}
     const attrs: Record<string, string> = { 'data-type': 'file' }
-    if (props.src) attrs.href = String(props.src)
+    const rawSrc = String(props.src || '')
+    const displaySrc = sanitizeAssetUrl(rawSrc) ?? sanitizeResolvedAssetUrl(this.options.resolveSrc?.(props) || '')
+    if (displaySrc) attrs.href = displaySrc
+    attrs['data-ginko-props'] = JSON.stringify(props)
     if (props.title) attrs.title = String(props.title)
     if (props.id) attrs['data-file-id'] = String(props.id)
     if (props.filename) attrs['data-filename'] = String(props.filename)

@@ -221,6 +221,7 @@ export async function prepareMarkdownForVisualEditing(
   options?: TiptapToMDCOptions,
   schema?: Schema,
   authoringKit?: AuthoringKitV1,
+  context: 'document' | 'fragment' = 'document',
 ): Promise<ConversionResult<JSONContent>> {
   let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>
   try {
@@ -236,16 +237,21 @@ export async function prepareMarkdownForVisualEditing(
   )
   if (!converted.ok || !converted.value) return converted
 
-  if (authoringKit) {
+  if (authoringKit && context === 'document') {
     const issue = validateParsedDocumentForAuthoring(sourceDocument, authoringKit)
     if (issue) {
       return { ...converted, issues: [...converted.issues, issue], ok: false }
     }
   }
 
+  let visualDocument = converted.value
   if (schema) {
     try {
-      schema.nodeFromJSON(converted.value).check()
+      const document = schema.nodeFromJSON(converted.value)
+      document.check()
+      // ProseMirror drops unknown attributes without throwing. Verify the
+      // document the editor will actually keep, not only the converter output.
+      visualDocument = document.toJSON()
     } catch (error) {
       const issue = buildIssue(
         'validate',
@@ -261,7 +267,7 @@ export async function prepareMarkdownForVisualEditing(
     }
   }
 
-  const roundTrip = await convertTiptapDocToMarkdown(converted.value, options)
+  const roundTrip = await convertTiptapDocToMarkdown(visualDocument, options)
   if (!roundTrip.ok || roundTrip.value === undefined) {
     return {
       ...converted,
@@ -300,7 +306,7 @@ export async function prepareMarkdownForVisualEditing(
     }
   }
 
-  return converted
+  return { ...converted, value: visualDocument }
 }
 
 function stableJson(value: unknown): string {
@@ -331,6 +337,12 @@ function normalizeComarkNodes(nodes: unknown[]): unknown[] {
     if (!Array.isArray(node) || typeof node[0] !== 'string') return [node]
     const [tag, rawProps, ...children] = node
     const props = { ...((rawProps && typeof rawProps === 'object' ? rawProps : {}) as Record<string, unknown>) }
+    const metadata = props.$
+    if (metadata && typeof metadata === 'object' && 'syntax' in metadata && (metadata.syntax === 'angle' || metadata.syntax === 'colon') && 'block' in metadata) {
+      // Content may change delimiters to preserve edited property values.
+      // Component identity and inline/block placement carry the meaning.
+      props.$ = { component: 1, block: metadata.block }
+    }
     if (tag === 'a' && props.target === '_blank' && props.rel === 'noopener noreferrer nofollow') {
       delete props.target
       delete props.rel

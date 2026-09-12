@@ -170,11 +170,16 @@ function createTableElement(node: JSONContent, context: TiptapToMDCContext): MDC
 }
 
 function createTableCellElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
-  return createElement(node, context, 'td')
+  return createElement(node, context, 'td', { props: tableAlignmentProps(node) })
 }
 
 function createTableHeaderElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
-  return createElement(node, context, 'th')
+  return createElement(node, context, 'th', { props: tableAlignmentProps(node) })
+}
+
+function tableAlignmentProps(node: JSONContent): JsonRecord {
+  const align = node.attrs?.align
+  return ['left', 'center', 'right'].includes(align) ? { style: `text-align:${align}` } : {}
 }
 
 function createTableRowElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
@@ -274,10 +279,6 @@ export async function tiptapToMDC(
   }
 
   return cleaned
-}
-
-export function tiptapToMDCSync(node: JSONContent, options?: TiptapToMDCOptions): MDCRoot {
-  return createMdcBodyFromTiptap(node, options)
 }
 
 function createMdcBodyFromTiptap(node: JSONContent, options?: TiptapToMDCOptions): MDCRoot {
@@ -631,25 +632,6 @@ function createLinkElement(node: JSONContent): MDCElement {
 }
 
 function createListItemElement(node: JSONContent, context: TiptapToMDCContext) {
-  const flattenedContent = (node.content || []).flatMap((child: JSONContent) => {
-    if (child.type === 'paragraph') {
-      return child.content
-    }
-    return child
-  })
-  node.content = flattenedContent
-
-  const hasMeaningfulContent = flattenedContent.some((child: JSONContent) => {
-    if (!child) return false
-    if (child.type === 'text') {
-      return (child.text || '').trim().length > 0
-    }
-    return true
-  })
-
-  if (!hasMeaningfulContent) {
-    return []
-  }
   return createElement(node, context, 'li')
 }
 

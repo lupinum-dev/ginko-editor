@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   enableDebug?: boolean
   enableFiles?: boolean
+  enableImages?: boolean
   enableImageMetadata?: boolean
   enableVideo?: boolean
   fileOutput?: 'markdown' | 'mdc'
@@ -49,6 +50,7 @@ const props = withDefaults(defineProps<{
   disabled: false,
   enableDebug: false,
   enableFiles: true,
+  enableImages: true,
   enableImageMetadata: false,
   enableVideo: true,
   fileOutput: 'mdc',
@@ -73,6 +75,7 @@ const emit = defineEmits<{
 const viewMode = ref<'raw' | 'visual'>('raw')
 const rawContent = ref(props.modelValue)
 const conversionError = ref<ConversionErrorPayload | null>(null)
+const clipboardError = ref<string>()
 const hasPendingVisualChanges = ref(false)
 let pendingEcho: string | undefined
 let revision = 0
@@ -122,13 +125,19 @@ const editor = useEditor({
   editable: !props.disabled,
   editorProps: { attributes: { 'aria-label': props.ariaLabel ?? 'Content' } },
   extensions: createEditorExtensions({
-    assetProvider: resolvedAssetProvider.value,
+    assetProvider: {
+      buildUrl: asset => resolvedAssetProvider.value.buildUrl(asset),
+      parseUrl: url => resolvedAssetProvider.value.parseUrl(url),
+    },
     codeBlockTheme: props.codeBlockTheme,
     enableDebug: props.enableDebug,
     enableFiles: props.enableFiles,
     enableVideo: props.enableVideo,
     fileOutput: props.fileOutput,
     getAuthoringKit: () => props.authoringKit,
+    getOutputOptions: () => outputOptions.value,
+    canPaste: () => canMutateVisualContent(),
+    onPasteError: message => { clipboardError.value = message },
     imageOutput: props.imageOutput,
     placeholder: props.placeholder,
     showMarkdownMarkers: props.showMarkdownMarkers,
@@ -147,7 +156,7 @@ const editor = useEditor({
 
 const filteredRecipes = computed(() => {
   const query = insertQuery.value.trim().toLocaleLowerCase()
-  const recipes = [...(props.authoringKit?.recipes ?? []), ...writingRecipes]
+  const recipes = [...(props.authoringKit?.recipes ?? []), ...writingRecipes.filter(recipe => props.enableImages || !isImageRecipe(recipe))]
   if (!query) return recipes
   return recipes.filter((recipe) =>
     [recipe.id, recipe.label, recipe.description ?? '', ...(recipe.keywords ?? [])]
@@ -240,6 +249,11 @@ function selectedPropValue(name: string): JsonValue | undefined {
   return selectedComponent.value?.node.attrs.props?.[name] as JsonValue | undefined
 }
 
+function effectivePropValue(name: string): JsonValue | undefined {
+  const selected = selectedComponent.value
+  return selectedPropValue(name) ?? (selected ? props.authoringKit?.implementation[selected.tag]?.props[name]?.default : undefined)
+}
+
 function updateSelectedProp(name: string, value: JsonValue | undefined) {
   const instance = editor.value
   const selected = selectedComponent.value
@@ -300,7 +314,7 @@ function propertyError(name: string) {
 }
 
 function valueFromOption(options: readonly JsonValue[], value: string): JsonValue | undefined {
-  return options.find((option) => String(option) === value)
+  return options.find((option) => JSON.stringify(option) === value)
 }
 
 const activeRecipe = computed(() => filteredRecipes.value[insertIndex.value])
@@ -328,7 +342,9 @@ function positionInsertMenu() {
 }
 
 function dismissOutside(event: globalThis.PointerEvent) {
-  if (insertMenuOpen.value && event.target instanceof globalThis.Node && !insertMenu.value?.contains(event.target) && !(event.target instanceof globalThis.Element && event.target.closest('.ginko-editor__insert-trigger'))) closeInsertMenu(false)
+  if (!insertMenuOpen.value || !(event.target instanceof globalThis.Node)) return
+  const ownTrigger = editorRoot.value?.querySelector('.ginko-editor__insert-trigger')
+  if (!insertMenu.value?.contains(event.target) && !ownTrigger?.contains(event.target)) closeInsertMenu(false)
 }
 
 function canOpenSlashMenu(instance: TiptapEditor) {
@@ -626,6 +642,7 @@ function clearFailure(traceId: string) {
 }
 
 async function loadSource(value: string, options: { initial?: boolean; switchToVisual?: boolean } = {}) {
+  clipboardError.value = undefined
   closeInsertMenu(false)
   cancelPendingUpdate()
   const currentRevision = revision
@@ -736,7 +753,9 @@ async function flush(): Promise<EditorFlushResult> {
 }
 
 async function showSource() {
-  await flush()
+  const result = await flush()
+  if (!result.ok || disposed) return
+  closeInsertMenu(false)
   viewMode.value = 'raw'
 }
 
@@ -765,29 +784,33 @@ function storedAssetSource(asset: Partial<AssetInfo>) {
 
 function insertImageAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
-  if (!instance || !canMutateVisualContent()) return false
-  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src: storedAssetSource(asset), title: asset.title, width: asset.width }
-  if (instance.isActive('image')) instance.chain().focus().updateAttributes('image', { props: payload }).run()
-  else instance.chain().focus().setImage(payload).run()
-  return true
+  if (!instance || !canMutateVisualContent(props.enableImages)) return false
+  const src = storedAssetSource(asset)
+  if (!src.trim()) return false
+  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src, title: asset.title, width: asset.width }
+  return instance.isActive('image')
+    ? instance.chain().focus().updateAttributes('image', { props: payload }).run()
+    : instance.chain().focus().setImage(payload).run()
 }
 
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent(props.enableFiles)) return false
-  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src: storedAssetSource(asset), title: asset.title || asset.filename, type: asset.mimeType }
-  if (instance.isActive('file')) instance.chain().focus().updateAttributes('file', { props: payload }).run()
-  else instance.chain().focus().setFile(payload).run()
-  return true
+  const src = storedAssetSource(asset)
+  if (!src.trim()) return false
+  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src, title: asset.title || asset.filename, type: asset.mimeType }
+  return instance.isActive('file')
+    ? instance.chain().focus().updateAttributes('file', { props: payload }).run()
+    : instance.chain().focus().setFile(payload).run()
 }
 
 function insertVideo(value: VideoInfo): boolean {
   const instance = editor.value
   if (!instance || !value.src.trim() || !canMutateVisualContent(props.enableVideo)) return false
   const payload = { src: value.src.trim(), title: value.title?.trim() || undefined }
-  if (instance.isActive('video')) instance.chain().focus().updateAttributes('video', { props: payload, ...payload }).run()
-  else instance.chain().focus().setVideo(payload).run()
-  return true
+  return instance.isActive('video')
+    ? instance.chain().focus().updateAttributes('video', { props: payload, ...payload }).run()
+    : instance.chain().focus().setVideo(payload).run()
 }
 
 function removeSelectedMedia(): boolean {
@@ -802,13 +825,20 @@ function createAssetRequest<T>(complete: (value: T) => boolean): EditorAssetRequ
   const requestRevision = revision
   const requestDocument = instance?.state.doc
   const requestSelection = instance?.state.selection
+  const requestSelectionRevision = selectionRevision.value
+  const requestContext = assetContextRevision
+  let settled = false
   return {
     complete(value) {
+      if (settled) return false
+      settled = true
       if (
         value === null ||
         !instance ||
         editor.value !== instance ||
         revision !== requestRevision ||
+        assetContextRevision !== requestContext ||
+        selectionRevision.value !== requestSelectionRevision ||
         !requestDocument?.eq(instance.state.doc) ||
         !requestSelection?.eq(instance.state.selection)
       ) return false
@@ -818,7 +848,7 @@ function createAssetRequest<T>(complete: (value: T) => boolean): EditorAssetRequ
 }
 
 function requestImage() {
-  if (!canMutateVisualContent()) return
+  if (!canMutateVisualContent(props.enableImages)) return
   emit('request-image', createAssetRequest(insertImageAsset))
 }
 
@@ -847,7 +877,14 @@ watch(() => props.modelValue, (value, previous) => {
 watch(hasPendingVisualChanges, (pending) => emit('pending-change', pending), {
   flush: 'sync',
 })
-watch(() => props.disabled, (disabled) => editor.value?.setEditable(!disabled))
+let assetContextRevision = 0
+watch([viewMode, () => props.disabled, () => props.enableImages, () => props.enableFiles, () => props.enableVideo, () => props.assetProvider], () => {
+  assetContextRevision += 1
+}, { flush: 'sync' })
+watch(() => props.disabled, (disabled) => {
+  editor.value?.setEditable(!disabled)
+  if (disabled) closeInsertMenu(false)
+}, { flush: 'sync' })
 watch(() => props.authoringKit, () => {
   clearPropertyDrafts()
   void (async () => {
@@ -875,7 +912,7 @@ onBeforeUnmount(() => {
 })
 
 const statusLabel = computed(() => {
-  if (conversionError.value) return 'Source only'
+  if (conversionError.value) return viewMode.value === 'visual' ? 'Changes need attention' : 'Source only'
   if (hasPendingVisualChanges.value) return 'Converting changes'
   return viewMode.value === 'visual' ? 'Visual editor' : 'Markdown source'
 })
@@ -1018,11 +1055,18 @@ defineExpose({
       </p>
     </div>
     <div
+      v-if="clipboardError"
+      class="ginko-editor__warning"
+      role="alert"
+    >
+      {{ clipboardError }}
+    </div>
+    <div
       v-if="conversionError"
       class="ginko-editor__warning"
       role="alert"
     >
-      <strong>Visual editing is unavailable for this source.</strong>
+      <strong>{{ viewMode === 'visual' ? 'Your changes are still here. Correct the document or use Undo before switching modes.' : 'Visual editing is unavailable for this source.' }}</strong>
       <span>{{ conversionError.message }}</span>
     </div>
     <template v-if="viewMode === 'visual' && editor">
@@ -1030,6 +1074,7 @@ defineExpose({
         v-if="!disabled"
         :editor="editor"
         :enable-files="enableFiles"
+        :enable-images="enableImages"
         :enable-video="enableVideo"
         @request-file="requestFile"
         @request-image="requestImage"
@@ -1045,12 +1090,13 @@ defineExpose({
         />
       </div>
       <section
-        v-if="selectedImage"
+        v-if="selectedImage && !disabled"
         class="ginko-editor__media-actions"
         aria-label="Selected image actions"
       >
         <span>{{ selectedImage.filename || 'Selected image' }}</span>
         <button
+          v-if="enableImages"
           type="button"
           @click="requestImage"
         >
@@ -1072,7 +1118,7 @@ defineExpose({
         </button>
       </section>
       <section
-        v-if="selectedComponent"
+        v-if="selectedComponent && !disabled"
         class="ginko-editor__inspector"
         :aria-labelledby="componentSettingsId"
       >
@@ -1099,21 +1145,21 @@ defineExpose({
             <input
               v-if="item.field.control === 'toggle'"
               type="checkbox"
-              :checked="selectedPropValue(item.name) === true"
+              :checked="effectivePropValue(item.name) === true"
               @change="updateSelectedProp(item.name, ($event.target as HTMLInputElement).checked)"
             >
             <select
               v-else-if="item.field.control === 'select'"
-              :value="String(selectedPropValue(item.name) ?? '')"
+              :value="JSON.stringify(selectedPropValue(item.name)) ?? ''"
               @change="updateSelectedProp(item.name, valueFromOption(item.options, ($event.target as HTMLSelectElement).value))"
             >
               <option value="">Default</option>
               <option
                 v-for="option in item.options"
-                :key="String(option)"
-                :value="String(option)"
+                :key="JSON.stringify(option)"
+                :value="JSON.stringify(option)"
               >
-                {{ option }}
+                {{ typeof option === 'string' ? (option || 'Empty text') : JSON.stringify(option) }}
               </option>
             </select>
             <input
