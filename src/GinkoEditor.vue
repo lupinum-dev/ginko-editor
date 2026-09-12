@@ -61,6 +61,7 @@ const emit = defineEmits<{
   'conversion-recovered': [payload: ConversionRecoveredPayload]
   'request-file': [request: EditorAssetRequest<Partial<AssetInfo>>]
   'request-image': [request: EditorAssetRequest<Partial<AssetInfo>>]
+  'request-image-metadata': [assetId: string]
   'request-video': [request: EditorAssetRequest<VideoInfo>]
   'update:modelValue': [value: string]
 }>()
@@ -186,6 +187,28 @@ const selectedComponent = computed(() => {
     }),
     label: metadata.label,
     tag,
+  }
+})
+
+const selectedImage = computed(() => {
+  const instance = editor.value
+  if (!instance || selectionRevision.value < 0) return undefined
+  const selection = instance.state.selection as (TiptapEditor['state']['selection'] & {
+    node?: ProseMirrorNode
+  })
+  if (!selection?.node || selection.node.type.name !== 'image') return undefined
+  const properties = selection.node.attrs.props as Record<string, unknown> | undefined
+  const source = typeof properties?.src === 'string' ? properties.src : ''
+  const parsed = source ? resolvedAssetProvider.value.parseUrl(source) : null
+  const storedIdentity = /^[a-z0-9]{20,40}$|^[a-z0-9]+;[a-z_]+$/i.test(source) ? source : ''
+  return {
+    assetId:
+      typeof properties?.id === 'string' && properties.id
+        ? properties.id
+        : typeof parsed?.id === 'string' && parsed.id
+          ? parsed.id
+          : storedIdentity,
+    filename: typeof properties?.filename === 'string' ? properties.filename : '',
   }
 })
 
@@ -733,6 +756,12 @@ function requestImage() {
   emit('request-image', createAssetRequest(insertImageAsset))
 }
 
+function requestSelectedImageMetadata() {
+  const assetId = selectedImage.value?.assetId
+  if (!assetId || !canMutateVisualContent()) return
+  emit('request-image-metadata', assetId)
+}
+
 function requestFile() {
   if (!canMutateVisualContent(props.enableFiles)) return
   emit('request-file', createAssetRequest(insertFileAsset))
@@ -911,6 +940,33 @@ defineExpose({
         />
       </div>
       <section
+        v-if="selectedImage"
+        class="ginko-editor__media-actions"
+        aria-label="Selected image actions"
+      >
+        <span>{{ selectedImage.filename || 'Selected image' }}</span>
+        <button
+          type="button"
+          @click="requestImage"
+        >
+          Replace
+        </button>
+        <button
+          v-if="selectedImage.assetId"
+          type="button"
+          @click="requestSelectedImageMetadata"
+        >
+          Metadata
+        </button>
+        <button
+          type="button"
+          class="ginko-editor__delete"
+          @click="removeSelectedMedia"
+        >
+          Remove
+        </button>
+      </section>
+      <section
         v-if="selectedComponent"
         class="ginko-editor__inspector"
         :aria-labelledby="componentSettingsId"
@@ -1061,6 +1117,8 @@ defineExpose({
 .ginko-editor__surface :deep(table) { width: 100%; border-collapse: collapse; }
 .ginko-editor__surface :deep(td), .ginko-editor__surface :deep(th) { border: 1px solid var(--ginko-border); padding: .5rem; }
 .ginko-editor__inspector { display: grid; grid-template-columns: minmax(10rem, .75fr) minmax(0, 1.25fr); gap: 1rem; border-top: 1px solid var(--ginko-border); background: var(--ginko-muted); padding: .9rem 1rem 1rem; }
+.ginko-editor__media-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; border-top: 1px solid var(--ginko-border); background: var(--ginko-muted); padding: .5rem .75rem; }
+.ginko-editor__media-actions > span { margin-inline-end: auto; overflow: hidden; color: var(--ginko-muted-text); text-overflow: ellipsis; white-space: nowrap; }
 .ginko-editor__inspector h3, .ginko-editor__inspector p { margin: 0; }
 .ginko-editor__inspector h3 { font-size: 1rem; line-height: 1.3; }
 .ginko-editor__inspector > div > p:last-child { margin-block-start: .2rem; color: var(--ginko-muted-text); font-size: .8rem; }

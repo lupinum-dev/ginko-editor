@@ -185,6 +185,42 @@ describe('GinkoEditor browser journey', () => {
     expect(wrapper.vm.editor?.getJSON().content?.some((node) => node.type === 'heading')).toBe(true)
   })
 
+  it('exposes host-owned replacement and metadata actions for a selected stored image', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        assetProvider: {
+          buildUrl: () => '/resolved.png',
+          parseUrl: () => null,
+        },
+        modelValue: '',
+        syncDebounceMs: 0,
+      },
+    })
+    await flushPromises()
+    await waitFor(() => Boolean(wrapper.vm.editor))
+    expect(wrapper.vm.insertImageAsset({
+      alt: 'Diagram',
+      filename: 'diagram.png',
+      id: 'asset_123456789012345',
+      url: '/resolved.png',
+    })).toBe(true)
+    let imagePosition = -1
+    wrapper.vm.editor!.state.doc.descendants((node, position) => {
+      if (imagePosition < 0 && node.type.name === 'image') imagePosition = position
+    })
+    wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[aria-label="Selected image actions"]').text()).toContain('diagram.png')
+    await clickButton(wrapper, 'Metadata')
+    expect(wrapper.emitted('request-image-metadata')).toEqual([['asset_123456789012345']])
+
+    await clickButton(wrapper, 'Replace')
+    const request = wrapper.emitted('request-image')?.at(-1)?.[0] as EditorAssetRequest<Partial<AssetInfo>>
+    expect(request.complete({ alt: 'Replacement', id: 'asset_456', url: '/replacement.png' })).toBe(true)
+  })
+
   it('keeps block separation when a markdown file is inserted before a heading', async () => {
     const wrapper = mount(GinkoEditor, {
       attachTo: document.body,
