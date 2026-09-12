@@ -46,7 +46,87 @@ function sourceFor(tag: string): AuthoringKitSourceV1 {
   }
 }
 
+function configurableSource(): AuthoringKitSourceV1 {
+  return {
+    authoring: {
+      info: {
+        label: 'Information',
+        props: {
+          appearance: { control: 'select', label: 'Appearance' },
+          icon: { control: 'text', label: 'Icon' },
+          visible: { control: 'toggle', label: 'Visible' },
+        },
+      },
+    },
+    implementation: {
+      info: {
+        componentName: 'Information',
+        props: {
+          appearance: { options: ['quiet', 'tint'], required: false, types: ['string'] },
+          icon: { required: false, types: ['string'] },
+          visible: { required: false, types: ['boolean'] },
+        },
+        slots: ['default'],
+      },
+    },
+    policy: {
+      version: 2,
+      components: {
+        info: {
+          kind: 'block',
+          media: null,
+          props: {
+            appearance: { required: false, types: ['string'], allowedValues: ['quiet', 'tint'] },
+            icon: { required: false, types: ['string'], allowedValues: null },
+            visible: { required: false, types: ['boolean'], allowedValues: null },
+          },
+          slots: ['default'],
+          allowedParents: null,
+          allowedChildren: null,
+        },
+      },
+    },
+    recipes: [],
+    version: 1,
+  }
+}
+
 describe('editor-specific authoring kits', () => {
+  it('keeps natural form focus while selected-component properties update', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        authoringKit: await createAuthoringKit(configurableSource()),
+        modelValue: '<info appearance="tint" visible>\nContext\n</info>',
+      },
+    })
+    try {
+      await flushPromises()
+      await new Promise(resolve => globalThis.setTimeout(resolve, 30))
+      wrapper.vm.editor!.chain().setNodeSelection(0).run()
+      await wrapper.vm.$nextTick()
+
+      const icon = wrapper.get('input[type="text"]')
+      ;(icon.element as HTMLInputElement).focus()
+      await icon.setValue('info')
+      expect(document.activeElement).toBe(icon.element)
+      expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(true)
+
+      const appearance = wrapper.get('select')
+      ;(appearance.element as HTMLSelectElement).focus()
+      await appearance.setValue('quiet')
+      expect(document.activeElement).toBe(appearance.element)
+
+      const visible = wrapper.get('input[type="checkbox"]')
+      ;(visible.element as HTMLInputElement).focus()
+      await visible.setValue(false)
+      expect(document.activeElement).toBe(visible.element)
+      expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(true)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('inserts a real recipe through slash-keyword search and restores focus on cancel', async () => {
     const kit = await createAuthoringKit({
       ...sourceFor('info'),

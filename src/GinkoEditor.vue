@@ -199,7 +199,6 @@ function updateSelectedProp(name: string, value: JsonValue | undefined) {
       props: next,
     }),
   )
-  instance.commands.focus()
 }
 
 function valueFromOption(options: readonly JsonValue[], value: string): JsonValue | undefined {

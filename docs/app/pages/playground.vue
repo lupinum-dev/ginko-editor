@@ -323,9 +323,9 @@ function renderErrorMessage(cause: unknown) {
 </template>
 
 <style scoped>
-.playground-page { width: min(100% - 2rem, 92rem); margin: 0 auto; padding: clamp(2.5rem, 6vw, 5rem) 0; }
-.playground-intro { max-width: 50rem; margin-bottom: clamp(2.5rem, 5vw, 4rem); }
-.playground-intro h1 { max-width: 12ch; margin: .35rem 0 .9rem; font-size: clamp(2.35rem, 6vw, 4.8rem); line-height: .98; letter-spacing: -.052em; }
+.playground-page { width: min(100% - 2rem, 92rem); margin: 0 auto; padding: clamp(1.75rem, 4vw, 3.25rem) 0; }
+.playground-intro { max-width: 58rem; margin-bottom: clamp(1.75rem, 3vw, 2.5rem); }
+.playground-intro h1 { max-width: 18ch; margin: .3rem 0 .7rem; font-size: clamp(2.15rem, 4vw, 3.5rem); line-height: 1; letter-spacing: -.045em; }
 .playground-intro > p:last-child { max-width: 42rem; font-size: 1.05rem; line-height: 1.65; }
 .playground-intro > p:last-child, .playground-section__header p { margin: 0; color: var(--muted-foreground); }
 .playground-kicker { margin: 0; color: var(--primary); font-size: .72rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
@@ -365,6 +365,8 @@ function renderErrorMessage(cause: unknown) {
   .playground-panel--preview { position: static; }
   .playground-preview { min-height: 18rem; }
   .playground-local__actions { justify-content: start; }
-  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column']) { grid-column: 1 / -1; }
+  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column']),
+  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='sm']),
+  :deep(.ginko-editor .ProseMirror div[data-type='element'][tag='layout'] > div[data-type='element'][tag='column'][props*='lg']) { grid-column: 1 / -1; }
 }
 </style>
