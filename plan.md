@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 consumer integration is assigned, starting with exact CMS + unpublished V2 Content package-consumer certification before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 requires corrections after Gate C review: pending-edit preservation, asset handling, reproducible candidate setup, actual V2 package-consumer proof and the real CMS browser journey. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -267,7 +267,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
 | 6 | Docs writing proof, then focused interaction hardening | 4 | D: initial-kit writing quality accepted | ACCEPTED |
-| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof; assigned | IN PROGRESS |
+| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: changes required; corrections assigned | IN PROGRESS |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
 | 9 | ChiliSkills full adoption and content migration | 8 | G: application cutover | TODO |
@@ -2555,3 +2555,66 @@ Return Gate C with independently operable local previews, consumer API examples,
 focused behavior evidence and owning verification results. Commit scoped source,
 tests and evidence locally. Step 7 and later milestones remain unassigned. No
 push, publication, deployment or production migration is authorized.
+
+
+#### 2026-09-12 — Gate C reviewer requires host integration corrections
+
+The implementor submitted Editor `856372e`, CMS `17db81ef` (prerequisites
+`b172eaf0`, `3b8fcc5b`), and ChiliSkills `f5a67ee`. The packet reports clean
+source trees, CMS check/build and 1,276 tests with one skipped, ChiliSkills check
+with 55 tests, and local candidate package installation/build. Gate C is
+**CHANGES REQUIRED**; passing build/component checks do not cover the failures
+below.
+
+1. **Pending edits can be lost.** In the real ChiliSkills pilot at port 4321,
+   the reviewer typed a final phrase in Visual mode and immediately selected
+   “Einfaches Textfeld.” The phrase was absent from the resulting textarea.
+   Neither host currently awaits the shared Editor's exposed `flush()` at its
+   save/close boundary; Editor cancels pending conversion on unmount by design.
+   Integrate pending edits into host save, close/navigation and undo ordering.
+   Preserve recoverable source on failure. The separate plain-text escape also
+   removes pilot enrollment with no return path for a nonempty pilot; prefer the
+   existing Source mode or a safely reversible mode switch.
+2. **Local image insertion fails.** The reviewer used the real file picker with
+   `tests/fixtures/diagram.png`. The image rendered without a `src` (natural
+   width zero) and conversion reported “This document violates the editor
+   authoring kit.” The pilot's canonical `asset:` scheme and display `blob:` URL
+   do not fit the current Content/Editor URL boundaries. Correct the canonical
+   reference/display resolution contract, preserving URL safety and host-owned
+   bytes. Verify real insertion, reload after asynchronous asset loading,
+   export/restore, failure cleanup and Undo. Synchronous insertion acceptance is
+   not equivalent to later conversion success. Keep CMS-specific storage-ID
+   recognition in its asset provider and hide unsupported metadata actions.
+3. **Candidate setup is not reproducible from committed inputs.** Both hosts
+   import unpublished packages absent their dependency manifests/lockfiles or a
+   committed setup command; verification relies on manually linked ignored
+   `node_modules` entries. Add a documented exact-candidate bootstrap for clean
+   checkouts/consumers, including compatible Vue/TipTap identity, without putting
+   temporary links in release manifests or publishing. The visual editor must
+   actually mount in integration regressions. A temporary reviewer component
+   probe failed during mounting with Vue ref/peer warnings before its intended
+   assertion; it was removed and is not counted as data-loss evidence.
+4. **The V2 package prerequisite remains open.** The new local-content lane
+   checks V2 symbol presence, but its offline contract builder receives no V2
+   policy. The reviewer executed that exact builder call and confirmed version
+   1 with an empty V1 component policy. Existing packed safety probes exercise
+   native Content without a component policy. Add an actual V2 custom-component
+   contract and positive/negative cases through packed CMS using the exact
+   Content archive; record artifacts and results.
+5. **The real CMS browser journey is missing.** Mounted FieldRichtext tests and
+   a Studio build do not satisfy both-host acceptance. Investigate the documented
+   local host/bridge workflow without disturbing the user's port 3000 process or
+   changing remote backend/auth state. If an external action is necessary,
+   identify the exact missing authorization and finish independent corrections
+   first. Do not silently waive this requirement.
+
+The reviewer restored the disposable Fourier script through the UI, undid the
+failed image/module asset insertion, and left the pilot available at
+`http://127.0.0.1:4321/modules/signale-spektren`. Source fixture content is
+restored; temporary reviewer test files are removed. Implementation source was
+not edited by the reviewer during this audit.
+
+These bounded Step 5 corrections are assigned to the implementor. Commit source,
+tests and evidence locally, then return Gate C again with operable host previews.
+Step 7 and later milestones remain unassigned. No push, publication, deployment
+or production migration is authorized.
