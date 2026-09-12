@@ -1,0 +1,57 @@
+{
+  "name": "@lupinum/ginko-editor",
+  "version": "0.1.0",
+  "description": "A portable Vue editor for Ginko content.",
+  "type": "module",
+  "sideEffects": ["**/*.css"],
+  "license": "MIT",
+  "author": "Lupinum OG <info@lupinum.com> (https://lupinum.com)",
+  "homepage": "https://ginko-editor.lupinum.com",
+  "repository": { "type": "git", "url": "git+https://github.com/lupinum-dev/ginko-editor.git" },
+  "bugs": { "url": "https://github.com/lupinum-dev/ginko-editor/issues" },
+  "packageManager": "pnpm@11.21.0",
+  "engines": { "node": "^22.14.0 || ^24.0.0 || ^26.0.0" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./style.css": "./dist/style.css"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "check:dependencies": "node scripts/check-dependency-policy.mjs",
+    "audit:all": "pnpm audit",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "docs:build": "pnpm --dir docs build",
+    "dev": "pnpm build && pnpm docs:dev",
+    "docs:dev": "pnpm --dir docs dev",
+    "lint": "eslint .",
+    "pack:release": "node scripts/pack-release.mjs",
+    "preview:pack": "node scripts/pack-release.mjs --preview",
+    "release:prepare": "changelogen --bump --clean",
+    "release:verify": "pnpm audit:all && pnpm verify && pnpm pack:release && node scripts/verify-packed-consumer.mjs",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit",
+    "verify": "pnpm check:dependencies && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm docs:build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.1.1",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "changelogen": "0.6.2",
+    "eslint": "^10.4.1",
+    "eslint-plugin-vue": "^10.9.0",
+    "pkg-pr-new": "0.0.87",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.59.1",
+    "vite": "8.1.5",
+    "vitest": "^4.1.8",
+    "vue": "3.5.42",
+    "vue-tsc": "^3.3.7",
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  }
+}
