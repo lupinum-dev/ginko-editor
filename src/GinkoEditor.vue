@@ -699,10 +699,18 @@ function canMutateVisualContent(featureEnabled = true) {
   return featureEnabled && !disposed && !props.disabled && viewMode.value === 'visual' && editor.value?.isEditable === true
 }
 
+function storedAssetSource(asset: Partial<AssetInfo>) {
+  // A host-owned provider uses the stable id as canonical source and resolves
+  // display URLs separately. Without a provider, a supplied URL is already the
+  // only durable source; do not discard it merely because metadata also has an id.
+  if (props.assetProvider && asset.id) return asset.id
+  return asset.url || asset.id || resolvedAssetProvider.value.buildUrl(asset)
+}
+
 function insertImageAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent()) return false
-  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src: asset.id || asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title, width: asset.width }
+  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src: storedAssetSource(asset), title: asset.title, width: asset.width }
   if (instance.isActive('image')) instance.chain().focus().updateAttributes('image', { props: payload }).run()
   else instance.chain().focus().setImage(payload).run()
   return true
@@ -711,7 +719,7 @@ function insertImageAsset(asset: Partial<AssetInfo>): boolean {
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent(props.enableFiles)) return false
-  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src: asset.id || asset.url || resolvedAssetProvider.value.buildUrl(asset), title: asset.title || asset.filename, type: asset.mimeType }
+  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src: storedAssetSource(asset), title: asset.title || asset.filename, type: asset.mimeType }
   if (instance.isActive('file')) instance.chain().focus().updateAttributes('file', { props: payload }).run()
   else instance.chain().focus().setFile(payload).run()
   return true

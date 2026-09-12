@@ -189,6 +189,24 @@ describe('GinkoEditor browser journey', () => {
     expect(wrapper.vm.editor?.getJSON().content?.some((node) => node.type === 'heading')).toBe(true)
   })
 
+  it('keeps caller-supplied URLs when the default asset provider also receives an id', async () => {
+    const wrapper = await mountEditor('')
+    expect(
+      wrapper.vm.insertImageAsset({
+        alt: 'Example',
+        id: 'asset-id',
+        url: 'https://example.com/image.png',
+      }),
+    ).toBe(true)
+    await expect(wrapper.vm.flush()).resolves.toMatchObject({ ok: true })
+    expect(wrapper.get('img').attributes('src')).toBe(
+      'https://example.com/image.png',
+    )
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain(
+      'src="https://example.com/image.png"',
+    )
+  })
+
   it('exposes host-owned replacement and metadata actions for a selected stored image', async () => {
     const wrapper = mount(GinkoEditor, {
       attachTo: document.body,
@@ -252,7 +270,13 @@ describe('GinkoEditor browser journey', () => {
     })
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
-    expect(wrapper.vm.insertFileAsset({ filename: 'Guide.pdf', url: '/guide.pdf' })).toBe(true)
+    expect(
+      wrapper.vm.insertFileAsset({
+        filename: 'Guide.pdf',
+        id: 'guide-id',
+        url: '/guide.pdf',
+      }),
+    ).toBe(true)
     const result = await wrapper.vm.flush()
     expect(result.ok).toBe(true)
     const emitted = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
