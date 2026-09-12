@@ -2759,3 +2759,39 @@ evidence is recorded in the follow-up below.
 This review does not waive the authenticated CMS save/reload acceptance gate
 described above. No release, deployment or remote backend change is authorized
 by these local verification results.
+
+
+#### Final installed-package and browser evidence
+
+The clean Content correction is `2789113`; its reproducible archive SHA-256 is
+`f25e43f24d88c820612421011cd8a475155b92398698ffc778de25236eb7bc07`.
+The Editor correction is `43a73ca`; its archive SHA-256 is
+`3582d95f511f9bfab0d0316cc9ef83553727c1490e0b70f7a732331f76c807ed`.
+Fresh installed Vue and Nuxt consumers passed public API/declaration checks,
+component/slot typechecks, production builds and explicit CSS inclusion using
+these two archives. Editor's dependency audit reports no known vulnerabilities.
+The Content archive includes the verified IDE metadata artifact.
+
+CMS correction `4da0a230` passed the full check described above. Its refreshed
+strict candidate install uses these exact archives; 64 focused workflow/probe
+tests and Studio types passed again against them. ChiliSkills updated its host
+to Vue 3.5.42 and Nuxt 4.5.2 to meet the accepted package peer ranges. Its refreshed
+candidate install validates peers, retaining only Ginko Docs' existing, narrowly
+scoped Sharp 0.35.4 exception, with a removal condition in its migration log.
+ChiliSkills then passed full `pnpm check`: all 63 tests, lint, formatting, types,
+slide build and Nuxt production build. Docs source remains unchanged at `10fc712`.
+
+The coordinator tested the actual built playground at
+`http://localhost:4317/playground`: `/note` filtering and keyboard insertion,
+property editing and matching live preview, Markdown paste conversion and
+visible rejection of unsupported pasted content, aligned tables, multi-paragraph
+lists, unlabeled code fences, and isolated-editor collapse retention. Final
+desktop and 390×844 checks passed; the insert menu fits the viewport and the page
+has one main landmark and one main-content ID. The welcome document was restored
+and survives reload. The preview remains running.
+
+Independent reviewers report no remaining actionable findings in the reviewed
+API, conversion and playground changes. Authenticated CMS editing/save/reload
+remains the explicit unverified acceptance gate; local package and component
+checks do not establish that backend workflow. No push, publication or deployment
+was performed.
