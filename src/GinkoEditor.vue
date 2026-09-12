@@ -231,8 +231,7 @@ async function flush(): Promise<EditorFlushResult> {
 }
 
 async function showSource() {
-  const result = await flush()
-  if (!result.ok) return
+  await flush()
   viewMode.value = 'raw'
 }
 

@@ -267,6 +267,12 @@ describe('GinkoEditor browser journey', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(wrapper.attributes('data-mode')).toBe('visual')
 
+    await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
+    await flushPromises()
+    expect(wrapper.attributes('data-mode')).toBe('raw')
+    expect(wrapper.get('textarea').element.value).toBe('<Badge>\nLast safe value\n</Badge>\n')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
     await wrapper.setProps({ modelValue: '# Recovered externally\n' })
     await waitFor(() => wrapper.vm.editor?.getText().includes('Recovered externally') === true)
     expect(wrapper.emitted('conversion-recovered')).toHaveLength(1)
