@@ -328,6 +328,91 @@ describe('editor-specific authoring kits', () => {
     }
   })
 
+  it('shows the restored canonical number after undo', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        authoringKit: await createAuthoringKit(configurableSource()),
+        modelValue: '<info :count="1">\nOriginal\n</info>',
+        syncDebounceMs: 0,
+      },
+    })
+    try {
+      await flushPromises()
+      wrapper.vm.editor!.commands.setNodeSelection(0)
+      await wrapper.vm.$nextTick()
+      await wrapper.get('input[inputmode="decimal"]').setValue('5')
+      await wrapper.vm.flush()
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(5)
+
+      wrapper.vm.editor!.commands.undo()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1)
+      expect((wrapper.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('1')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps decimal and negative prefixes editable until they form complete numbers', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        authoringKit: await createAuthoringKit(configurableSource()),
+        modelValue: '<info :count="0">\nOriginal\n</info>',
+        syncDebounceMs: 0,
+      },
+    })
+    try {
+      await flushPromises()
+      wrapper.vm.editor!.commands.setNodeSelection(0)
+      await wrapper.vm.$nextTick()
+      const input = wrapper.get('input[inputmode="decimal"]')
+
+      await input.setValue('1.')
+      expect((input.element as HTMLInputElement).value).toBe('1.')
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(0)
+      await input.setValue('1.5')
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
+
+      await input.setValue('-')
+      expect((input.element as HTMLInputElement).value).toBe('-')
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
+      await input.setValue('-2.5')
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(-2.5)
+      expect(wrapper.text()).not.toContain('Enter a valid number.')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('discards an invalid number draft when the host replaces the document', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        authoringKit: await createAuthoringKit(configurableSource()),
+        modelValue: '<info :count="1">\nOriginal\n</info>',
+        syncDebounceMs: 0,
+      },
+    })
+    try {
+      await flushPromises()
+      wrapper.vm.editor!.commands.setNodeSelection(0)
+      await wrapper.vm.$nextTick()
+      await wrapper.get('input[inputmode="decimal"]').setValue('bad')
+      await wrapper.setProps({ modelValue: '<info :count="42">\nReplacement\n</info>' })
+      await flushPromises()
+      wrapper.vm.editor!.commands.setNodeSelection(0)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(42)
+      expect((wrapper.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('42')
+      expect(wrapper.text()).not.toContain('Enter a valid number.')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('validates Markdown paste through the active authoring kit before insertion', async () => {
     const wrapper = mount(GinkoEditor, {
       attachTo: document.body,

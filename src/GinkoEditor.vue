@@ -123,6 +123,7 @@ const editor = useEditor({
   }),
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
+    if (transaction.docChanged) clearPropertyDrafts()
     if (!isCurrentlyNormalizingTable() && normalizeTableCells(instance)) return
     if (!applyingDocument && transaction.docChanged) scheduleVisualUpdate(instance)
   },
@@ -188,6 +189,19 @@ const selectedComponent = computed(() => {
   }
 })
 
+function clearPropertyDrafts() {
+  propertyDrafts.value = {}
+  propertyErrors.value = {}
+}
+
+watch(
+  () => {
+    const selected = selectedComponent.value
+    return selected ? `${selected.pos}:${selected.tag}` : undefined
+  },
+  clearPropertyDrafts,
+)
+
 function selectedPropValue(name: string): JsonValue | undefined {
   return selectedComponent.value?.node.attrs.props?.[name] as JsonValue | undefined
 }
@@ -224,15 +238,25 @@ function updateNumberProp(name: string, event: BrowserEvent) {
   const raw = target.value
   propertyDrafts.value[key] = raw
   if (!raw.trim()) {
+    delete propertyDrafts.value[key]
     delete propertyErrors.value[key]
     updateSelectedProp(name, undefined)
     return
   }
-  const value = Number(raw)
+  const trimmed = raw.trim()
+  const completeNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)
+  if (!completeNumber) {
+    const incompleteNumber = /^[+-]?(?:(?:\d+\.?|\.\d*)?(?:[eE][+-]?)?)?$/.test(trimmed)
+    if (incompleteNumber) delete propertyErrors.value[key]
+    else propertyErrors.value[key] = 'Enter a valid number.'
+    return
+  }
+  const value = Number(trimmed)
   if (!Number.isFinite(value)) {
     propertyErrors.value[key] = 'Enter a valid number.'
     return
   }
+  delete propertyDrafts.value[key]
   delete propertyErrors.value[key]
   updateSelectedProp(name, value)
 }
@@ -722,10 +746,12 @@ function requestVideo() {
 watch(() => props.modelValue, (value, previous) => {
   if (value === previous) return
   if (consumeEcho(value)) return
+  clearPropertyDrafts()
   void loadSource(value)
 })
 watch(() => props.disabled, (disabled) => editor.value?.setEditable(!disabled))
 watch(() => props.authoringKit, () => {
+  clearPropertyDrafts()
   void (async () => {
     const result = await flush()
     if (!result.ok) return
