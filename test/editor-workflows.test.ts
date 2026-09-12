@@ -48,6 +48,17 @@ async function mountEditor(modelValue: string, syncDebounceMs = 0) {
   return wrapper
 }
 
+async function clickButton(wrapper: Awaited<ReturnType<typeof mountEditor>>, label: string) {
+  const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)
+  if (!button) throw new Error(`Button "${label}" is not available.`)
+  await button.trigger('click')
+}
+
+async function requestImage(wrapper: Awaited<ReturnType<typeof mountEditor>>) {
+  await clickButton(wrapper, 'More')
+  await clickButton(wrapper, 'Image')
+}
+
 describe('GinkoEditor browser journey', () => {
   it('opens, closes, and switches modes without changing source bytes', async () => {
     const source = '# Exact source\n\nParagraph.\n'
@@ -134,7 +145,7 @@ describe('GinkoEditor browser journey', () => {
 
   it('leaves source unchanged when the host cancels an asset request', async () => {
     const wrapper = await mountEditor('No asset\n')
-    await wrapper.get('button[title="Image"]').trigger('click')
+    await requestImage(wrapper)
     expect(wrapper.emitted('request-image')).toHaveLength(1)
     const request = wrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     expect(request.complete(null)).toBe(false)
@@ -196,21 +207,21 @@ describe('GinkoEditor browser journey', () => {
     const asset = { alt: 'Diagram', url: '/diagram.png' }
 
     const rawWrapper = await mountEditor('Raw guard\n')
-    await rawWrapper.get('button[title="Image"]').trigger('click')
+    await requestImage(rawWrapper)
     const rawRequest = rawWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     await rawWrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
     expect(rawRequest.complete(asset)).toBe(false)
     expect(rawWrapper.get('textarea').element.value).toBe('Raw guard\n')
 
     const disabledWrapper = await mountEditor('Disabled guard\n')
-    await disabledWrapper.get('button[title="Image"]').trigger('click')
+    await requestImage(disabledWrapper)
     const disabledRequest = disabledWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     await disabledWrapper.setProps({ disabled: true })
     expect(disabledRequest.complete(asset)).toBe(false)
     expect(disabledWrapper.emitted('update:modelValue')).toBeUndefined()
 
     const replacedWrapper = await mountEditor('Old document\n')
-    await replacedWrapper.get('button[title="Image"]').trigger('click')
+    await requestImage(replacedWrapper)
     const replacedRequest = replacedWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     await replacedWrapper.setProps({ modelValue: 'New document\n' })
     await waitFor(() => replacedWrapper.vm.editor?.getText().includes('New document') === true)
@@ -218,7 +229,7 @@ describe('GinkoEditor browser journey', () => {
     expect(replacedWrapper.vm.editor?.getText()).toContain('New document')
 
     const unmountedWrapper = await mountEditor('Unmount guard\n')
-    await unmountedWrapper.get('button[title="Image"]').trigger('click')
+    await requestImage(unmountedWrapper)
     const unmountedRequest = unmountedWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     unmountedWrapper.unmount()
     expect(unmountedRequest.complete(asset)).toBe(false)
@@ -246,8 +257,11 @@ describe('GinkoEditor browser journey', () => {
     })
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
-    expect(wrapper.find('button[title="File"]').exists()).toBe(false)
-    expect(wrapper.find('button[title="Video"]').exists()).toBe(false)
+    await clickButton(wrapper, 'More')
+    const actions = wrapper.findAll('button').map((button) => button.text())
+    expect(actions).toContain('Image')
+    expect(actions).not.toContain('File')
+    expect(actions).not.toContain('Video')
     expect(wrapper.vm.insertFileAsset({ url: '/file.pdf' })).toBe(false)
     expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
   })

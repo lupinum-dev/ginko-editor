@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { Editor } from '@tiptap/core'
+import { parseMdcDocument } from '@lupinum/ginko-content/cms-contract'
 import { describe, expect, it } from 'vitest'
 
 import { createEditorExtensions } from '../src/lib/config/editorConfig.js'
+import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring.js'
 import {
   applyTiptapDocToEditor,
   convertMarkdownToTiptapDoc,
@@ -28,6 +30,54 @@ function createEditor() {
 }
 
 describe('editor conversion contract', () => {
+  it('uses authored angle and colon form metadata when enforcing component kind', async () => {
+    const source: AuthoringKitSourceV1 = {
+      version: 1,
+      policy: {
+        version: 2,
+        components: {
+          badge: {
+            kind: 'inline',
+            props: {},
+            slots: ['default'],
+            allowedParents: null,
+            allowedChildren: null,
+            media: null,
+          },
+          panel: {
+            kind: 'block',
+            props: {},
+            slots: ['default'],
+            allowedParents: null,
+            allowedChildren: null,
+            media: null,
+          },
+        },
+      },
+      implementation: {
+        badge: { componentName: 'Badge', props: {}, slots: ['default'] },
+        panel: { componentName: 'Panel', props: {}, slots: ['default'] },
+      },
+      authoring: { badge: { label: 'Badge' }, panel: { label: 'Panel' } },
+      recipes: [],
+    }
+    const kit = await createAuthoringKit(source)
+
+    for (const markdown of ['hello :badge[world]', 'hello <Badge>world</Badge>', '::panel\nBody\n::']) {
+      expect((await prepareMarkdownForVisualEditing(markdown, undefined, undefined, kit)).ok).toBe(true)
+    }
+    for (const markdown of ['::badge\nWrong form\n::', 'hello :panel[Wrong form]']) {
+      const result = await prepareMarkdownForVisualEditing(markdown, undefined, undefined, kit)
+      expect(result.ok).toBe(false)
+      expect(result.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'authoring_kit_rejected',
+          detail: expect.objectContaining({ message: expect.stringMatching(/invalid_node/) }),
+        }),
+      ]))
+    }
+  })
+
   it('uses the actual TipTap schema for rich MDC documents', async () => {
     const source = [
       '# Title',
@@ -69,6 +119,33 @@ describe('editor conversion contract', () => {
     expect(output.value).toContain('# Original')
     expect(output.value).toContain('**meaning**')
     expect(output.value).toContain('Added')
+    editor.destroy()
+  })
+
+  it('round-trips host component props and named slots through a real edit', async () => {
+    const source = [
+      '<learning-objective level="advanced" assessed>',
+      'Goal',
+      '',
+      '<template #tip>',
+      'Hint',
+      '</template>',
+      '</learning-objective>',
+    ].join('\n')
+    const parsed = await convertMarkdownToTiptapDoc(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok || !parsed.value) throw new Error('Expected valid custom component source.')
+
+    const editor = createEditor()
+    applyTiptapDocToEditor(editor, parsed.value)
+    editor.commands.insertContentAt(editor.state.doc.content.size, 'After')
+    const output = await convertTiptapDocToMarkdown(editor.getJSON())
+    expect(output.ok).toBe(true)
+    expect(output.value).toContain('<learning-objective level="advanced" assessed>')
+    expect(output.value).toContain('<template #tip>')
+    const reparsed = await parseMdcDocument(output.value!, { autoClose: false })
+    expect(reparsed.nodes[0]?.[1]).toMatchObject({ assessed: true, level: 'advanced' })
+    expect(JSON.stringify(reparsed.nodes[0])).toContain('"template"')
     editor.destroy()
   })
 

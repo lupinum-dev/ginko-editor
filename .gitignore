@@ -4,6 +4,7 @@ node_modules
 dist
 release-artifacts
 .preview-artifacts
+docs/.candidate
 .nuxt
 .ginko
 .output

@@ -8,6 +8,10 @@
  */
 
 import type { JSONContent } from '@tiptap/vue-3'
+import {
+  classifyPortableMarkdownElement,
+  type PortableComponentPolicy,
+} from '@lupinum/ginko-content/cms-contract'
 
 import type { JsonRecord, JsonValue } from '../types'
 // Import categorized converters
@@ -51,16 +55,28 @@ import { isValidAttr } from './props'
 import { stripStyleNodes } from './stripStyleNodes'
 
 type MDCToTipTapMap = Record<string, (node: MDCNode | MDCRoot) => JSONContent | JSONContent[]>
+type MDCToTipTapConverter = (
+  node: MDCNode | MDCRoot,
+  parent?: MDCNode,
+) => JSONContent | JSONContent[]
+type TipTapNodeFactory = (
+  node: MDCElement,
+  type: string,
+  extra?: { attrs?: JsonRecord; children?: MDCNode[] },
+) => JSONContent
 
 /**
  * Creates the main MDC to TipTap conversion map
  * Combines entries from marks, nodes, and component categories
  */
-function createMdcToTiptapMap(): MDCToTipTapMap {
+function createMdcToTiptapMap(
+  convert: MDCToTipTapConverter,
+  createNode: TipTapNodeFactory,
+): MDCToTipTapMap {
   // Create mark entries from tagToMark mapping
   const markMapEntries = Object.entries(tagToMark).map(([key, value]) => [
     key,
-    (node: MDCNode) => createMark(node, value, [], mdcNodeToTiptap),
+    (node: MDCNode) => createMark(node, value, [], convert),
   ])
 
   // Component and node converters
@@ -69,55 +85,55 @@ function createMdcToTiptapMap(): MDCToTipTapMap {
     ...Object.fromEntries(markMapEntries),
 
     // Components (custom elements)
-    binding: (node: MDCNode) => createBindingNode(node, createTipTapNode),
-    blockquote: (node: MDCNode) => createBlockquoteNode(node, createTipTapNode),
-    br: (node: MDCNode) => createBrNode(node, createTipTapNode),
-    comment: (node: MDCNode) => createCommentNode(node, createTipTapNode),
-    file: (node: MDCNode) => createFileNode(node, createTipTapNode),
-    Image: (node: MDCNode) => createImageNode(node, createTipTapNode),
-    image: (node: MDCNode) => createImageNode(node, createTipTapNode),
-    img: (node: MDCNode) => createImageNode(node, createTipTapNode),
-    video: (node: MDCNode) => createVideoNode(node, createTipTapNode),
+    binding: (node: MDCNode) => createBindingNode(node, createNode),
+    blockquote: (node: MDCNode) => createBlockquoteNode(node, createNode),
+    br: (node: MDCNode) => createBrNode(node, createNode),
+    comment: (node: MDCNode) => createCommentNode(node, createNode),
+    file: (node: MDCNode) => createFileNode(node, createNode),
+    Image: (node: MDCNode) => createImageNode(node, createNode),
+    image: (node: MDCNode) => createImageNode(node, createNode),
+    img: (node: MDCNode) => createImageNode(node, createNode),
+    video: (node: MDCNode) => createVideoNode(node, createNode),
 
     // Structural nodes
-    h1: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    h2: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    h3: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    h4: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    h5: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    h6: (node: MDCNode) => createHeadingNode(node, createTipTapNode),
-    hr: (node: MDCNode) => createHrNode(node, createTipTapNode),
-    li: (node: MDCNode) => createLiNode(node, (n) => createListItemNode(n, createTipTapNode)),
-    ol: (node: MDCNode) => createOlNode(node, createTipTapNode),
+    h1: (node: MDCNode) => createHeadingNode(node, createNode),
+    h2: (node: MDCNode) => createHeadingNode(node, createNode),
+    h3: (node: MDCNode) => createHeadingNode(node, createNode),
+    h4: (node: MDCNode) => createHeadingNode(node, createNode),
+    h5: (node: MDCNode) => createHeadingNode(node, createNode),
+    h6: (node: MDCNode) => createHeadingNode(node, createNode),
+    hr: (node: MDCNode) => createHrNode(node, createNode),
+    li: (node: MDCNode) => createLiNode(node, (n) => createListItemNode(n, createNode)),
+    ol: (node: MDCNode) => createOlNode(node, createNode),
     p: (node: MDCNode) =>
-      createPNode(node, (n, opts) => createParagraphNode(n, mdcNodeToTiptap, opts)),
+      createPNode(node, (n, opts) => createParagraphNode(n, convert, opts)),
     pre: (node: MDCNode) =>
-      createPreNodeWrapper(node, (n) => createPreNode(n, getNodeText, createTipTapNode)),
+      createPreNodeWrapper(node, (n) => createPreNode(n, getNodeText, createNode)),
     span: (node: MDCNode) =>
-      createSpanNode(node, (n) => createSpanStyleNode(n, isValidAttr, createTipTapNode)),
-    table: (node: MDCNode) => createTableNode(node, createTipTapNode),
+      createSpanNode(node, (n) => createSpanStyleNode(n, isValidAttr, createNode)),
+    table: (node: MDCNode) => createTableNode(node, createNode),
     td: (node: MDCNode) =>
-      createTdNode(node, (n, t) => createTableCellNode(n, t, createTipTapNode)),
+      createTdNode(node, (n, t) => createTableCellNode(n, t, createNode)),
     template: (node: MDCNode) =>
-      createTemplateNodeWrapper(node, (n) => createTemplateNode(n, createTipTapNode)),
+      createTemplateNodeWrapper(node, (n) => createTemplateNode(n, createNode)),
     text: createTextNodeWrapper,
     th: (node: MDCNode) =>
-      createThNode(node, (n, t) => createTableCellNode(n, t, createTipTapNode)),
-    tr: (node: MDCNode) => createTrNode(node, createTipTapNode),
-    ul: (node: MDCNode) => createUlNode(node, createTipTapNode),
+      createThNode(node, (n, t) => createTableCellNode(n, t, createNode)),
+    tr: (node: MDCNode) => createTrNode(node, createNode),
+    ul: (node: MDCNode) => createUlNode(node, createNode),
 
     // Root document
-    root: createRootNode,
+    root: (node: MDCNode | MDCRoot) => createRootNode(node, convert),
   }
 }
 
 /**
  * Creates the root document node
  */
-function createRootNode(node: MDCNode | MDCRoot): JSONContent {
+function createRootNode(node: MDCNode | MDCRoot, convert: MDCToTipTapConverter): JSONContent {
   const element = node as MDCElement
   return {
-    content: (element.children || []).flatMap((child) => mdcNodeToTiptap(child, node as MDCNode)),
+    content: (element.children || []).flatMap((child) => convert(child, node as MDCNode)),
     type: 'doc',
   }
 }
@@ -130,6 +146,7 @@ function createTipTapNode(
   node: MDCElement,
   type: string,
   extra: { attrs?: JsonRecord; children?: MDCNode[] } = {},
+  convert: MDCToTipTapConverter,
 ): JSONContent {
   const { attrs = {}, children } = extra
   const attrsProps = (attrs as JsonRecord).props as JsonRecord | undefined
@@ -163,7 +180,7 @@ function createTipTapNode(
   const nodeChildren = children || node.children || []
   if (nodeChildren.length > 0) {
     tiptapNode.content = nodeChildren
-      .flatMap((child) => mdcNodeToTiptap(child, node))
+      .flatMap((child) => convert(child, node))
       .filter(Boolean)
   }
 
@@ -223,9 +240,6 @@ function removeEmptyTextNodes(content: JSONContent | JSONContent[]): JSONContent
   return content
 }
 
-// Initialize the converter map
-const mdcToTiptapMap = createMdcToTiptapMap()
-
 /**
  * Converts a single Editor node to TipTap format
  * Note: Can return JSONContent[] for text nodes with emojis, which will be flattened by caller
@@ -233,11 +247,35 @@ const mdcToTiptapMap = createMdcToTiptapMap()
 export function mdcNodeToTiptap(
   node: MDCNode | MDCRoot,
   parent?: MDCNode,
+  policy?: PortableComponentPolicy,
+): JSONContent | JSONContent[] {
+  return createMdcToTiptapConverter(policy)(node, parent)
+}
+
+function createMdcToTiptapConverter(
+  policy?: PortableComponentPolicy,
+): MDCToTipTapConverter {
+  function convert(node: MDCNode | MDCRoot, parent?: MDCNode) {
+    return convertMdcNode(node, parent, policy, converterMap, convert, createNode)
+  }
+  const createNode: TipTapNodeFactory = (node, type, extra) =>
+    createTipTapNode(node, type, extra, convert)
+  const converterMap = createMdcToTiptapMap(convert, createNode)
+  return convert
+}
+
+function convertMdcNode(
+  node: MDCNode | MDCRoot,
+  parent: MDCNode | undefined,
+  policy: PortableComponentPolicy | undefined,
+  converterMap: MDCToTipTapMap,
+  convert: MDCToTipTapConverter,
+  createNode: TipTapNodeFactory,
 ): JSONContent | JSONContent[] {
   const type = node.type === 'element' ? node.tag! : node.type
 
   if (type === 'p' && (parent as MDCElement | undefined)?.tag === 'li') {
-    return createParagraphNode(node as MDCElement, mdcNodeToTiptap, { allowImageLift: false })
+    return createParagraphNode(node as MDCElement, convert, { allowImageLift: false })
   }
 
   if (type === 'code' && node.type === 'element') {
@@ -250,8 +288,14 @@ export function mdcNodeToTiptap(
     })
   }
 
-  // Known node types
-  if (mdcToTiptapMap[type]) {
+  const classification = node.type === 'element'
+    ? classifyPortableMarkdownElement(node, policy ?? { components: {} })
+    : undefined
+  const policyComponent = classification?.kind === 'component' && classification.registered
+
+  // A policy-selected component keeps its authored identity even if its name
+  // collides with a native Markdown element handled by the built-in map.
+  if (!policyComponent && converterMap[type]) {
     if (node.type === 'element' && ['table', 'td', 'th', 'tr'].includes(type)) {
       editorDebug.log('mdcNodeToTiptap table element', {
         children: (node as MDCElement).children?.length || 0,
@@ -259,7 +303,7 @@ export function mdcNodeToTiptap(
         tag: type,
       })
     }
-    return mdcToTiptapMap[type](node)
+    return converterMap[type](node)
   }
 
   if (node.type === 'element') {
@@ -269,16 +313,9 @@ export function mdcNodeToTiptap(
     })
   }
 
-  // Parser metadata keeps nested inline components inline even when their
-  // immediate parent is another component instead of a paragraph.
-  const parserMetadata = node.type === 'element' && node.props?.$
-  const authoredInline =
-    parserMetadata &&
-    typeof parserMetadata === 'object' &&
-    !Array.isArray(parserMetadata) &&
-    parserMetadata.block === 0
+  const authoredInline = classification?.kind === 'component' && classification.form === 'inline'
   if ((parent as MDCElement)?.tag === 'p' || authoredInline) {
-    return createTipTapNode(node as MDCElement, 'inline-element', { attrs: { tag: type } })
+    return createNode(node as MDCElement, 'inline-element', { attrs: { tag: type } })
   }
 
   // In tiptap side only, inside element, text must be enclosed in a paragraph
@@ -300,13 +337,16 @@ export function mdcNodeToTiptap(
     }
   }
 
-  return createTipTapNode(node as MDCElement, 'element', { attrs: { tag: type } })
+  return createNode(node as MDCElement, 'element', { attrs: { tag: type } })
 }
 
 /**
  * Convert MDC AST to TipTap JSON (without frontmatter)
  */
-export function mdcToTiptap(body: MDCRoot): JSONContent {
+export function mdcToTiptap(
+  body: MDCRoot,
+  policy?: PortableComponentPolicy,
+): JSONContent {
   const cleanedBody = stripStyleNodes(body)
 
   // Remove invalid text node which added by table syntax
@@ -319,7 +359,7 @@ export function mdcToTiptap(body: MDCRoot): JSONContent {
     body: structuredClone(cleanedBody),
   })
 
-  const tree = mdcNodeToTiptap(cleanedBody)
+  const tree = createMdcToTiptapConverter(policy)(cleanedBody)
 
   // Handle case where mdcNodeToTiptap returns an array
   let doc: JSONContent

@@ -10,7 +10,13 @@ export default defineAppConfig({
         { label: { en: 'Privacy' }, to: 'https://lupinum.com/datenschutz' },
       ],
     },
-    nav: { links: 'auto', socialIcons: true },
+    nav: {
+      links: [
+        { label: { en: 'Playground' }, to: { en: '/playground' } },
+        { label: { en: 'Docs' }, to: { en: '/docs' } },
+      ],
+      socialIcons: true,
+    },
     social: { github: 'https://github.com/lupinum-dev/ginko-editor', discord: 'https://discord.gg/RPH6SeA36N' },
     repository: { url: 'https://github.com/lupinum-dev/ginko-editor', branch: 'main', contentDirectory: 'docs/content' },
     analytics: { plausible: { scriptId: '' } },
@@ -18,8 +24,8 @@ export default defineAppConfig({
     landing: {
       title: { en: 'Ginko Editor' },
       description: { en: 'A portable Vue editor for Ginko content.' },
-      primary: { label: { en: 'Get started' }, to: { en: '/docs' } },
-      secondary: { label: { en: 'View on GitHub' }, to: { en: 'https://github.com/lupinum-dev/ginko-editor' } },
+      primary: { label: { en: 'Open playground' }, to: { en: '/playground' } },
+      secondary: { label: { en: 'Read the docs' }, to: { en: '/docs' } },
       install: { command: 'pnpm add @lupinum/ginko-editor' },
     },
   },

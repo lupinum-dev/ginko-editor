@@ -76,6 +76,22 @@ Root Directory because the documentation build uses this package.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Maintainers use [MAINTAINING.md](MAINTAINING.md).
 
+### Local documentation playground
+
+The playground temporarily needs accepted local Content and Docs candidates
+because their required contracts are not published yet. Build both candidates,
+then start the playground with explicit absolute paths:
+
+```bash
+GINKO_CONTENT_CANDIDATE=/absolute/path/to/ginko-content/packages/content \
+GINKO_DOCS_CANDIDATE=/absolute/path/to/ginko-docs/layer \
+pnpm docs:dev
+```
+
+The preparation script validates both inputs and creates only ignored files in
+`docs/.candidate`. Remove this setup after the matching package releases are
+published, as tracked in `internals/migrations.md`.
+
 ## Support and security
 
 Ask questions in the [Lupinum OSS Discord](https://discord.gg/RPH6SeA36N). Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/lupinum-dev/ginko-editor/security/advisories/new).

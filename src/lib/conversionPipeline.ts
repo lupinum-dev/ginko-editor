@@ -2,8 +2,14 @@ import type { Editor } from '@tiptap/core'
 import type { Schema } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import type { JSONContent } from '@tiptap/vue-3'
-import { parseMdcDocument } from '@lupinum/ginko-content/cms-contract'
+import {
+  parseMdcDocument,
+  projectMdcDocument,
+  validateStoredPortableMarkdownAst,
+  type PortableComponentPolicy,
+} from '@lupinum/ginko-content/cms-contract'
 
+import type { AuthoringKitV1 } from '../authoring'
 import { validateTiptapDocShape } from './conversionInvariants'
 import { finishTrace, logIssue, logPhase, startTrace } from './conversionLogger'
 import type {
@@ -12,7 +18,7 @@ import type {
   ConversionResult,
   ConversionSeverity,
 } from './conversionTypes'
-import { parseMdc, stringifyMdc } from './markdown'
+import { adaptMdcDocument, stringifyMdc } from './markdown'
 import { mdcToTiptap } from './mdcToTiptap'
 import type { TiptapToMDCOptions } from './tiptapToMdc'
 import { tiptapToMDC } from './tiptapToMdc'
@@ -84,40 +90,100 @@ function splitIssues(issues: ConversionIssue[]) {
   return { errors, warnings }
 }
 
+export async function validateMarkdownForAuthoring(
+  markdown: string,
+  authoringKit: AuthoringKitV1,
+): Promise<ConversionIssue | undefined> {
+  try {
+    const sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
+    return validateParsedDocumentForAuthoring(sourceDocument, authoringKit)
+  } catch (error) {
+    return buildIssue(
+      'validate',
+      'authoring_kit_rejected',
+      'This document violates the editor authoring kit.',
+      error,
+    )
+  }
+}
+
+function validateParsedDocumentForAuthoring(
+  sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>,
+  authoringKit: AuthoringKitV1,
+): ConversionIssue | undefined {
+  const validation = validateStoredPortableMarkdownAst(
+    projectMdcDocument(sourceDocument).body,
+    authoringKit.policy,
+  )
+  if (validation.ok) return undefined
+  const firstIssue = validation.issues[0]
+  return buildIssue(
+    'validate',
+    'authoring_kit_rejected',
+    'This document violates the editor authoring kit.',
+    new TypeError(
+      `Invalid authoring kit: source is outside policy (${firstIssue?.code} at ${firstIssue?.path.join('.')}).`,
+    ),
+  )
+}
+
 export async function convertMarkdownToTiptapDoc(
   markdown: string,
 ): Promise<ConversionResult<JSONContent>> {
+  let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>
+  try {
+    sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
+  } catch (error) {
+    return markdownParseFailure(markdown, error)
+  }
+  return convertParsedMdcDocumentToTiptap(markdown, sourceDocument)
+}
+
+function markdownParseFailure(
+  markdown: string,
+  error: unknown,
+): ConversionResult<JSONContent> {
   const trace = startTrace({
     direction: 'markdown_to_tiptap',
   })
   const issues: ConversionIssue[] = []
+  logPhase(trace, 'parse_mdc', { inputLength: markdown.length })
+  const issue = buildIssue(
+    'parse_mdc',
+    'parse_mdc_failed',
+    'Failed to parse MDC markdown',
+    error,
+    {
+      inputLength: markdown.length,
+      preview: markdown.slice(0, 200),
+    },
+  )
+  issues.push(issue)
+  logIssue(trace, issue)
+  return failure(trace.traceId, issues, finishTrace(trace, { status: 'failed' }))
+}
 
+function convertParsedMdcDocumentToTiptap(
+  markdown: string,
+  sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>,
+  policy?: PortableComponentPolicy,
+): ConversionResult<JSONContent> {
+  const trace = startTrace({ direction: 'markdown_to_tiptap' })
+  const issues: ConversionIssue[] = []
   logPhase(trace, 'parse_mdc', { inputLength: markdown.length })
 
-  let ast: Awaited<ReturnType<typeof parseMdc>>
+  let ast: ReturnType<typeof adaptMdcDocument>
   try {
-    ast = await parseMdc(markdown, { strict: true })
+    ast = adaptMdcDocument(sourceDocument)
   } catch (error) {
-    const issue = buildIssue(
-      'parse_mdc',
-      'parse_mdc_failed',
-      'Failed to parse MDC markdown',
-      error,
-      {
-        inputLength: markdown.length,
-        preview: markdown.slice(0, 200),
-      },
-    )
-    issues.push(issue)
-    logIssue(trace, issue)
-    return failure(trace.traceId, issues, finishTrace(trace, { status: 'failed' }))
+    return markdownParseFailure(markdown, error)
   }
 
   logPhase(trace, 'mdc_to_tiptap')
 
   let doc: JSONContent
   try {
-    doc = mdcToTiptap(ast)
+    doc = mdcToTiptap(ast, policy)
   } catch (error) {
     const issue = buildIssue(
       'mdc_to_tiptap',
@@ -154,9 +220,28 @@ export async function prepareMarkdownForVisualEditing(
   markdown: string,
   options?: TiptapToMDCOptions,
   schema?: Schema,
+  authoringKit?: AuthoringKitV1,
 ): Promise<ConversionResult<JSONContent>> {
-  const converted = await convertMarkdownToTiptapDoc(markdown)
+  let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>
+  try {
+    sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
+  } catch (error) {
+    return markdownParseFailure(markdown, error)
+  }
+
+  const converted = convertParsedMdcDocumentToTiptap(
+    markdown,
+    sourceDocument,
+    authoringKit?.policy,
+  )
   if (!converted.ok || !converted.value) return converted
+
+  if (authoringKit) {
+    const issue = validateParsedDocumentForAuthoring(sourceDocument, authoringKit)
+    if (issue) {
+      return { ...converted, issues: [...converted.issues, issue], ok: false }
+    }
+  }
 
   if (schema) {
     try {
@@ -186,11 +271,8 @@ export async function prepareMarkdownForVisualEditing(
   }
 
   try {
-    const [sourceTree, roundTripTree] = await Promise.all([
-      parseMdcDocument(markdown, { autoClose: false }),
-      parseMdcDocument(roundTrip.value, { autoClose: false }),
-    ])
-    if (stableJson(normalizeVisualSemantics(sourceTree)) !== stableJson(normalizeVisualSemantics(roundTripTree))) {
+    const roundTripTree = await parseMdcDocument(roundTrip.value, { autoClose: false })
+    if (stableJson(normalizeVisualSemantics(sourceDocument)) !== stableJson(normalizeVisualSemantics(roundTripTree))) {
       const issue = buildIssue(
         'validate',
         'source_only_required',

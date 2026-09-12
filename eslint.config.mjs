@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 
 export default [
   {
-    ignores: ['dist/**', 'release-artifacts/**', '.preview-artifacts/**', 'docs/.nuxt/**', 'docs/.output/**'],
+    ignores: ['dist/**', 'release-artifacts/**', '.preview-artifacts/**', 'docs/.candidate/**', 'docs/.nuxt/**', 'docs/.output/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

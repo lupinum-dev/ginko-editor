@@ -1,14 +1,20 @@
 import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [vue()],
+  test: {
+    include: ['test/**/*.test.ts'],
+  },
   build: {
     lib: {
-      entry: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+      entry: {
+        authoring: fileURLToPath(new URL('./src/authoring.ts', import.meta.url)),
+        index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+      },
       formats: ['es'],
-      fileName: 'index',
+      fileName: (_format, entryName) => `${entryName}.js`,
       cssFileName: 'style',
     },
     rolldownOptions: {

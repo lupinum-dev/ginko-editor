@@ -72,11 +72,7 @@ export async function parseMdc(content: string, options: ParseMdcOptions = {}): 
     })
 
     const tree = await parseMdcDocument(content, { autoClose: options.strict === false })
-    const root = {
-      children: comarkNodesToMdc(tree.nodes),
-      type: 'root',
-    } satisfies MDCRoot
-    const cleaned = stripStyleNodes(root, 'parseMdc')
+    const cleaned = adaptMdcDocument(tree)
     editorDebug.log('comark mdc', collectMdcStats(cleaned))
     return cleaned
   } catch (error) {
@@ -97,6 +93,16 @@ export async function parseMdc(content: string, options: ParseMdcOptions = {}): 
       type: 'root',
     }
   }
+}
+
+/** Adapt one canonical parse result to the editor's lossless conversion tree. */
+export function adaptMdcDocument(
+  tree: Awaited<ReturnType<typeof parseMdcDocument>>,
+): MDCRoot {
+  return stripStyleNodes({
+    children: comarkNodesToMdc(tree.nodes),
+    type: 'root',
+  }, 'parseMdc')
 }
 
 /**

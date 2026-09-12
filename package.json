@@ -25,6 +25,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./authoring": {
+      "types": "./dist/authoring.d.ts",
+      "import": "./dist/authoring.js"
+    },
     "./style.css": "./dist/style.css"
   },
   "main": "./dist/index.js",
@@ -42,9 +46,9 @@
     "check:dependencies": "node scripts/check-dependency-policy.mjs",
     "audit:all": "pnpm audit",
     "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
-    "docs:build": "pnpm --dir docs build",
+    "docs:build": "node scripts/prepare-docs-candidates.mjs && pnpm --dir docs build",
     "dev": "pnpm build && pnpm docs:dev",
-    "docs:dev": "pnpm --dir docs dev",
+    "docs:dev": "node scripts/prepare-docs-candidates.mjs && pnpm --dir docs dev",
     "lint": "eslint .",
     "pack:release": "node scripts/pack-release.mjs",
     "preview:pack": "node scripts/pack-release.mjs --preview",

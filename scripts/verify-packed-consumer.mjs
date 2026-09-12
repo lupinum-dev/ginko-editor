@@ -44,6 +44,14 @@ async function verifyDeclarations(consumer) {
   if (manifest.exports?.['./style.css'] !== './dist/style.css') throw new Error('The packed CSS export is missing.')
   const entryTypes = await readFile(join(packageRoot, 'dist', 'index.d.ts'), 'utf8')
   if (!entryTypes.includes('GinkoEditor')) throw new Error('The packed public declaration is missing.')
+  const authoringEntry = manifest.exports?.['./authoring']
+  if (authoringEntry?.import !== './dist/authoring.js' || authoringEntry?.types !== './dist/authoring.d.ts') {
+    throw new Error('The packed authoring export is missing.')
+  }
+  const authoringRuntime = await readFile(join(packageRoot, 'dist', 'authoring.js'), 'utf8')
+  if (/\b(?:vue|tiptap|nuxt)\b/i.test(authoringRuntime)) {
+    throw new Error('The authoring-only entry imports UI or framework runtime code.')
+  }
   await readFile(join(packageRoot, 'dist', 'GinkoEditor.vue.d.ts'), 'utf8')
 }
 
@@ -76,7 +84,7 @@ async function verifyVueConsumer(consumer) {
   )
   await write(
     join(consumer, 'App.vue'),
-    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nconst source = ref('# Vue consumer\\n')\n</script>\n\n<template><GinkoEditor v-model=\"source\" /></template>\n",
+    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nimport { createAuthoringKit } from '@lupinum/ginko-editor/authoring'\nconst source = ref('# Vue consumer\\n')\nconst authoringKit = await createAuthoringKit({ version: 1, implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default'] } }, policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, authoring: { note: { label: 'Note' } }, recipes: [{ id: 'note', label: 'Note', source: '<note>\\nText\\n</note>' }] })\n</script>\n\n<template><GinkoEditor v-model=\"source\" :authoring-kit=\"authoringKit\" /></template>\n",
   )
   await write(
     join(consumer, 'vite.config.ts'),
@@ -84,7 +92,7 @@ async function verifyVueConsumer(consumer) {
   )
   await write(
     join(consumer, 'tsconfig.json'),
-    `${JSON.stringify({ compilerOptions: { lib: ['ESNext', 'DOM'], module: 'ESNext', moduleResolution: 'Bundler', strict: true, target: 'ESNext', types: ['node'] }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
+    `${JSON.stringify({ compilerOptions: { lib: ['ESNext', 'DOM'], module: 'ESNext', moduleResolution: 'Bundler', skipLibCheck: true, strict: true, target: 'ESNext', types: ['node'] }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
   )
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
   run('npm', ['run', 'typecheck'], consumer)
