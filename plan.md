@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 and the Step 6A Docs writing proof are accepted for local development. Step 6B is now assigned to harden the demonstrated interaction and complete its bounded keyboard, block-action, property and source-recovery requirements. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and the Step 6A Docs writing proof are accepted for local development. Step 6B requires a bounded numeric-field lifecycle correction after Gate D review; it is not yet accepted. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -266,7 +266,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
-| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A accepted, 6B assigned | IN PROGRESS |
+| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A accepted, 6B corrections assigned | IN PROGRESS |
 | 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof | TODO |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
@@ -2432,3 +2432,35 @@ ordinary semantic HTML continues through ProseMirror's native paste behavior.
 Step 6B is **READY FOR GATE D REVIEW** by coordinator task
 `01a09564-7dee-70a1-828c-84dd6628054d`. Step 5 and CMS/ChiliSkills adoption remain
 paused. No push, tag, publication, deployment or production data change occurred.
+
+
+#### 2026-09-12 — Gate D reviewer requires numeric-field lifecycle correction
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` reviewed source
+`49e6be4` and evidence `341aba8`. Gate D is **CHANGES REQUIRED** for a confirmed
+property-control defect. Valid numeric drafts remain in a cache keyed by document
+position, tag and property name. After changing count from 1 to 5, Undo restores
+canonical count 1 while the inspector still displays 5. An invalid `bad` entry
+also survives host document replacement: the new document has count 42, but its
+field still displays the old entry and error. Both independent mounted-editor
+probes fail at the displayed-value assertion after confirming correct canonical
+values.
+
+Correction scope: keep the document authoritative after valid property commits,
+undo/redo, selected-block changes and document/kit replacement. Retain incomplete
+numeric text only for the relevant active field. Avoid adding persistent block
+identity or a second model to manage temporary input. Move the two observable
+regressions into the owning authoring-editor suite and remove the temporary
+reviewer probe file.
+
+Independent existing authoring-editor and editor-workflows suites passed all 26
+tests. Real playground operation confirmed Duplicate followed by one Undo
+restores the original component tree. A separate rich-HTML placement probe did
+not establish a defect: native paste normalized the tested wrapper to ordinary
+rich text, and flush/save succeeded. It is not part of this correction request.
+
+Content, Docs, CMS and both ChiliSkills checkouts were clean at their recorded
+local commits during this review. Editor correction source/tests and evidence
+must also be committed locally before resubmission. No push, publication,
+deployment or production data change is authorized. Step 5 remains unassigned
+until Gate D is accepted and its exact CMS/V2 package prerequisite is proved.
