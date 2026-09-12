@@ -47,6 +47,7 @@ async function verifyVueConsumer(consumer) {
       scripts: { build: 'vite build', typecheck: 'vue-tsc --noEmit' },
       dependencies: { vue: '3.5.42' },
       devDependencies: {
+        '@types/node': '26.1.1',
         '@vitejs/plugin-vue': '6.0.6',
         typescript: '5.9.3',
         vite: '8.1.5',
@@ -69,7 +70,7 @@ async function verifyVueConsumer(consumer) {
   )
   await write(
     join(consumer, 'tsconfig.json'),
-    `${JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', strict: true, target: 'ES2022' }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
+    `${JSON.stringify({ compilerOptions: { lib: ['ESNext', 'DOM'], module: 'ESNext', moduleResolution: 'Bundler', strict: true, target: 'ESNext', types: ['node'] }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
   )
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive], consumer)
   run('npm', ['run', 'typecheck'], consumer)
