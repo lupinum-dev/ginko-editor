@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 and the Step 6A Docs writing proof are accepted for local development. Step 6B requires a bounded numeric-field lifecycle correction after Gate D review; it is not yet accepted. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -266,7 +266,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
-| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A accepted, 6B corrections assigned | IN PROGRESS |
+| 6 | Docs writing proof, then focused interaction hardening | 4 | D: initial-kit writing quality accepted | ACCEPTED |
 | 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof | TODO |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
@@ -2492,11 +2492,45 @@ Vue type checking and `git diff --check`. The final post-correction `pnpm verify
 aggregate passes dependency policy, full ESLint, Vue type checking, all 73 tests,
 the Editor production build, candidate preparation and the Docs Nuxt production
 build. The reviewer also independently confirmed sequential `1.` → `1.5` input
-and block move/delete with single Undo in the browser, then restored the saved
-reviewer fixture. The playground remains available at
+in a mounted-editor test, and block move/delete with single Undo in the browser,
+then restored the saved reviewer fixture. The playground remains available at
 `http://127.0.0.1:4317/playground`.
 
 The Step 6B limits recorded above are unchanged. This correction is **READY FOR
 GATE D RE-REVIEW** by coordinator task
 `01a09564-7dee-70a1-828c-84dd6628054d`. Step 5 and CMS/ChiliSkills adoption remain
 paused. No push, tag, publication, deployment or production data change occurred.
+
+
+#### 2026-09-12 — Reviewer accepts Step 6 / Gate D and audits local commits
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` accepts Step 6B and
+Gate D at corrective source commit `4a9da6659f9f7e0da8e10535fd50516ecc4f3169`
+with implementor evidence `d057d45`. Independent review confirms the correction
+removes valid drafts, clears stale incomplete drafts on document changes, and
+preserves a newer input when a delayed host echo is consumed. The original Undo
+and document-replacement failures are now passing owning regressions. The
+reviewer independently ran authoring-editor and editor-workflows on the submitted
+commit: both files, all 29 tests passed. The implementor's final full verification
+reports 73 passing tests, lint, type checking, Editor build and Docs build.
+
+The reviewer operated Duplicate, Move down and Delete, each followed by a single
+Undo restoring the original block tree. A fresh post-build browser tab reopened
+the saved nested Docs/host-component fixture in Visual mode with a Current real
+preview and no warning or error logs. Earlier desktop/mobile, slash insertion,
+focus, source recovery and exact save/reopen evidence remains applicable. Numeric
+controls are covered by mounted-editor regressions; the initial Docs fixture has
+no numeric field. This accepts the bounded initial-kit experience, not all Docs
+components, complete host integration or release readiness.
+
+Local work is committed at Content `e484dbe`, Docs `10fc712`, CMS `b8d6de45`,
+and Editor `4a9da66` plus plan/evidence commits. Both ChiliSkills checkouts remain
+unchanged and clean at `663ee19`. The unrelated untracked
+`plans/2026-09-06-architecture-review.md` in the main CMS checkout is excluded
+from this work; the CMS implementation worktree is clean. Temporary reviewer
+probes are removed. The playground remains at
+`http://127.0.0.1:4317/playground` with the reviewer document restored.
+
+Step 5 is the next planned milestone and remains unassigned. Its exact CMS/V2
+package-consumer prerequisite still applies before adoption. No push, tag,
+publication, deployment or production data change occurred.
