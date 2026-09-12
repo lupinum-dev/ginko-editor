@@ -221,7 +221,15 @@ function cleanComarkProps(rawProps: Record<string, unknown> = {}): JsonRecord {
 }
 
 function mdcNodesToComark(nodes: MDCNode[], options: StringifyMdcOptions): ComarkNode[] {
-  return nodes.flatMap((node) => mdcNodeToComark(node, options))
+  return nodes.flatMap((node) => {
+    const converted = mdcNodeToComark(node, options)
+    // Markdown images and links are inline syntax. TipTap media nodes are
+    // blocks, so retain that boundary at every structural depth.
+    if (node.type === 'element' && node.props?.__mdc_block === true) {
+      return [['p', {}, ...converted] satisfies ComarkElementNode]
+    }
+    return converted
+  })
 }
 
 function mdcNodeToComark(node: MDCNode, options: StringifyMdcOptions): ComarkNode[] {

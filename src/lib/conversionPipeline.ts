@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core'
-import { createDocument } from '@tiptap/core'
+import type { Schema } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import type { JSONContent } from '@tiptap/vue-3'
 import { parseMdcDocument } from '@lupinum/ginko-content/cms-contract'
@@ -153,9 +153,28 @@ export async function convertMarkdownToTiptapDoc(
 export async function prepareMarkdownForVisualEditing(
   markdown: string,
   options?: TiptapToMDCOptions,
+  schema?: Schema,
 ): Promise<ConversionResult<JSONContent>> {
   const converted = await convertMarkdownToTiptapDoc(markdown)
   if (!converted.ok || !converted.value) return converted
+
+  if (schema) {
+    try {
+      schema.nodeFromJSON(converted.value).check()
+    } catch (error) {
+      const issue = buildIssue(
+        'validate',
+        'visual_schema_unsupported',
+        'This document contains nodes that the visual editor does not support.',
+        error,
+      )
+      return {
+        ...converted,
+        issues: [...converted.issues, issue],
+        ok: false,
+      }
+    }
+  }
 
   const roundTrip = await convertTiptapDocToMarkdown(converted.value, options)
   if (!roundTrip.ok || roundTrip.value === undefined) {
@@ -330,7 +349,11 @@ export function applyTiptapDocToEditor(
 
   logPhase(trace, 'set_content')
   try {
-    const nextDoc = createDocument(doc, editor.schema)
+    // Schema.nodeFromJSON is strict. TipTap's createDocument helper can catch an
+    // unknown-node error and return an empty fallback document, which would
+    // make unsupported source look successfully applied.
+    const nextDoc = editor.schema.nodeFromJSON(doc)
+    nextDoc.check()
 
     // Echo guard: applying content that matches the current document (e.g. the
     // autosave round-trip writing our own value back) must not touch the doc,

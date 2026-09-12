@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
+import type { AssetInfo, EditorAssetRequest } from '../src/types'
 
 beforeAll(() => {
   if (!globalThis.ResizeObserver) {
@@ -109,19 +110,165 @@ describe('GinkoEditor browser journey', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
-  it('cancels a pending edit when the component unmounts', async () => {
-    const wrapper = await mountEditor('Original\n', 50)
+  it('flushes a pending edit before the host closes the component', async () => {
+    const wrapper = await mountEditor('Original\n', 120)
     wrapper.vm.editor?.commands.insertContent(' pending')
+    const result = await wrapper.vm.flush()
+    expect(result).toEqual({ emitted: true, ok: true })
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('pending')
+    const emissions = wrapper.emitted('update:modelValue')!
     wrapper.unmount()
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 80))
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 140))
+    expect(emissions).toHaveLength(1)
+  })
+
+  it('includes an edit made while a flush is converting', async () => {
+    const wrapper = await mountEditor('Original\n', 120)
+    wrapper.vm.editor?.commands.insertContent(' first')
+    const flushing = wrapper.vm.flush()
+    wrapper.vm.editor?.commands.insertContent(' second')
+    const result = await flushing
+    expect(result.ok).toBe(true)
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('first second')
   })
 
   it('leaves source unchanged when the host cancels an asset request', async () => {
     const wrapper = await mountEditor('No asset\n')
-    await wrapper.get('button[title="Image"], button:nth-last-child(3)').trigger('click')
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 20))
+    await wrapper.get('button[title="Image"]').trigger('click')
     expect(wrapper.emitted('request-image')).toHaveLength(1)
+    const request = wrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
+    expect(request.complete(null)).toBe(false)
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('does not restore a stale local emission after an external replacement', async () => {
+    const wrapper = await mountEditor('First\n')
+    wrapper.vm.editor?.commands.insertContent(' local')
+    await waitFor(() => Boolean(wrapper.emitted('update:modelValue')))
+    const staleEmission = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
+
+    await wrapper.setProps({ modelValue: 'Replacement\n' })
+    await waitFor(() => wrapper.vm.editor?.getText().includes('Replacement') === true)
+    await wrapper.setProps({ modelValue: staleEmission })
+    await flushPromises()
+    expect(wrapper.vm.editor?.getText()).toContain('Replacement')
+
+    await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('textarea').element.value).toBe('Replacement\n')
+    await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
+    await waitFor(() => wrapper.attributes('data-mode') === 'visual')
+    expect(wrapper.vm.editor?.getText()).toContain('Replacement')
+  })
+
+  it('keeps block separation when an image is inserted before a heading', async () => {
+    const wrapper = await mountEditor('# Review document\n\nOriginal paragraph.\n')
+    expect(wrapper.vm.insertImageAsset({ alt: 'Sample', url: '/sample.svg' })).toBe(true)
+    const result = await wrapper.vm.flush()
+    expect(result.ok).toBe(true)
+    const emitted = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
+    expect(emitted).toContain('![Sample](/sample.svg)\n\n# Review document')
+
+    await wrapper.setProps({ modelValue: emitted })
+    await flushPromises()
+    expect(wrapper.vm.editor?.getJSON().content?.some((node) => node.type === 'heading')).toBe(true)
+  })
+
+  it('keeps block separation when a markdown file is inserted before a heading', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        fileOutput: 'markdown',
+        modelValue: '# File review\n\nOriginal paragraph.\n',
+        syncDebounceMs: 120,
+      },
+    })
+    await flushPromises()
+    await waitFor(() => Boolean(wrapper.vm.editor))
+    expect(wrapper.vm.insertFileAsset({ filename: 'Guide.pdf', url: '/guide.pdf' })).toBe(true)
+    const result = await wrapper.vm.flush()
+    expect(result.ok).toBe(true)
+    const emitted = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
+    expect(emitted).toMatch(/\[Guide\.pdf\]\(\/guide\.pdf\)(?:\{[^\n]+\})?\n\n# File review/)
+  })
+
+  it('rejects asset completion after mode, editability, document, or lifetime changes', async () => {
+    const asset = { alt: 'Diagram', url: '/diagram.png' }
+
+    const rawWrapper = await mountEditor('Raw guard\n')
+    await rawWrapper.get('button[title="Image"]').trigger('click')
+    const rawRequest = rawWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
+    await rawWrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
+    expect(rawRequest.complete(asset)).toBe(false)
+    expect(rawWrapper.get('textarea').element.value).toBe('Raw guard\n')
+
+    const disabledWrapper = await mountEditor('Disabled guard\n')
+    await disabledWrapper.get('button[title="Image"]').trigger('click')
+    const disabledRequest = disabledWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
+    await disabledWrapper.setProps({ disabled: true })
+    expect(disabledRequest.complete(asset)).toBe(false)
+    expect(disabledWrapper.emitted('update:modelValue')).toBeUndefined()
+
+    const replacedWrapper = await mountEditor('Old document\n')
+    await replacedWrapper.get('button[title="Image"]').trigger('click')
+    const replacedRequest = replacedWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
+    await replacedWrapper.setProps({ modelValue: 'New document\n' })
+    await waitFor(() => replacedWrapper.vm.editor?.getText().includes('New document') === true)
+    expect(replacedRequest.complete(asset)).toBe(false)
+    expect(replacedWrapper.vm.editor?.getText()).toContain('New document')
+
+    const unmountedWrapper = await mountEditor('Unmount guard\n')
+    await unmountedWrapper.get('button[title="Image"]').trigger('click')
+    const unmountedRequest = unmountedWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
+    unmountedWrapper.unmount()
+    expect(unmountedRequest.complete(asset)).toBe(false)
+  })
+
+  it('guards direct media operations outside an editable visual document', async () => {
+    const wrapper = await mountEditor('Direct guard\n')
+    await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
+    expect(wrapper.vm.insertImageAsset({ url: '/raw.png' })).toBe(false)
+    expect(wrapper.vm.insertFileAsset({ url: '/raw.pdf' })).toBe(false)
+    expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
+    expect(wrapper.get('textarea').element.value).toBe('Direct guard\n')
+
+    await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
+    await waitFor(() => wrapper.attributes('data-mode') === 'visual')
+    await wrapper.setProps({ disabled: true })
+    expect(wrapper.vm.insertImageAsset({ url: '/disabled.png' })).toBe(false)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('does not offer disabled asset features', async () => {
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: { enableFiles: false, enableVideo: false, modelValue: 'Features\n', syncDebounceMs: 0 },
+    })
+    await flushPromises()
+    await waitFor(() => Boolean(wrapper.vm.editor))
+    expect(wrapper.find('button[title="File"]').exists()).toBe(false)
+    expect(wrapper.find('button[title="Video"]').exists()).toBe(false)
+    expect(wrapper.vm.insertFileAsset({ url: '/file.pdf' })).toBe(false)
+    expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
+  })
+
+  it('reports a flush conversion failure and keeps recovery available', async () => {
+    const wrapper = await mountEditor('<Badge>\nLast safe value\n</Badge>\n', 120)
+    const editor = wrapper.vm.editor!
+    editor.view.dispatch(editor.state.tr.setNodeMarkup(0, undefined, {
+      ...editor.state.doc.firstChild?.attrs,
+      props: { unsupported: () => 'not cloneable' },
+    }))
+
+    const result = await wrapper.vm.flush()
+    expect(result.ok).toBe(false)
+    expect((await wrapper.vm.flush()).ok).toBe(false)
+    expect(wrapper.emitted('conversion-error')).toHaveLength(1)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.attributes('data-mode')).toBe('visual')
+
+    await wrapper.setProps({ modelValue: '# Recovered externally\n' })
+    await waitFor(() => wrapper.vm.editor?.getText().includes('Recovered externally') === true)
+    expect(wrapper.emitted('conversion-recovered')).toHaveLength(1)
   })
 })

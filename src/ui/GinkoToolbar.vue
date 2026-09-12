@@ -13,13 +13,6 @@ const emit = defineEmits<{
   'request-video': []
 }>()
 
-function run(editor: Editor, action: string) {
-  const chain = editor.chain().focus() as unknown as Record<string, (...args: unknown[]) => unknown>
-  const command = chain[action]
-  if (typeof command !== 'function') return
-  const result = command.call(chain) as { run?: () => void }
-  result.run?.()
-}
 </script>
 
 <template>
@@ -31,14 +24,14 @@ function run(editor: Editor, action: string) {
     <button
       type="button"
       title="Undo"
-      @click="run(editor, 'undo')"
+      @click="editor.chain().focus().undo().run()"
     >
       Undo
     </button>
     <button
       type="button"
       title="Redo"
-      @click="run(editor, 'redo')"
+      @click="editor.chain().focus().redo().run()"
     >
       Redo
     </button>
@@ -141,3 +134,11 @@ function run(editor: Editor, action: string) {
     </button>
   </div>
 </template>
+
+<style scoped>
+.ginko-editor__toolbar { display: flex; align-items: center; gap: .25rem; border-bottom: 1px solid var(--ginko-border); padding: .4rem .5rem; overflow-x: auto; }
+.ginko-editor__toolbar button { border: 0; border-radius: .35rem; background: transparent; color: inherit; cursor: pointer; padding: .35rem .55rem; }
+.ginko-editor__toolbar button:hover, .ginko-editor__toolbar button[aria-pressed='true'] { background: var(--ginko-muted); }
+.ginko-editor__toolbar button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.ginko-editor__toolbar span { align-self: stretch; border-left: 1px solid var(--ginko-border); margin: .15rem .25rem; }
+</style>

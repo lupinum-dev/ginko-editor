@@ -92,4 +92,41 @@ describe('editor conversion contract', () => {
     expect(editor.getJSON()).toEqual(before)
     editor.destroy()
   })
+
+  it.each([
+    '<Info><template #actions>Open **now**</template></Info>',
+    '<Info><template #actions><Card>Nested</Card></template></Info>',
+    '<Info><template #actions></template></Info>',
+  ])('accepts schema-valid named slot content: %s', async (source) => {
+    const editor = createEditor()
+    const result = await prepareMarkdownForVisualEditing(source, undefined, editor.schema)
+    expect(result.ok).toBe(true)
+    if (!result.ok || !result.value) throw new Error('Expected schema-valid slot source.')
+    expect(() => editor.schema.nodeFromJSON(result.value!).check()).not.toThrow()
+    editor.destroy()
+  })
+
+  it('keeps nested markdown media separate from the following block', async () => {
+    const editor = createEditor()
+    const document = {
+      content: [{
+        attrs: { props: {}, tag: 'Info' },
+        content: [{
+          attrs: { name: 'default', props: {} },
+          content: [
+            { attrs: { props: { alt: 'Nested', src: '/nested.png' } }, type: 'image' },
+            { attrs: { level: 2 }, content: [{ text: 'Nested heading', type: 'text' }], type: 'heading' },
+          ],
+          type: 'slot',
+        }],
+        type: 'element',
+      }],
+      type: 'doc',
+    }
+    expect(() => editor.schema.nodeFromJSON(document).check()).not.toThrow()
+    const result = await convertTiptapDocToMarkdown(document, { imageOutput: 'markdown' })
+    expect(result.ok).toBe(true)
+    expect(result.value).toContain('![Nested](/nested.png)\n\n## Nested heading')
+    editor.destroy()
+  })
 })

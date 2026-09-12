@@ -18,9 +18,9 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 
 ## Requirements
 
-- Node.js 22.14 or later, Node.js 24, or Node.js 26.
+- Node.js 22.18 or later, Node.js 24.11 or later, or Node.js 26 or later.
 - pnpm 11 for repository development.
-- Vue 3.5 and TipTap 3.31.3 in the consuming application.
+- Vue 3.5.40 or later and TipTap 3.31.3 in the consuming application.
 - `@lupinum/ginko-content` 1.0.0-beta.7 or later for the shared CMS contract.
 
 ## Installation
@@ -50,8 +50,17 @@ emits normalized MDC. An invalid or unsupported value remains byte-for-byte
 available in the Markdown textarea.
 
 The host owns persistence and asset selection. Listen for `request-image`,
-`request-file`, or `request-video`, then call the matching exposed insertion
-method after the user selects an asset. If selection is cancelled, do nothing.
+`request-file`, or `request-video`, then call the event request's `complete`
+method after the user selects an asset. Pass `null` when selection is cancelled.
+The completion returns `false` if its document or selection is no longer current.
+Only the latest emitted value is recognized as a normal `v-model` echo. After an
+external replacement, the current external source remains authoritative; hosts
+should not replay older editor emissions as intentional replacements.
+Before closing the editor or replacing its document, await the exposed `flush()`
+method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
+result means conversion failed: keep the editor open so the user can recover or
+switch to Markdown source. `flush()` emits the latest converted source but does
+not persist it; the host still owns and must await its save operation.
 The editor does not import Nuxt, the CMS, Convex, or an application router.
 
 ## Documentation

@@ -9,10 +9,10 @@ A portable Vue editor for Ginko content.
 - `docs/` owns public documentation. Release verification separately tests packed consumers.
 - `scripts/` owns inert package certification. It does not publish.
 
-The current `GinkoEditorScaffold` component is temporary package-boundary code.
-Remove it when Step 3 adds the real editor implementation. The scaffold does not
-authorize a second package, a Nuxt module, or runtime coupling to Ginko Content,
-Tiptap, CMS, or ChiliSkills.
+The editor owns conversion and its derived TipTap state. Hosts own persistence,
+document switching, and asset selection. Keep the shared Content contract as the
+only parser boundary. Do not add a second package, Nuxt module, or runtime
+coupling to CMS or ChiliSkills.
 
 ## Working procedure
 

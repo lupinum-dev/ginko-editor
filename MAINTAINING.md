@@ -20,6 +20,14 @@ The Editor package owns conversion, TipTap schema, mode switching, and editor UI
 The CMS owns persistence, asset dialogs, and workflow state. Remove the temporary
 CMS copy when the CMS consumes the package; do not maintain both implementations.
 
+Hosts must await the component's `flush()` method before closing an editor or
+replacing its document. A successful flush only updates `v-model`; the host must
+then await its own persistence path. Keep the editor mounted when flush returns
+an error so the user can recover without losing the visual document. Asset
+pickers must complete the request-scoped callback from their event; stale
+callbacks safely return `false` after document, selection, mode, editability, or
+lifetime changes.
+
 Until Ginko Content publishes the accepted CMS parser helpers, local release
 verification needs its inspected candidate archive in `GINKO_CONTENT_TARBALL`.
 This is a release gate, not a supported install workaround. Do not publish

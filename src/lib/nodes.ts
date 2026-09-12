@@ -279,17 +279,50 @@ export function createTemplateNode(
 ): JSONContent {
   const props = node.props || {}
   const name = (props.name as string) || (props.slotName as string) || 'default'
+  const children = normalizeBlockChildren(node.children || [])
 
-  if (node.children?.[0]?.type === 'text') {
-    node.children = [
-      {
-        children: node.children,
-        props: {},
-        tag: 'p',
-        type: 'element',
-      } as MDCElement,
-    ]
+  return createTipTapNodeFn(node, 'slot', { attrs: { name }, children })
+}
+
+const BLOCK_TAGS = new Set([
+  'blockquote',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'ol',
+  'p',
+  'pre',
+  'table',
+  'template',
+  'ul',
+])
+
+export function normalizeBlockChildren(children: MDCNode[]): MDCNode[] {
+  const result: MDCNode[] = []
+  let inlineRun: MDCNode[] = []
+  const flushInlineRun = () => {
+    if (inlineRun.length === 0) return
+    result.push({ children: inlineRun, props: {}, tag: 'p', type: 'element' })
+    inlineRun = []
   }
 
-  return createTipTapNodeFn(node, 'slot', { attrs: { name } })
+  for (const child of children) {
+    const metadata = child.type === 'element' ? child.props?.$ : undefined
+    const parserSaysBlock = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      && metadata.block === 1
+    const isBlock = child.type === 'element'
+      && (BLOCK_TAGS.has(child.tag || '') || parserSaysBlock)
+    if (isBlock) {
+      flushInlineRun()
+      result.push(child)
+    } else {
+      inlineRun.push(child)
+    }
+  }
+  flushInlineRun()
+  return result
 }

@@ -9,6 +9,7 @@ import type { JSONContent } from '@tiptap/vue-3'
 import type { JsonRecord } from '../types'
 import { EMOJI_REGEXP, getEmojiUnicode } from './emoji'
 import type { MDCElement, MDCNode } from './mdcTypes'
+import { normalizeBlockChildren } from './nodes'
 
 /**
  * Creates a binding node for data binding expressions
@@ -107,7 +108,10 @@ export function createBlockquoteNode(
     extra?: { attrs?: JsonRecord; children?: MDCNode[] },
   ) => JSONContent,
 ): JSONContent {
-  return createTipTapNodeFn(node as MDCElement, 'blockquote')
+  const element = node as MDCElement
+  return createTipTapNodeFn(element, 'blockquote', {
+    children: normalizeBlockChildren(element.children || []),
+  })
 }
 
 /**

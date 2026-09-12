@@ -500,7 +500,7 @@ function createFileElement(node: JSONContent, context: TiptapToMDCContext): MDCE
     const linkText = fileProps.title || fileProps.filename || fileProps.src || 'Download'
     return {
       children: [{ type: 'text', value: String(linkText) }],
-      props: { href: fileProps.src, title: fileProps.title },
+      props: { __mdc_block: true, href: fileProps.src, title: fileProps.title },
       tag: 'a',
       type: 'element',
     }
@@ -583,7 +583,9 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
   }
 
   if (imageOutput === 'markdown') {
-    return createElement(sanitizedNode, context, 'img', { props: imageProps })
+    return createElement(sanitizedNode, context, 'img', {
+      props: { ...imageProps, __mdc_block: true },
+    })
   }
 
   if (props.id || hasTransforms) {
@@ -595,7 +597,9 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
     return createElement(sanitizedNode, context, tag, { props: imageProps })
   }
 
-  return createElement(sanitizedNode, context, 'img', { props: imageProps })
+  return createElement(sanitizedNode, context, 'img', {
+    props: { ...imageProps, __mdc_block: true },
+  })
 }
 
 function createLinkElement(node: JSONContent): MDCElement {

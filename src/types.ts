@@ -41,6 +41,20 @@ export interface AssetProvider {
   parseUrl: (url: string) => Partial<AssetInfo> | null
 }
 
+export interface EditorAssetRequest<T> {
+  /** Apply a confirmed result. Returns false when the request is stale or cancelled. */
+  complete: (value: T | null) => boolean
+}
+
+export type EditorFlushResult =
+  | { emitted: boolean; ok: true }
+  | { error: import('./lib/conversionTypes').ConversionErrorPayload; ok: false }
+
+export interface VideoInfo {
+  src: string
+  title?: string
+}
+
 export interface PropFormItem {
   custom?: boolean
   default?: PropValue
