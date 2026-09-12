@@ -2209,3 +2209,63 @@ Both the user's ChiliSkills checkout and the implementor's ChiliSkills worktree
 were clean and required no commit. Generated builds, candidate copies and archives
 remain ignored. This plan/evidence update is committed separately after the four
 source commits so the cross-repository checkpoint has an exact durable record.
+
+#### 2026-09-12 — Step 6A complete writing journey ready for review
+
+The permanent Docs playground now demonstrates the assigned writing slice through
+the built Editor, Content and Docs packages. From an empty visual document, the
+real browser accepted `/note`; the keyword-filtered list exposed the Docs
+Information recipe, ArrowDown/ArrowUp retained keyboard selection, and Enter
+inserted the callout. Escape closed a second slash menu while preserving the
+editor's active focus. The pointer/touch `+ Insert` path used the same recipe
+list and inserted Information at the 390 px viewport.
+
+The selected callout's typed metadata controls changed its title to “Before you
+begin” and appearance to `quiet`; editing its content updated the real Docs
+preview. The two-column recipe inserted, both column bodies were edited, Undo
+restored “Second column.”, and Redo restored “Recommended approach.” The
+host-owned `learning-objective` recipe inserted with its named `tip` slot;
+the title and assessed toggle were configured and the named-slot content was
+edited. Markdown mode then showed the canonical component source, including the
+`<template #tip>` boundary.
+
+The deliberate unclosed source remained byte-for-byte unchanged in the source
+textarea. The preview switched to Stale while retaining the last valid rendered
+body, stated the parse failure, and the explicit recovery action restored the
+previous canonical source. The clearly labeled Local demo draft awaited the
+Editor's exposed `flush()`, saved one namespaced browser-storage value, survived
+a new empty document, and reopened the complete source. This remains demo-only
+browser storage; it does not claim application persistence.
+
+Desktop inspection showed the content-led reading surface, compact progressive
+toolbar, typed component settings and side-by-side real preview. At a requested
+390 by 844 viewport, the page's 375 px content width equalled its scroll width,
+the toolbar remained operable, touch targets expanded, the editor and preview
+stacked, and `+ Insert` completed the same Information insertion. The restored
+desktop viewport also had equal 1,265 px client and scroll widths. Browser logs
+contained no warnings or errors. The second editor continued to render only its
+isolated `host-note` kit.
+
+Focused checks pass: Editor type checking; targeted source, component and
+playground lint; 14 authoring/authoring-editor tests including slash search,
+insertion and Escape focus restoration; the Editor production build; six Docs
+authoring/generator tests; Docs candidate preparation against the accepted local
+Content build; and Docs Nuxt type checking and production build. The reviewer
+checkpoint additionally ran all 62 Editor tests and seven Docs focused tests
+before the browser journey. All owning worktrees are clean at the source
+checkpoint; this evidence entry is the only subsequent tracked change.
+
+The consumer calls actually needed are `composeAuthoringKits` /
+`createAuthoringKit`, `<GinkoEditor v-model :authoring-kit>`, its exposed
+`flush()`, Content's `parseMdcBody` and `validatePublicMarkdownAst`, and
+`ContentBodyRenderer` with the same policy and host component map. One concrete
+API friction remains for later evaluation: insertion is intentionally anchored
+to the current ProseMirror selection, so a host cannot request a root-level
+insertion independently of that selection. The playground did not add a second
+placement authority or speculative API for this.
+
+Step 6A is **READY FOR REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. The running deliverable remains
+`http://127.0.0.1:4317/playground`. Step 6B and Step 5 remain paused pending
+reviewer operation and acceptance. No push, tag, publication, deployment or
+production data change occurred.
