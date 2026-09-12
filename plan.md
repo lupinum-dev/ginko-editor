@@ -243,8 +243,8 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 0 | Fresh evidence, baseline and bounded work map | None | Recon review | ACCEPTED |
 | 1 | Parser agreement and angle-syntax implementation | 0 | A: content safety | ACCEPTED |
 | 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
-| 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | READY FOR REVIEW |
-| 4 | Authoring contract and small Docs component kit | 3 | B2: contract | TODO |
+| 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
+| 4 | Authoring contract and small Docs component kit | 3 | B2: contract | IN PROGRESS |
 | 5 | CMS adoption and ChiliSkills pilot | 4 | C: two-consumer proof | TODO |
 | 6 | Complete core writing interaction | 5 | D: writing quality | TODO |
 | 7 | Exact preview in each host | 5; final check after 6 | E: preview agreement | TODO |
@@ -887,3 +887,28 @@ back to Visual with both image and `h1` intact. The owned preview processes and
 temporary files were removed. No external action occurred. The registry Content
 helper/version blocker from the original packet remains unchanged. Step 3 is
 again `READY FOR REVIEW`; Step 4 has not started.
+
+#### 2026-09-12 — Reviewer accepts Gate B1 and assigns Step 4
+
+**Gate B1: ACCEPTED** by coordinator task
+`01a09425-69ce-73d3-843f-32d46fe88775` at Editor
+`2cc8271cf6c280d7689361c06d0c03b6a07a34fb`, with the main correction in
+`7e1b81a90a3c0d5a0d33509ef8809bee4b88bd65`. The reviewer inspected the full
+correction diff and clean worktree, reproduced the earlier failed-flush recovery
+defect, and verified that Markdown mode now reveals the exact last safe source
+without emitting the invalid visual document. Its independent focused rerun
+passed 28 tests across lifecycle, real-schema and conversion files; diff hygiene
+also passed.
+
+The earlier aggregate, candidate-archive certification, packed Vue/Nuxt and
+Chromium evidence remains accepted because the final focused change only alters
+the failed-flush mode transition and adds its regression. No unresolved Gate B1
+content-loss, stale-async, asset-cancellation, browser-import, peer-range or
+style blocker remains. The Content registry helper/version gate is unchanged
+and publication remains unauthorized.
+
+The reviewer assigned Step 4 only. The implementation must keep runtime-free
+authoring metadata separate from Content policy and UI metadata, derive types
+from one source, reuse Docs tag/component authority, parse recipes with the
+canonical Content engine, and prove real registration, isolated kits, duplicate
+rejection and bounded property/slot handling. Step 5 remains blocked on Gate B2.
