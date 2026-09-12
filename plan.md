@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 requires corrections after Gate C review: pending-edit preservation, asset handling, reproducible candidate setup, actual V2 package-consumer proof and the real CMS browser journey. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development. Step 5's pending-edit, asset, candidate-setup and V2 package corrections are reviewed, including a real ChiliSkills image export/restore round trip. Gate C remains open for the authenticated CMS save/reload journey. A local CMS host is available at `http://localhost:3000/studio`, awaiting development-account sign-in. Step 7 remains unassigned. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -267,7 +267,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
 | 6 | Docs writing proof, then focused interaction hardening | 4 | D: initial-kit writing quality accepted | ACCEPTED |
-| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: changes required; corrections assigned | IN PROGRESS |
+| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: corrections reviewed; authenticated CMS journey pending | BLOCKED |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
 | 9 | ChiliSkills full adoption and content migration | 8 | G: application cutover | TODO |
@@ -2658,3 +2658,78 @@ These are included in the existing Step 5 correction assignment. Final image
 picker/reload/export evidence, exact final-candidate checks and the real CMS
 host journey remain required. No further milestone, publication or deployment
 is assigned. Scoped local correction and evidence commits remain authorized.
+
+#### 2026-09-12 — Gate C corrections reviewed; CMS sign-in remains the next action
+
+Reviewed local revisions:
+
+- Content `f854977551c9a32b3bedf1abc8d6b94e757a8a7f`: shared stored-media collection
+  and stored-ID remapping, with policy validation and exact no-op source preservation.
+  The coordinator implemented this bounded correction using the existing AST traversal.
+- Editor `2d9aa495549a2c072d09765e0044a6ae80b062f6`: default asset insertion preserves
+  a supplied durable URL; host providers can retain canonical IDs.
+- CMS `b0ebeb435380210be77a0e174b1869c93a667675`: awaited locale/create/route boundaries
+  and correct ownership after successful entry creation.
+- ChiliSkills `795ecef`, then `eb4ce97`: awaited host source/asset transactions,
+  per-block failure state, safe lecture collapse/removal, Content-owned media parsing,
+  concurrent slide-field preservation, and no unsupported File action.
+- Docs remains `10fc712215b493b508ba828000e86420c60b028b`.
+
+The coordinator independently ran Editor workflow/authoring tests (33 passed),
+CMS locale/flush tests (5 passed), and ChiliSkills pilot/module tests (14 passed
+before the final File-capability-only correction). The implementor verified that
+final correction with its mounted pilot tests (2 passed), lint and typecheck.
+The implementor reports full Editor verification (78 tests), full ChiliSkills
+check (63 tests, types and builds), and focused CMS checks plus Studio types/build.
+
+Content's full `pnpm verify` passed: 1,363 core tests, 15 server e2e tests,
+typechecks, static checks, docs and examples. Two `pnpm release:pack` builds
+produced the same clean-source archive. Its packed consumer build/import/typecheck
+lane passed, including public imports and meaningful new helper regressions;
+the optional browser/plugin lane was not rerun for this pure helper addition.
+
+Exact local candidate identities:
+
+- Content `.pack/lupinum-ginko-content-1.0.0-beta.7.tgz`:
+  `81b94b5950c5b396989172e6d21d195fc99afd0525a272873bab8196df0e4119`.
+- Editor `release-artifacts/lupinum-ginko-editor-0.1.0.tgz`:
+  `6b4f6eda23aafaa227c253df3c821d7f478faa3af22f83819cf3f430414d8861`.
+- CMS local-content archive:
+  `80ebb49f568cf6be4596f13c17b6c23256da3a567a1c08eddf29a18e9551422c`.
+
+CMS's `.pack/local-content/release-evidence-pnpm.json` identifies clean CMS
+`b0ebeb43` and the exact Content archive above. The implementor's local-content
+lane passed clean install/build, public imports, actual V2 authoring positive/
+negative probes and a portability document/asset round trip. This is offline
+candidate evidence, not live CMS acceptance or release certification. The
+coordinator also executed CMS's committed candidate bootstrap and verified the
+installed new Content exports.
+
+Independent ChiliSkills browser evidence at the isolated `localhost:4321` origin:
+immediate type/collapse/reopen retained the final text; the actual picker inserted
+`tests/fixtures/diagram.png`; Markdown stored a UUID while the image rendered from
+a blob URL at natural width 640. Reload retained that image. The actual module
+export produced a ZIP containing `module.json` and the referenced image bytes.
+Restoring that exact ZIP through the app remapped the UUID and rendered the image
+at width 640 again. Module Undo recovered the prior module. The reviewer restored
+the original `Collapse persistence proof` script and removed the generated ZIP.
+The separate implementor origin at `127.0.0.1:4321` remains available.
+
+CMS startup investigation recovered an inspectable host without remote changes.
+The normal dev launcher hits `spawn EBADF` in esbuild 0.28.2 during Nitro's dev
+build; pipe/PTY, Node 24.18/24.21 and Nuxt `--no-fork` reproduced it. A normal
+production build instead failed because `/blog` prerender received a Content
+data-source 502. A diagnostic built host with only public prerender disabled
+serves the real Studio sign-in at `http://localhost:3000/studio`; Studio source
+is served by Vite on 5252. The repository config is unchanged. Only an ignored
+`.env.local` with the existing development connection settings was created.
+No credentials were copied into source, and no backend/auth configuration or
+backend data was changed. Temporary process instrumentation was removed.
+
+**Remaining gate and owners:** Matthias signs in with the development owner
+account; the coordinator then verifies real CMS editing, immediate save, reload,
+locale switching and creation, and reports any observed contract/backend blocker.
+An authenticated session was requested instead of exposing the password in the
+task. Code corrections and package checks do not waive this browser requirement.
+Gate C is not accepted, and Step 7 remains unassigned. Completed source changes
+are committed locally; no push, publication or deployment occurred.
