@@ -2378,3 +2378,57 @@ owning final checks once at handoff. Do not expand the component set, invent a
 root-insert API without demonstrated need, or start CMS/ChiliSkills adoption.
 Return Gate D for reviewer operation. Local corrective commits remain authorized;
 Step 5, push, publication, deployment and production migration remain unassigned.
+
+#### 2026-09-12 — Step 6B hardening ready for Gate D review
+
+Editor source commit `49e6be4` completes the assigned initial-kit hardening while
+preserving the accepted Step 6A writing journey. Slash and `+ Insert` use the same
+focused menu; Escape restores the document selection after the menu unmounts.
+Slash insertion stays inactive during IME composition and in code blocks.
+
+Every selected component now exposes accessible Move up, Move down, Duplicate and
+Delete actions. Move also has `Alt+ArrowUp` / `Alt+ArrowDown`, and duplicate has
+`Alt+Shift+D`. Each action is one undoable history step and keeps a useful node
+selection. No drag implementation was added, so there is no separate pointer-only
+mutation path whose validity can diverge from these actions.
+
+Structural editing now protects component boundaries from destructive Backspace
+and Delete merges. Recipe placement checks the selected component's actual parent.
+Markdown paste constructs the candidate ProseMirror transaction, serializes the
+whole resulting document, and validates it with the active authoring kit before
+dispatch. This accepts a column replacement inside a layout while rejecting the
+same column at the root, without duplicating Content's policy model in Editor.
+Parent deletion remains a normal undoable block action, and the restored document
+continues to validate after Enter, boundary deletion attempts, delete and undo.
+
+Typed properties distinguish omitted values from valid empty strings, zero and
+false. Number controls keep invalid intermediate text local, announce a concise
+validation error, and update canonical source only after a finite number is
+available; blank input removes the optional property. Source/Visual stale-preview
+and explicit recovery behavior from Step 6A remains intact.
+
+Focused authoring-editor coverage now has 11 tests for insertion focus, code/IME,
+block actions and single-step undo, typed property edge cases, parent-sensitive
+paste and structural boundaries. The single final owning `pnpm verify` aggregate
+passed dependency policy, full ESLint, Vue type checking, all 70 tests, the Editor
+production build, candidate preparation, and the Docs Nuxt production build.
+`git diff --check` also passed.
+
+Browser operation on the built playground confirmed duplicate/delete/move and
+Undo, plus-menu focus and Escape recovery, and a 21-paragraph long document whose
+real preview reflected the final edit by the 400 ms check. At 390 by 844, the
+document client and scroll widths both measured 375 px; nested `sm` and `lg`
+columns remained readable as equal-width stacked rows. A fresh post-build tab has
+no warning or error logs and is restored to the saved reviewer document in Visual
+mode at `http://127.0.0.1:4317/playground`.
+
+Known limits are unchanged and explicit. Insertion remains anchored to the current
+selection; no speculative root-insert API was added. The initial Docs kit has no
+standalone numeric component, so numeric transient-input behavior is proven by the
+focused generic-kit test rather than that browser fixture. Local demo storage is
+still browser-only. Markdown flavors receive the new policy-validated paste path;
+ordinary semantic HTML continues through ProseMirror's native paste behavior.
+
+Step 6B is **READY FOR GATE D REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. Step 5 and CMS/ChiliSkills adoption remain
+paused. No push, tag, publication, deployment or production data change occurred.
