@@ -2464,3 +2464,39 @@ local commits during this review. Editor correction source/tests and evidence
 must also be committed locally before resubmission. No push, publication,
 deployment or production data change is authorized. Step 5 remains unassigned
 until Gate D is accepted and its exact CMS/V2 package prerequisite is proved.
+
+#### 2026-09-12 — Numeric-field lifecycle correction ready for re-review
+
+Correction source commit `4a9da66` makes canonical component properties
+authoritative again. A valid number no longer remains in the local draft cache,
+and any real document transaction clears the current invalid draft. Selection,
+external document and authoring-kit changes also clear it. A consumed delayed
+v-model echo does not clear a newer incomplete input, so ordinary host feedback
+cannot interrupt the active field.
+
+The number control now distinguishes an incomplete numeric prefix from invalid
+text. Prefixes such as `1.`, `-` and an unfinished exponent remain editable and
+do not mutate canonical source or show a premature error; complete decimal,
+negative and exponent values commit normally. Unrelated text such as `bad` keeps
+the existing concise validation error until corrected or its authority changes.
+No block IDs or parallel persisted state were introduced.
+
+The two reviewer regressions are now owning tests: Undo restores both canonical
+count 1 and displayed value 1, and host replacement at the same position/tag
+replaces `bad` with canonical/displayed count 42 and removes the error. A third
+focused test covers sequential decimal and negative prefixes. The temporary
+reviewer probe file is removed.
+
+Focused authoring-editor checks pass all 14 tests, along with targeted ESLint,
+Vue type checking and `git diff --check`. The final post-correction `pnpm verify`
+aggregate passes dependency policy, full ESLint, Vue type checking, all 73 tests,
+the Editor production build, candidate preparation and the Docs Nuxt production
+build. The reviewer also independently confirmed sequential `1.` → `1.5` input
+and block move/delete with single Undo in the browser, then restored the saved
+reviewer fixture. The playground remains available at
+`http://127.0.0.1:4317/playground`.
+
+The Step 6B limits recorded above are unchanged. This correction is **READY FOR
+GATE D RE-REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. Step 5 and CMS/ChiliSkills adoption remain
+paused. No push, tag, publication, deployment or production data change occurred.
