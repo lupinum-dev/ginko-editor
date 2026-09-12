@@ -206,4 +206,27 @@ describe('editor conversion contract', () => {
     expect(result.value).toContain('![Nested](/nested.png)\n\n## Nested heading')
     editor.destroy()
   })
+
+  it('writes a markdown image identity only as its destination', async () => {
+    const document = {
+      content: [
+        {
+          attrs: {
+            props: {
+              alt: 'Diagram',
+              filename: 'diagram.png',
+              id: 'asset_123',
+              src: 'asset_123',
+            },
+          },
+          type: 'image',
+        },
+      ],
+      type: 'doc',
+    }
+    const result = await convertTiptapDocToMarkdown(document, { imageOutput: 'markdown' })
+    expect(result).toMatchObject({ ok: true, value: '![Diagram](asset_123)\n' })
+    expect(result.value).not.toContain('id=')
+    expect(result.value).not.toContain('filename=')
+  })
 })

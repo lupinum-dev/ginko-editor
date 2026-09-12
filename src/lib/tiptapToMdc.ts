@@ -583,8 +583,17 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
   }
 
   if (imageOutput === 'markdown') {
+    // Markdown carries the host-owned stable identity in its destination.
+    // Host metadata and transforms belong to MDC image output; emitting them
+    // as attributes would force HTML-like output and violate Content's native
+    // image property policy.
+    const markdownProps = {
+      ...(imageProps.alt !== undefined ? { alt: imageProps.alt } : {}),
+      ...(imageProps.src !== undefined ? { src: imageProps.src } : {}),
+      ...(imageProps.title !== undefined ? { title: imageProps.title } : {}),
+    }
     return createElement(sanitizedNode, context, 'img', {
-      props: { ...imageProps, __mdc_block: true },
+      props: { ...markdownProps, __mdc_block: true },
     })
   }
 
