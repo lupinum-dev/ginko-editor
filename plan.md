@@ -4,7 +4,11 @@ Prepared: 2026-09-12. Owner: Matthias / Lupinum. Intended executor: GPT 5.6 Sol,
 
 ## 1. Current authorization and how to use this plan
 
-This repository currently contains only this plan and Git metadata. No library, dependencies, application changes, GitHub repository, commits, or releases have been created by this planning task. This document describes future work; it is not evidence that any step has passed.
+This plan began before implementation. Steps 0–3 are now accepted, and Step 4 has a working Editor/Docs candidate and local playground. Section 6 and the dated review entries own current status; the original reconnaissance remains historical evidence. No external publication is authorized.
+
+**Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
+
+**Current checkpoint, 2026-09-12:** Gate B2 is accepted for the local shared-contract foundation and Docs writing proof. Step 6A is now assigned; build and review the complete playground writing journey before 6B hardening and Step 5 consumer integration. Exact CMS + unpublished V2 Content package-consumer certification remains an explicit prerequisite to CMS adoption; the registry-compatible CMS development lane is not evidence for that tuple. Publication, deployment and production migrations remain unauthorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -159,8 +163,8 @@ Read-only behavioral references if useful: `/Users/matthias/Git/alignment/nuxt-s
 
 | Owner | Responsibility |
 |---|---|
-| Ginko Content | Parsing semantics, normalized content contract, portable policy, render boundary |
-| Ginko Editor | Tiptap integration, source conversion, authoring UI, authoring metadata types, scoped styles |
+| Ginko Content | Document parsing/serialization, canonical node identity, shared document-validity rules and diagnostics, derived render body, explicit rendering boundary |
+| Ginko Editor | Tiptap conversion and representability, editing lifecycle, slash/plus insertion, selection, properties, layouts, undo, authoring UI metadata and scoped styles |
 | Ginko Docs | Its Vue/prose components, explicit content policy, generated implementation metadata, authoring labels and recipes |
 | Ginko CMS | Draft/save/publish workflow, access control, asset operations, metadata transport and host preview |
 | ChiliSkills | Workshop context, local storage, backup/import, document migrations, module undo, script workspace |
@@ -173,11 +177,28 @@ There are three different facts, each with one owner:
 
 1. **Implementation metadata:** Vue declares actual props/defaults/slots. Extract representable metadata during build where practical. Do not ship an SFC compiler in the editor browser bundle.
 2. **Content policy:** the component owner explicitly allows a subset of props and slots for authored documents. Do not automatically expose every Vue prop, event, binding or arbitrary class/style hook.
-3. **Authoring metadata:** labels, icons, keywords, grouping, preferred controls, valid nesting and insertion recipes. Put this next to the component kit, keyed by existing canonical tags.
+3. **Authoring metadata:** labels, icons, keywords, grouping, preferred controls, insertion suggestions and recipes. Put this next to the component kit, keyed by existing canonical tags. Rules that determine document validity, including constrained values and structural parent/slot rules, belong to Content policy and its validator. Pure menu preferences remain authoring hints and must not silently invalidate stored source.
 
 Combine these into a serializable authoring manifest. Validate that allowed fields exist and are type-compatible. Derive enum choices/defaults when extraction is reliable; allow explicit authoring control hints for cases that cannot be represented, without duplicating the underlying type declaration. Unsupported complex props use a validated advanced control or source mode. Do not promise automatic form generation for every possible TypeScript type.
 
 Reuse the existing portable policy rather than manually redeclaring its prop types inside a new editor schema. Where authoring types extend it, use inference/indexed access from the canonical types. Keep policy enforcement at the content boundary as well as UI validation.
+
+Content must supply the shared component/native-HTML identity semantics for angle,
+colon and legacy nodes. Consumers must not independently interpret parser-owned
+markers. Editor may separately reject visual representation it cannot preserve;
+that is different from an invalid Content document. Keep these diagnostics distinct.
+
+Provide explicit body rendering with the selected policy and host-local component
+map. A standalone preview must not invent a collection envelope to obtain a policy
+from global Nuxt configuration. Keep the existing full-document renderer as the
+appropriate adapter for collection, locale and reference context. Reuse rendering
+logic rather than creating a competing renderer.
+
+Retain source-preserving editing data and normalized rendering data as derived
+representations where each is required. Expose the smallest operations needed to
+reuse a parsed result; do not force consumers to repeat parsing merely to change
+representation. Preserve strict stored-source handling and the existing no-op
+source guarantee. API names and export placement are reviewed in Step 4A.
 
 Two applications must be able to use different component sets on the same page without leakage. Reject duplicate tags/recipe IDs with a useful diagnostic. Preserve unknown source without executing unregistered components. Use one direct composition operation if needed; do not add a mutable global registration system.
 
@@ -244,16 +265,24 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 1 | Parser agreement and angle-syntax implementation | 0 | A: content safety | ACCEPTED |
 | 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
-| 4 | Authoring contract and small Docs component kit | 3 | B2: contract | IN PROGRESS |
-| 5 | CMS adoption and ChiliSkills pilot | 4 | C: two-consumer proof | TODO |
-| 6 | Complete core writing interaction | 5 | D: writing quality | TODO |
-| 7 | Exact preview in each host | 5; final check after 6 | E: preview agreement | TODO |
+| 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
+| 6 | Docs writing proof, then focused interaction hardening | 4 | D: writing quality; 6A assigned | IN PROGRESS |
+| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof | TODO |
+| 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
 | 9 | ChiliSkills full adoption and content migration | 8 | G: application cutover | TODO |
 | 10 | Public documentation and release certification | 9 | H: release readiness | TODO |
 | 11 | Authorized external setup, publishing and rollout | 10 | Human release gates | TODO |
 
+The current order is **4C → 6A writing proof → 6B focused hardening → 5 consumer integration → 7–11**. Step and gate identifiers are retained for historical references; table order and dependencies govern execution. Step 6 proves the shared writing experience in Docs; Step 5 must then prove it in both applications before the API is treated as stable.
+
 Default to serial execution. Steps 1 and 2 can be separate bounded assignments if the coordinator explicitly delegates them to different agents. Do not let two agents edit the same files. No implementation agent should execute this entire table unattended in one turn.
+
+Step 4's earlier Editor-owned validation candidate is a preserved checkpoint,
+not the final shared validity authority. Its focused corrections are preserved
+as regression evidence; Gate B2 now accepts the Content-owned contract through
+the revised checkpoints below, with the CMS package tuple limitation recorded
+in the latest acceptance entry.
 
 ## 7. Step-by-step work packets
 
@@ -401,13 +430,758 @@ adding the new UX. Preserve source and failure recovery, isolate host assets
 and persistence, and keep imports browser-safe. Return Gate B1 evidence.
 ```
 
-### Step 4 — Define the authoring contract and a small Docs kit
+### Step 4 — Align the Content contract, authoring kit and playground
 
-**Outcome:** a host can register its own component, and both applications can consume the same serializable metadata and initial Docs recipes.
+**Outcome:** a host registers its components once, edits and renders through one document contract, and retains its own persistence/assets/workflow. Content owns shared document meaning; Editor owns the writing experience. The same JSON-safe kit and initial Docs recipes work in the playground and the two later consumers.
 
-**Scope:** Editor authoring types/validation; Docs metadata/build exports, selected authored components/styles and component-only registration; minimal Content policy extension only if demonstrated and reviewed. No full Docs site inheritance in ChiliSkills.
+**Scope:** the smallest Content-owned validity/identity and explicit body-rendering contract needed by the existing Step 4 fixtures; direct Editor/Docs/playground adoption; the existing component metadata and kit proof. CMS contract readers and transport may change only as required by an accepted contract migration, without editor adoption. No ChiliSkills production changes or full Docs site inheritance.
 
-**Work:**
+#### Step 4A — Review the consumer contract and migration before changing it
+
+Pause former aggregate certification and inventory the current candidate, running
+checks, worktrees and dirty files. Keep the playground running and preserve useful
+completed results. Use the accepted Content/CMS worktrees from Gate A; record new
+revisions explicitly when later assigned changes supersede them.
+
+Prepare one bounded proposal in this plan or a linked owning architecture record:
+
+1. Show actual consumer snippets for: registering Docs plus a host component; editing a source string; rendering its body with an explicit instance policy/component map; CMS transporting the JSON contract through its existing path. Identify the integration code removed. Treat sample API names from discussion as proposals, not requirements.
+2. Place shared validity rules (types, requiredness, constrained literal values, slots and necessary structural nesting) and canonical node classification in Content. Retain labels, menu preferences and controls with authoring/UI owners. Define how existing object-valued props, colon documents and native HTML retain their meaning.
+3. Reuse the existing parser and serializer; propose only the public projection/diagnostic operations needed by these consumers. Strict stored parsing stays explicit. Do not change existing public parsing defaults without dependency evidence and an accepted migration.
+4. Specify the smallest public body-rendering boundary that accepts body, policy and host-local components. Explain how the existing Nuxt full-document renderer delegates to it while preserving locale/reference behavior. Keep parsing/policy imports usable without Vue/Nuxt runtime code. State installation footprint separately from import purity.
+5. Audit exact Content contract validators, serialized/generated artifacts, hashes and Content/CMS/Docs readers before adding fields. The current V1 contract rejects unknown fields; an optional TypeScript member is not automatically compatible. Propose coordinated evolution, release order and rollback based on actual dependents. Tightened validity must not silently reject or rewrite existing stored documents; apply new constraints through the accepted policy/migration boundary.
+6. Define focused positive/negative fixtures, exact commands and removal criteria for duplicated Editor validity logic and temporary candidate setup. Preserve existing regressions as tests of the owning behavior. Prefer direct adoption of unpublished local APIs; retain published contracts only where dependencies require it, tracked in `internals/migrations.md`.
+
+##### Step 4A proposed contract (review candidate, 2026-09-12)
+
+This proposal is intentionally a versioned extension of the existing Content
+contract, not a second authoring schema. The current authoring-kit aggregate stays
+in Editor. Content owns the policy inside it and the operations which interpret
+that policy; Docs owns the implementation and UI metadata which surround it.
+
+**Consumer shape**
+
+Docs continues to publish its serializable source and its component-only Nuxt
+module. A host composes serializable sources separately from runtime component
+imports:
+
+```ts
+// app/lib/authoring.ts — safe to import from Nuxt configuration
+import { ginkoDocsAuthoringKitSource } from '@lupinum/ginko-docs/authoring'
+import { composeAuthoringKits } from '@lupinum/ginko-editor/authoring'
+import { learningObjectiveAuthoringSource } from './learning-objective'
+
+export const authoringKit = await composeAuthoringKits(
+  ginkoDocsAuthoringKitSource,
+  learningObjectiveAuthoringSource,
+)
+```
+
+The host source is plain JSON-safe data. The existing unpublished Editor
+aggregate remains version 1 because its envelope did not change; its `policy`
+member now requires the independently discriminated Content policy V2:
+
+```ts
+// app/lib/learning-objective.ts
+import type { AuthoringKitSourceV1 } from '@lupinum/ginko-editor/authoring'
+
+export const learningObjectiveAuthoringSource = {
+  version: 1,
+  policy: {
+    version: 2,
+    components: {
+      'learning-objective': {
+        kind: 'block',
+        props: {
+          title: { types: ['string'], required: true, allowedValues: null },
+          assessed: { types: ['boolean'], required: false, allowedValues: null },
+        },
+        slots: ['default', 'tip'],
+        allowedParents: null,
+        allowedChildren: null,
+        media: null,
+      },
+    },
+  },
+  implementation: {
+    'learning-objective': {
+      componentName: 'LearningObjective',
+      props: {
+        title: { required: true, types: ['string'] },
+        assessed: { required: false, types: ['boolean'], default: false },
+      },
+      slots: ['default', 'tip'],
+    },
+  },
+  authoring: {
+    'learning-objective': {
+      label: 'Learning objective',
+      description: 'State what the learner should understand.',
+      props: {
+        title: { control: 'text', label: 'Title' },
+        assessed: { control: 'toggle', label: 'Assessed' },
+      },
+      slots: { default: { label: 'Objective' }, tip: { label: 'Teaching tip' } },
+    },
+  },
+  recipes: [{
+    id: 'learning-objective',
+    label: 'Learning objective',
+    source: '<learning-objective title="Understand the contract">\nExplain the outcome.\n\n<template #tip>\nUse a concrete example.\n</template>\n</learning-objective>',
+  }],
+} as const satisfies AuthoringKitSourceV1
+```
+
+```ts
+// nuxt.config.ts — no app component or #components import here
+import ginkoDocsComponentKit from '@lupinum/ginko-docs/component-kit'
+import { authoringKit } from './app/lib/authoring'
+
+export default defineNuxtConfig({
+  modules: [ginkoDocsComponentKit],
+  content: { componentPolicy: authoringKit.policy },
+})
+```
+
+```ts
+// app/lib/preview-components.ts — runtime-local implementations
+import LearningObjective from '../components/LearningObjective.vue'
+import { authoringKit } from './authoring'
+
+export const previewComponents = {
+  ...Object.fromEntries(Object.entries(authoringKit.implementation)
+    .map(([tag, implementation]) => [tag, implementation.componentName])),
+  'learning-objective': LearningObjective,
+}
+```
+
+The string remains the only authoring state. Editor receives the instance-local
+kit; it does not own or persist a parsed tree:
+
+```vue
+<script setup lang="ts">
+import { GinkoEditor } from '@lupinum/ginko-editor'
+import { authoringKit } from './authoring'
+
+const source = defineModel<string>({ required: true })
+</script>
+
+<template>
+  <GinkoEditor v-model="source" :authoring-kit="authoringKit" />
+</template>
+```
+
+A preview parses strictly, keeps the last valid body in host UI state, and renders
+that body through the new explicit component. `ContentBodyRenderer` is also a
+Nuxt auto-import when the Content module is installed:
+
+```vue
+<script setup lang="ts">
+import ContentBodyRenderer from '@lupinum/ginko-content/body-renderer'
+import {
+  parseMdcBody,
+  validatePublicMarkdownAst,
+  type ParseMdcBodyResult,
+} from '@lupinum/ginko-content/cms-contract'
+import { authoringKit } from './authoring'
+import { previewComponents } from './preview-components'
+import { shallowRef, watch } from 'vue'
+
+const source = defineModel<string>({ required: true })
+const body = shallowRef<ParseMdcBodyResult['body']>()
+const previewError = shallowRef<unknown>()
+
+watch(source, async (value, _oldValue, onCleanup) => {
+  let stale = false
+  onCleanup(() => { stale = true })
+  try {
+    const next = await parseMdcBody(value, { autoClose: false })
+    const result = validatePublicMarkdownAst(next.body, authoringKit.policy)
+    if (!result.ok) throw new Error(result.issues[0]?.message ?? 'Invalid content')
+    if (!stale) {
+      body.value = result.value
+      previewError.value = undefined
+    }
+  } catch (error) {
+    if (!stale) previewError.value = error
+  }
+}, { immediate: true })
+</script>
+
+<template>
+  <ContentBodyRenderer
+    v-if="body"
+    :body="body"
+    :policy="authoringKit.policy"
+    :components="previewComponents"
+  />
+</template>
+```
+
+The real implementation keeps the candidate's post-`await` revision guard and
+explicit stale/error UI; the abbreviated snippet only shows the data boundary.
+The Content renderer does not own debounce, stale-body retention, or error copy.
+
+CMS receives the same policy through the existing Content configuration and
+artifact path, rather than through an Editor-specific transport:
+
+```ts
+// The same nuxt.config.ts adds the existing CMS options; componentPolicy above
+// remains the single Content/CMS contract source.
+export default defineNuxtConfig({
+  modules: [ginkoDocsComponentKit, '@lupinum/ginko-cms'],
+  content: { componentPolicy: authoringKit.policy },
+  ginkoCms: { /* existing workflow/presentation options */ },
+})
+```
+
+```json
+{
+  "format": "ginko-content-contract",
+  "version": 2,
+  "collections": {
+    "docs": {
+      "componentPolicy": {
+        "version": 2,
+        "components": {
+          "info": {
+            "kind": "block",
+            "props": {
+              "appearance": {
+                "types": ["string"],
+                "required": false,
+                "allowedValues": ["quiet", "tint"]
+              }
+            },
+            "slots": ["default"],
+            "allowedParents": null,
+            "allowedChildren": null,
+            "media": null
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Content still writes `.ginko/content-contract.json`; CMS still reads it, hashes
+the canonical JSON, installs it in `cmsContract`, and projects the policy into
+each collection's `settings.componentPolicy`. CMS continues to transport and
+save `bodyMdc` strings. Parsed bodies remain derived publication/preview data.
+
+This removes the playground's fake `{ body, collection: 'docs' }` envelope and
+global `content.componentPolicy` assembly solely for preview; Editor's
+`validateRecipeTree`, its document-value checks against implementation options,
+and its parser-marker checks; Docs authoring nesting declarations; and the
+full-document renderer's direct ownership of the low-level Markdown renderer. It does not remove
+Editor representability checks, Docs labels/controls/recipes, host save/assets,
+or CMS workflow validation.
+
+**Exact Content policy and operations**
+
+Add a discriminated, closed `PortableComponentPolicyV2`; do not add optional
+members to V1:
+
+```ts
+type PortableComponentValueTypeV2 =
+  | 'string' | 'number' | 'boolean' | 'json' | 'asset'
+
+interface PortableComponentPropPolicyV2 {
+  types: readonly [PortableComponentValueTypeV2, ...PortableComponentValueTypeV2[]]
+  required: boolean
+  allowedValues: readonly (string | number | boolean)[] | null
+}
+
+interface PortableComponentPolicyV2 {
+  version: 2
+  components: Record<string, {
+    kind: 'block' | 'inline'
+    props: Record<string, PortableComponentPropPolicyV2>
+    slots: readonly string[]
+    allowedParents: readonly string[] | null
+    allowedChildren: readonly string[] | null
+    media: {
+      sourceProp: string
+      altProp: string | null
+      titleProp: string | null
+      filenameProp: string | null
+    } | null
+  }>
+}
+```
+
+`types` is an array because an authored value can genuinely be `string | json`;
+implementation metadata must not narrow that to a false single type. In V2,
+`json` means `null`, an array, or a plain JSON object; primitive alternatives are
+listed explicitly. `asset` remains a non-empty safe URL or stored asset identity
+at its existing boundary. `allowedValues` is either `null` (no literal
+restriction) or the exhaustive allowed primitive values; every listed value must
+match a declared primitive type. Required means present in authored source; a Vue
+default does not make an explicitly required content property optional.
+
+The contract builder normalizes `types` into the fixed order `string`, `number`,
+`boolean`, `json`, `asset` before canonical JSON and hashing, and rejects
+duplicates. Strict readers and validators require that canonical order but never
+sort, rewrite or otherwise mutate caller-owned policy/contract values. They also
+reject non-finite numbers,
+non-plain or cyclic JSON, duplicate allowed values (identity includes primitive
+type), and `allowedValues: []`; use `null` for no literal restriction. If
+`allowedValues` is not null, it must contain at least one value for every declared
+primitive type. Structured `json` values are not compared with `allowedValues`.
+`asset` is exclusive: it cannot be combined with `string` or any other type and
+cannot declare `allowedValues`. This prevents an unsafe asset string from being
+accepted through an ordinary string branch.
+
+| Declaration | Accepted authored values | Rejected / note |
+|---|---|---|
+| `types: ['string'], allowedValues: null` | Every string | Numbers, booleans, structured JSON |
+| `types: ['string', 'number'], allowedValues: ['sm', 'lg', 1, 2]` | Exactly those four values | Other strings/numbers; omitting all values of either declared primitive type is invalid policy |
+| `types: ['string', 'json'], allowedValues: ['auto', 'wide']` | Those strings plus `null`, arrays and plain objects | Other strings; `json` does not absorb primitive values |
+| `types: ['string', 'number', 'boolean', 'json'], allowedValues: null` | All finite JSON values | Exact V2 representation of V1 `type: 'json'` |
+| `types: ['json'], allowedValues: null` | `null`, arrays and plain objects | Every primitive |
+| `types: ['asset'], allowedValues: null` | A safe public asset URL at the public boundary, or a verified stored identity at the storage boundary | Empty/unsafe strings; any union with `asset`; non-null `allowedValues` |
+
+The mechanical V1-to-V2 property projection is fixed and testable:
+
+| V1 `type` | Exact V2 `types` | Other exact V2 fields |
+|---|---|---|
+| `string` | `['string']` | Same `required`, `allowedValues: null` |
+| `number` | `['number']` | Same `required`, `allowedValues: null` |
+| `boolean` | `['boolean']` | Same `required`, `allowedValues: null` |
+| `json` | `['string', 'number', 'boolean', 'json']` | Same `required`, `allowedValues: null` |
+| `asset` | `['asset']` | Same `required`, `allowedValues: null` |
+
+Every V1 component additionally projects to the identical canonical name,
+`kind`, prop-name set, `slots` and `media`, with `allowedParents: null` and
+`allowedChildren: null`. This preserves V1 value meaning, including primitive
+JSON. A V2 owner may add only the reviewed restricting `allowedValues`, parent
+and child rules during the eligible migration; the inventory below must prove
+all current canonical documents satisfy them.
+
+`slots` remains an allow-list. Existing direct named-template validation remains.
+For children inside a named template, the enclosing authored component remains
+the structural parent. `allowedParents` and `allowedChildren` are independent
+constraints: the former restricts where a component can appear; the latter
+restricts what authored component children a container accepts. `null` means no
+component-nesting restriction. Native Markdown/HTML children are not component
+children and remain allowed unless a later, separately reviewed policy adds prose
+content rules. All referenced component names must exist in the same policy.
+
+Extend the existing public functions instead of adding a parallel validator:
+
+```ts
+type PortableComponentPolicy = PortableComponentPolicyV1 | PortableComponentPolicyV2
+
+function validatePublicMarkdownAst(
+  value: unknown,
+  policy?: PortableComponentPolicy,
+): PublicMarkdownValidationResult
+
+function validateStoredPortableMarkdownAst(
+  value: unknown,
+  policy: PortableComponentPolicy,
+): PublicMarkdownValidationResult
+
+function classifyPortableMarkdownElement(
+  node: Pick<MarkdownNode, 'tag' | 'props'>,
+  policy: PortableComponentPolicy,
+):
+  | { kind: 'html'; name: string }
+  | { kind: 'component'; name: string; form: 'block' | 'inline'; registered: boolean }
+
+function projectMdcDocument(
+  document: MarkdownDocument,
+  options?: Pick<ParseMdcBodyOptions, 'tocDepth'>,
+): ParseMdcBodyResult
+```
+
+`validatePublicMarkdownAst` keeps all current render-safety checks, then applies
+V2 value and nesting rules. Constraint failures use the existing
+`invalid_prop_value` code; structural failures add only `invalid_nesting`.
+Diagnostics retain the current stable node/property path. Source ranges are
+deferred. `classifyPortableMarkdownElement` is the single interpretation of
+parser metadata plus policy: explicit HTML stays HTML even when a component has
+the same canonical name; angle and colon component forms produce the same
+component identity; an unregistered authored component remains identifiable and
+is rejected by validation. Consumers do not read `props.$`.
+
+The two validation modes are deliberately not interchangeable:
+
+| Boundary | Parser mode | Validator | Asset rule |
+|---|---|---|---|
+| Docs recipes and public standalone source | `autoClose: false` | `validatePublicMarkdownAst` | Public-safe URLs only |
+| Editor authoring preparation/emission | `autoClose: false` | `validateStoredPortableMarkdownAst` plus Editor representability/round-trip checks | Preserves supported stored identities; the host owns existence, access and URL resolution |
+| Interactive playground body | `autoClose: false` after debounce | `validatePublicMarkdownAst`, then `ContentBodyRenderer` repeats it at render | Public-safe URLs only; the last valid body stays visible on failure |
+| CMS draft and transition source inventory | `autoClose: false` | `validateStoredPortableMarkdownAst` after the CMS has identified the collection policy | Stored-identity grammar is accepted for declared asset props, but this alone does not prove the asset exists or is renderable |
+| CMS publish and active-publication migration proof | `autoClose: false` through the existing projection builder | Existing `assertPublicBodySafe`, then `validatePublicMarkdownAst` on its resolved clone | CMS must resolve/verify supported stored assets before public validation; raw stored identities never reach the renderer |
+| Portable import/export | Existing strict portable parser | Existing stored validator plus manifest/asset verification | Contract-declared references must match verified portable assets |
+
+`validateStoredPortableMarkdownAst` already exists internally; 4B exports that
+exact runtime-neutral operation from `/cms-contract` because CMS transition and
+Editor preparation need it. It must never be used by `ContentBodyRenderer`, Docs
+recipes, or an untrusted browser preview. Unsafe schemes fail both validators;
+stored mode permits only the existing narrow identity grammar, not arbitrary
+strings. The existing CMS public projection currently
+resolves only its supported image shapes. A custom component asset identity
+which that path cannot resolve makes the no-write V2 migration ineligible; adding
+general component-asset resolution and changing purge/reference extraction remain
+deferred asset work, not a reason to weaken public URL validation here.
+
+`projectMdcDocument` extracts the current normalized body, TOC and search text
+from an already parsed document. `parseMdcBody` delegates to
+`parseMdcDocument` plus that projection, so existing callers and defaults remain.
+Editor can parse strict source once, project it for Content validation, and adapt
+the same `MarkdownDocument` to Tiptap. `serializeMdcDocument` remains the only
+serializer. Interactive recovery must opt into `autoClose: true`; stored source,
+recipes, editor mode changes, CMS save/publish, and migration audits use
+`autoClose: false`.
+
+Colon documents are neither rewritten nor converted to angle syntax on load.
+Native HTML is selected by Content's existing explicit HTML marker and safe-tag
+rules. Object-valued properties remain valid only when `json` is one of their V2
+types. Editor may still reject a valid Content tree as visually unrepresentable;
+that remains an Editor diagnostic, not a Content validity failure.
+
+Keep the source callers explicit. Public `parseAuthoringSource` is the Editor
+storage/source preparation operation and uses the stored validator. Kit creation
+uses a separate package-private `parsePublicRecipeSource` for Docs recipes, and
+the playground preview continues to call `parseMdcBody` plus
+`validatePublicMarkdownAst` directly before rendering. Do not accept a validation
+callback or caller-selected arbitrary validator. The current image conversion
+keeps the original `id`/`src` in TipTap props and emits those props again. Its
+image extension shows no bare stored identity: `sanitizeImageUrl` rejects that
+identity as a display URL, then `assetProvider.buildUrl` supplies the safe host
+URL. If schema conversion or semantic round-trip cannot preserve an asset-bearing
+node, preparation fails into the existing source-only fallback rather than
+rewriting or dropping the reference.
+
+Contract and policy dialects cannot be mixed. A V1 resolved contract contains
+only V1 policies; a V2 resolved contract contains only V2 policies in every
+collection. The strict named V1 and V2 readers reject the other version and mixed
+collections. During the migration window only the generic
+`assertResolvedContentContract` returns the discriminated V1-or-V2 union. The
+builder emits V1 for an omitted/V1 policy and V2 only for an explicit V2 policy;
+there is no per-collection version selection. Render validation accepts either
+dialect and preserves V1 semantics unchanged.
+
+**Body-rendering boundary**
+
+Add one public Vue component, `ContentBodyRenderer`, with required `body`,
+`policy`, and `components` props and the existing useful presentation props
+`tag`, `prose`, `locale`, `defaultLocale`, and `locales`. It forwards ordinary
+attributes to its root. An internal `fallbackComponents` prop may remain for the
+full Content renderer's bundled prose/plugin fallbacks; it is not a second policy.
+The component validates the body with `validatePublicMarkdownAst` immediately
+before rendering.
+
+The explicit component map is authoritative. Values may be Vue components or an
+explicit registered component name such as `{ info: 'MdcInfo' }`. The low-level
+renderer may resolve that named value from Vue's app registry, but it must stop
+discovering a custom component merely because its source tag happens to be global.
+This preserves Docs module registration while keeping per-instance policy and
+component selection isolated.
+
+`ContentRendererMarkdown.vue` continues to resolve document locale, localized
+links, references, unwrap, configured tag mappings, plugins, and fallbacks. It
+then delegates its final body to `ContentBodyRenderer`. Thus the new body boundary
+does not pretend a bare AST contains collection/reference context.
+
+The runtime-neutral `@lupinum/ginko-content/cms-contract` entry remains free of
+Vue, Nuxt, Node and filesystem imports. The Vue component is a separate
+`@lupinum/ginko-content/body-renderer` export and a Nuxt auto-import. Import purity
+does not imply a minimal installation: the current Content package still installs
+its existing Nuxt/module dependencies. Splitting that installation footprint is
+explicitly deferred.
+
+**Dependency, artifact and migration audit**
+
+- Registry checks on 2026-09-12 found Content `latest` 0.3.6 and `next`
+  1.0.0-beta.8; Docs `latest` 0.3.0 and `next` 0.4.0-rc.10; CMS latest 0.1.3,
+  CMS Convex latest 0.1.2, and no published Editor package. The local accepted
+  Content candidate is `b219f55` with package version beta.7 and contains the
+  unpublished strict document parser/serializer work. The local CMS 0.2.0-rc.2
+  packages are not published. Docs rc.10 is published; its current authoring and
+  component-kit candidate changes are uncommitted.
+- The published Content beta.8 tarball exposes only `parseMdcBody` at the MDC
+  boundary and has the same closed `PortableComponentPolicyV1`. Its
+  `assertResolvedContentContract` accepts only top-level version 1 and exact keys;
+  each V1 component accepts exactly `kind`, `props`, `slots`, `media`, and each
+  property exactly `type`, `required`. Therefore V2 data cannot be placed in a V1
+  object, even as TypeScript-optional members.
+- Content's Nuxt module writes canonical JSON to
+  `.ginko/content-contract.json`. Its Node reader validates it and recomputes
+  SHA-256. Portable-manifest V1 references that file and hash, while directory
+  import/export then validates the contract as V1. A V2 contract changes the hash
+  even when document source is unchanged and is not a valid V1 portable bundle;
+  emitting it under a manifest labelled V1 would hide the incompatibility.
+- Local CMS pins Content beta.4 in package manifests, lockfile,
+  `compatibility.json`, packed consumers and release evidence. CMS loads the
+  artifact into runtime config, validates again in the Nuxt module and Convex,
+  stores the JSON plus canonical hash in `cmsContract`, projects the component
+  policy into collection settings, and validates public bodies at publish.
+  Contract hashes also fence writes, revisions, transitions, diagnostics,
+  projection/asset references, and portability runs. Transition target/source
+  contracts and portability archives are persisted JSON and will be read again.
+- Docs currently develops against beta.7 and declares the broad peer
+  `>=1.0.0-beta.7 <2.0.0`; that range would incorrectly claim V1 and V2 are
+  interchangeable. The published Docs rc.10 tarball does not contain the new
+  `authoring` or `component-kit` exports at all; those exports and files exist only
+  in the current uncommitted candidate. Editor's package is unpublished and can
+  adopt the new API directly. The playground currently aliases the local built
+  Content contract and copies a Docs candidate; these are candidate proofs, not
+  registry evidence.
+- Existing CMS transitions treat every component-policy change as incompatible,
+  but currently validate only strict parsing for draft `bodyMdc` and require all
+  affected entries to be unpublished. That is not an acceptable V1-to-V2 policy
+  migration: active revision snapshots also need validation, while valid source
+  must not be unpublished or rewritten merely to change policy metadata.
+
+Use a temporary dual-reader window, tracked in Content and CMS
+`internals/migrations.md`. The no-write transition lane is deliberately narrower
+than "policy-only". CMS derives it server-side with this exact predicate; a
+client cannot select it:
+
+```ts
+type EligiblePolicyVersionChange = 'v1-to-v2' | 'v2-to-v1' | null
+
+function classifyNoWritePolicyVersionChange(
+  current: ResolvedContentContract,
+  target: ResolvedContentContract,
+): EligiblePolicyVersionChange
+```
+
+For `v1-to-v2`, `current.version` is 1 and `target.version` is 2. Canonical
+comparison must prove identical top-level format, default locale, locales,
+fallbacks and collection-ID set. Every collection must have identical canonical
+fields other than `componentPolicy`, including kind, schema/structure, locale,
+routing and portability fields. Each target policy must have exactly the same
+component-name set; each component must have identical `kind`, prop-name set,
+per-prop `required`, slots and media. Each target prop's `types` must equal the
+fixed V1 projection table above. Only `allowedValues`, `allowedParents` and
+`allowedChildren` may change from their projected `null` value to a valid V2
+restriction. Parent/child names must resolve in the same unchanged component set.
+No component addition/removal, kind change, prop type/required change,
+slot/media change, collection-field change, locale/routing change, or arbitrary
+V2-to-V2 policy edit is eligible.
+
+For `v2-to-v1`, apply the exact inverse test: the current V2 contract must have
+only the projected V1 type sets and otherwise the same component identity,
+kind, props, required flags, slots and media; the target V1 contract must equal
+the canonical V1 projection which removes only the three V2 constraint fields.
+V1-to-V1 and V2-to-V2 changes never enter this lane. Recompute the predicate from
+the installed source contract and persisted target contract during staging,
+validation, every apply page, cancellation and activation; never trust a stored
+mode flag without checking both hashes and contracts again.
+
+Under the locked source contract, transition validation inventories every
+affected entry as follows:
+
+1. Strict-parse every draft `bodyMdc` with `autoClose: false` and call
+   `validateStoredPortableMarkdownAst` with the target collection policy.
+2. For each `activePublications` locale/revision pointer, prove the locale belongs
+   to that collection, load the exact `entryRevisions` row, verify its entry,
+   collection and stored hash relationship, strict-parse its snapshot, and run
+   storage validation with the target policy.
+3. Call the existing `buildPublicProjectionFromRevisionSnapshot` path with that
+   revision and target collection. This is the real publish path: it resolves the
+   supported stored assets, calls `assertPublicBodySafe`, public-validates the
+   resolved clone, and builds the expected public structural/data/search/asset
+   facts and references.
+4. Reuse/extract the existing read-only projection comparison behind
+   `publicDerivedRowsMatch` to compare that expected result with `publicEntries`,
+   `publicSearchEntries` and `contentAssetRefs`, including the active revision ID.
+   Do not repair or reproject. A mismatch fails the transition and must be fixed
+   through the existing repair operation before retrying.
+5. Call the existing `readPublicBodyFromRevision` path (or its exact shared
+   projection helper) as the final renderer-input proof. A `publicEntries` row
+   contains structural/data/asset facts, not body content; public body is always
+   derived on demand from the active revision snapshot.
+
+Inactive historical revisions keep their original contract/content hashes and
+are not relabelled or rendered under the target. The unchanged media declaration,
+exclusive asset value type and real projection path preserve asset meaning. If a
+custom component contains a stored asset identity that the current CMS projection
+cannot resolve, migration fails; this step does not widen asset extraction or
+purge behavior.
+
+The apply output for every eligible item must be canonical-field-for-field equal
+to `readTransitionInput` (including source and source hash). The apply handler
+checks that equality, skips `applyTransitionOutput` entirely, and changes only the
+transition item's bookkeeping state. It never writes entries, revisions, public
+rows, search rows or asset references. Activation is the single atomic operation
+which installs the target contract/hash and completes the transition.
+
+Cancellation remains conservative for ordinary transitions. For this proved
+no-write lane only, it also accepts `state: 'applying'` with `appliedCount > 0`
+when it recomputes eligibility, confirms the installed contract/hash still equal
+the transition source, and confirms the existing per-page counters/invariants show
+that every completed page took the guarded no-op branch. This evidence is recorded
+and advanced atomically by each existing transition page; cancellation checks the
+bounded run summary and current page state, never scans all applied items in one
+Convex mutation. It then cancels the run and releases the lock; no target contract
+is installed.
+This makes interruption after any apply page safely cancellable. Stale generation
+or cursor tokens remain rejected. Activation and cancellation use the existing
+serialization rule so only one terminal action wins; cancellation after completed
+activation is refused.
+
+The release and rollback sequence is:
+
+1. Release a Content candidate which preserves strict named V1 readers/writers,
+   adds strict named V2 readers/writers and the reviewed projection/renderer APIs,
+   and makes the generic reader return the discriminated union. Add
+   `PortableManifestV2` for V2 contracts and retain V1 bundle reads; portable
+   document bytes are unchanged. Omitted/V1 input still emits V1.
+2. Update the unpublished CMS 0.2 line to accept the contract union and implement
+   the exact lane above inside its existing transition system. No Convex table
+   shape changes. Prove interruption/resume, cancellation after multiple pages,
+   stale generation/cursor rejection, activation/cancel serialization, refusal
+   after completion, and the reverse transition. In every cancel case the source
+   hash and all canonical content/projection rows remain unchanged.
+3. Publish Docs with an explicit V2 policy and raise its Content peer floor to the
+   first V2 Content release. Publish Editor against that floor. Update CMS exact
+   dependencies, compatibility data, candidate artifacts and hashes. Candidate
+   cross-package tests precede any registry action.
+4. On each host, preflight the eligible V1-to-V2 transition. Invalid documents or
+   stale projections are corrected deliberately through their owning workflow;
+   they are never normalized by migration. Activate only when all draft and active
+   revision proofs pass, then regenerate the contract artifact, V2 portable
+   manifests and fixture hashes.
+5. Before activation, rollback is the safe cancellation above. After activation,
+   keep the V2-aware binaries installed and start a new reverse eligible
+   V2-to-V1 transition using the saved/rebuilt V1 artifact. Validate again, install
+   its V1 hash, then downgrade packages. Editor and Docs can revert independently.
+6. Only after supported hosts have no stored V1 contract, make V2 the Content
+   default, remove the V1 writer/normal CMS branches, and remove both migration-log
+   entries. Retain a named V1 archive reader only for a documented import need.
+
+**Bounded implementation files and proof**
+
+- Content: `types/component-policy.ts`; `cms-contract/{types,build,validate,
+  render-policy,mdc,index}.ts`; the public body renderer and the existing
+  `MarkdownRenderer`/`ContentRendererMarkdown`; module/runtime-config types;
+  contract, purity, parser, render-policy and component tests; package export and
+  packed Vue/Nuxt fixtures. Portability changes are limited to the discriminated
+  resolved-contract union plus a V2 manifest discriminator/read-write branch; its
+  document and asset formats do not change.
+- CMS: the existing artifact loader/module contract types; installed-contract,
+  publish-safety and transition model/staging/validation/apply paths; portability
+  resolved-contract annotations; compatibility metadata and focused tests. Do
+  not adopt Editor or change Studio UI in this step.
+- Docs: `tags.ts`, the authoring source/generator/generated metadata, their tests,
+  peer metadata and component-only certification. Vue extraction continues to
+  prove implemented props/defaults/slots and that explicit allowed literals are
+  supported. Extracted literal options are derived evidence; only Content policy
+  decides which values are valid authoring choices.
+- Editor/playground: `authoring.ts`, the conversion adapter/pipeline and fallback
+  node conversion, focused authoring/type tests, playground preview and Nuxt
+  setup. Preserve async/lifecycle regression files unchanged except for direct
+  API adoption.
+
+Positive fixtures cover angle and colon `info`, native `<article>`, the `img`
+native/component collision, string-or-object props, optional booleans, required
+props, default and named slots, layout/column nesting and two isolated policies.
+Negative fixtures cover unknown/unsafe components, wrong types, unsupported
+literal values, missing required props, duplicate/unknown slots, both directions
+of invalid nesting, malformed strict source and explicit native HTML collisions.
+An asset-boundary fixture uses the currently supported image shape with a stored
+identity: Editor load, visual edit and flush preserve that identity byte-for-byte;
+the visual node displays only a safe URL returned by `assetProvider.buildUrl`;
+direct public validation/rendering rejects the unresolved identity; and an unsafe
+scheme fails both stored and public validation. If that node is not representable,
+the test instead requires the existing source-only fallback with the source bytes
+unchanged—never a lossy visual conversion.
+The same canonical fixture source must be asserted through Content validation,
+Docs recipes, Editor preparation/emission, body rendering, and CMS draft plus
+active-publication transition preflight; owner-specific expected UI remains local.
+
+The first 4B proof uses these focused commands (with the new test files added to
+the named groups), not aggregate release gates:
+
+```sh
+# Content
+pnpm exec vitest run --config vitest.config.ts --project unit \
+  test/unit/resolved-content-contract.test.ts \
+  test/unit/cms-contract-purity.test.ts
+pnpm exec vitest run --config vitest.config.ts --project contracts-node \
+  test/contracts/cms-render-policy.test.ts \
+  test/contracts/render-components-contracts.test.ts \
+  test/contracts/portability-contracts.test.ts
+
+# CMS
+pnpm exec vitest run \
+  test/component/contractTransitions.test.ts \
+  test/component/contract-write-invariants.test.ts \
+  test/component/entries/projection-maintenance.test.ts \
+  test/component/entries/publish.test.ts \
+  test/module/content-contract.test.ts
+
+# Docs
+pnpm exec vp test \
+  layer/authoring.test.ts \
+  layer/component-kit.test.ts \
+  scripts/generate-authoring-metadata.test.ts
+
+# Editor
+pnpm exec vitest run \
+  test/authoring.test.ts \
+  test/authoring-editor.test.ts \
+  test/authoring-regressions.test.ts \
+  test/authoring-async-regressions.test.ts
+pnpm typecheck
+```
+
+At 4C run Content `pnpm verify`, Editor `pnpm verify`, Docs
+`pnpm release:verify` (which contains its aggregate and packed certification),
+and CMS `pnpm run check`, followed by CMS `pnpm run package:e2e` for the changed
+candidate contract path. Remove Editor's duplicate traversal and marker
+interpretation in the same 4B cutover. Remove candidate copies/aliases only after
+packed consumers resolve the reviewed Content and Docs archives. The lasting
+playground remains; temporary `.candidate` trees and local dependency links do not.
+
+**Checkpoint 4A:** reviewer accepts the concrete signatures, responsibility split,
+compatibility plan and bounded file map before production implementation. No new
+package, registry, parser grammar, document store, generic plugin framework, full
+source-map system or fleet refactor is included.
+
+#### Step 4B — Implement the accepted contract and adopt it directly
+
+After 4A acceptance, implement the reviewed Content contract and renderer boundary,
+then update Editor, Docs and the playground. Remove the superseded Editor-owned
+validity traversal and marker interpretation in the same cutover. Keep Editor's
+schema representability, async ordering, flush and asset-lifetime safeguards.
+Keep runtime component imports separate from serializable metadata and avoid
+hand-authored duplicate prop type declarations where build metadata is reliable.
+
+Prove identical Content validity results for source input, recipes, editor
+preparation/emission, body preview and the applicable CMS validation boundary.
+Include native/angle/colon collisions, primitive/object unions, required/default
+props, named slots and valid/invalid nesting. Two differently configured instances
+must remain isolated. Inspect the real body renderer with Docs and host components,
+plus stale/failed/recovered preview states, at desktop and narrow widths.
+
+**Checkpoint 4B:** reviewer accepts the focused correction and direct consumer code
+before final aggregate certification. Existing parser corpus and editor safety
+regressions must remain green; source-only fallback remains valid for unsupported
+visual representation.
+
+#### Step 4C — Certify the final shared contract
+
+Run owning aggregate gates for the final changed source: Content `pnpm verify`,
+Editor `pnpm verify`, Docs `pnpm verify`, and CMS `pnpm run check` when its contract
+reader/transport changes. Use package certification commands containing these
+aggregates instead of repeating both. Prove isolated packed Editor Vue/Nuxt
+consumers, the Content body-rendering entry and the Docs component-only entry.
+Record compatible candidate revisions, archive hashes and registry limitations.
+Only the reviewer accepts Gate B2. After acceptance, assign Step 6A in the Docs playground; Step 5 waits for the Step 6 writing proof and focused hardening.
+
+The remaining asset API cleanup, optional shared preview composable, full source
+mapping, and package-install footprint restructuring are deferred until their
+consumer requirement is demonstrated and separately assigned. The current work
+must not expand into every API opportunity from the discussion.
+
+**Kit and playground requirements retained from the original Step 4:**
 
 1. Implement section 4's separation between implementation metadata, explicit policy and authoring metadata. Reuse `layer/tags.ts` and `layer/components.ts` as the public tag authority.
 2. Start with prose, `info`, `layout`/`column`, and a test host component such as `learning-objective` with title and default content. Do not introduce a production workshop block type for this proof.
@@ -416,25 +1190,99 @@ and persistence, and keep imports browser-safe. Return Gate B1 evidence.
 5. Add a minimal component-only Docs integration, preferably an optional existing-package export/module. Trace transitive requirements: prose styles, CSS tokens, icons, image helpers and app-config defaults. It must not install pages, blog routes, sitemap, site SEO or host-wide fonts.
 6. Define recipes once in the accepted source syntax, then parse them with the canonical engine. Do not hand-maintain both a Tiptap JSON recipe and a Markdown recipe. Validate recipe nesting and required fields.
 7. Reject duplicate tags/IDs and invalid recipes. Demonstrate two editor instances with different kits and no shared mutable state.
+8. Use the existing Editor documentation app as the lasting interactive playground, as requested by Matthias on 2026-09-12. Embed the real built Editor package with the actual Docs kit, one host-owned component, canonical rendering, source access, sample documents and reset. Use disposable in-memory content. Include a second editor with a different kit to demonstrate isolation. This step demonstrates the existing editing surface; later writing milestones extend the same playground. Do not create a separate demo application or persistence system.
 
 **Acceptance:** the custom component appears through metadata alone, its props/slots round-trip, its real host renderer works, Docs rendering imports have no Editor runtime dependency, and the component-only consumer has no unintended routes/style changes.
 
-**Verify:** new manifest/recipe tests in Editor and Docs; Editor `pnpm verify`; Docs `pnpm verify` and isolated package-entry checks. Add type tests proving valid keys are inferred and unknown property names are rejected where practical.
+**Verify:** the focused and aggregate checks in 4B/4C, plus type tests proving valid keys are inferred and unknown property names are rejected where practical. Keep metadata-extraction fixtures and the current editing lifecycle regressions.
 
 **Gate B2:** reviewer approves public contract shape only after seeing consumer code. Reject duplicate type sources, unnecessary wrapper functions, and a type-extraction system larger than the actual requirements.
+
+The Editor docs playground is the shared manual review surface. Inspect editing,
+source/visual transitions, actual component rendering, invalid-source recovery,
+keyboard operation, and a narrow viewport. Leave the reviewed local playground
+running with its URL for Matthias. It complements isolated archive certification
+and later CMS/ChiliSkills acceptance; it does not replace either. Keep local
+candidate dependency evidence distinct from registry-compatible release proof.
 
 **Prompt:**
 
 ```text
-Execute Step 4 of /Users/matthias/Git/0_libs/ginko-editor/plan.md.
-Build the smallest serializable authoring contract and Docs component-only kit
-that prove info, two columns and one host-owned component. Keep policy explicit
-and metadata derived. Show real consumer registration code and return Gate B2.
+Execute Step 4A only of /Users/matthias/Git/0_libs/ginko-editor/plan.md.
+Preserve the current candidate and playground. Propose the smallest Content-owned
+document-validity and explicit body-rendering contract, show real consumer calls,
+and audit contract readers/migration needs. Return the bounded proposal for
+review before production changes. Do not start 4B, aggregates or Step 5 yet.
 ```
 
-### Step 5 — Integrate the shared editor into both consumers early
+### Step 6 — Prove the Docs writing experience, then harden it
+
+**Outcome:** a complete, convincing writing experience in the permanent Docs playground, using the real packages, before CMS and ChiliSkills integration.
+
+**Prerequisite:** reviewer acceptance of Step 4C / Gate B2. This step runs before Step 5.
+
+**Scope:** the existing Editor docs playground, actual Ginko Editor/Content packages, the Docs component kit, and one existing host-owned component. Keep experimental layout and demo controls in the playground where practical. Reusable editing behavior belongs in Editor and document meaning stays in Content. Do not build a second editor, duplicate parser or validation rules, new backend, or speculative extension framework. No CMS/ChiliSkills cutover or production data changes belong here.
+
+#### Step 6A — Demonstrate one complete writing journey
+
+Inspect the current interface first. Use applicable design, layout, typography and accessibility skills to make the writing surface content-led; the current toolbar-heavy playground is not the accepted design. Work through the real packages with the smallest useful implementation, and inspect the browser while exploring the interaction before expanding a permanent test suite or API.
+
+The first reviewable journey must work end to end:
+
+1. Start with an empty document. Type `/note`, find the actual Docs information/callout component, and insert it with Enter. Use `note` as an Editor search keyword for the existing component, without inventing a second Content tag or schema. The `/` menu supports search, arrows, Enter and Escape; the touch-friendly `+` exposes the same valid insertions.
+2. Write inside the callout and change its title/appearance using the existing typed metadata. Show the actual Docs renderer in preview. Cancelling the menu must preserve selection and focus.
+3. Insert two columns, write in both slots, and undo/redo insertion and edits without losing content or jumping the cursor.
+4. Insert and configure the existing host-owned component, including its named slot, using the same public integration contract. Preserve the second kit's isolation demonstration.
+5. Switch to Markdown and back without changing document meaning. An incomplete source example remains editable and unchanged, with honest stale-preview feedback and a recovery path.
+6. Save and reopen the source through a minimal playground-owned local draft control. Await the existing Editor `flush()` before reading/saving the source; clearly label it as a local demo draft. Reuse an existing local mechanism if one fits, otherwise use one namespaced browser-storage entry. Do not add persistence to Editor, create a backend, or imply this proves CMS persistence.
+
+**Checkpoint 6A:** provide the running playground, a concise list of consumer API calls actually used, and browser evidence for the complete journey at desktop and 390px width. The reviewer operates it before assigning 6B. This is a working slice, not a screenshot mockup; shortcuts in content safety, fake previews, and duplicated host integration rules are not acceptable. Identify any API friction from the demonstrated use before generalizing it.
+
+**Verification during exploration:** keep the existing source-preservation, validation and editing-lifecycle regressions green. Use focused checks for changed behavior and browser interaction while shaping the UX. Add a regression test immediately for a concrete safety defect; do not prebuild a large suite around speculative controls or implementation structure. Full final aggregates belong to 6B after the interaction is accepted unless a repository rule or concrete failure requires them earlier.
+
+**Prompt:**
+
+```text
+Execute Step 6A only of /Users/matthias/Git/0_libs/ginko-editor/plan.md after
+Gate B2 acceptance. Prove the complete Docs playground writing journey through
+the real packages: /note, properties, two columns, a custom host component,
+undo/redo, source recovery and local save/reopen. Inspect desktop and mobile
+behavior while implementing. Keep content safety checks; avoid speculative API
+and test expansion. Return the running browser proof for review before 6B.
+```
+
+#### Step 6B — Harden the demonstrated interaction
+
+After reviewer acceptance of 6A, retain the proven interaction and simplify any temporary implementation. Complete the initial writing behavior without widening the component set:
+
+1. Finish slash/plus keyboard and focus handling; do not trigger in code blocks or during IME composition. Use Content's structural rules for all insertions.
+2. Complete selection formatting and block move, duplicate and delete actions. Provide keyboard alternatives to drag and keep destructive actions undoable.
+3. Verify column boundary movement, empty slots, Enter/Backspace, nesting, paste, parent deletion and undo. Prevent invalid parent/child placement consistently in insertion, drag and paste paths.
+4. Finish typed property controls required by the initial kit. Preserve omitted, empty, zero and false values, and prevent invalid transient input from corrupting source. Add asset/advanced controls only where this journey demonstrates a need.
+5. Keep source/visual transitions and diagnostics reliable. Preserve the existing source-only fallback for unsupported representations.
+6. Remove obsolete experimental controls, duplicate state and unused abstractions introduced during 6A. Keep the example as the permanent integration playground.
+
+**Acceptance:** keyboard-only authors complete the accepted journey; mobile insertion works without slash typing; no content loss, selection jumps or duplicate history entries occur. The example uses the public packages with little host code. Final cross-application acceptance remains in Step 5.
+
+**Verify:** add focused regression tests for accepted observable behavior, including IME, paste, source recovery and the save/flush boundary. Run the owning Editor aggregate once at final handoff and relevant owning checks for other changed packages. Record desktop and 390px behavior and inspect a representative long document. Measure typing/preview behavior before adding performance machinery. Do not write tests that merely mirror the chosen implementation.
+
+**Gate D:** reviewer evaluates actual writing behavior and the consumer integration example, corrects observed focus/cursor defects, and accepts Step 6 before assigning Step 5.
+
+**Prompt:**
+
+```text
+Execute Step 6B only of /Users/matthias/Git/0_libs/ginko-editor/plan.md after
+6A acceptance. Harden the demonstrated Docs writing experience, simplify the
+implementation, and add focused behavior regressions. Prove keyboard, touch,
+undo, paste, source recovery and local save/reopen; run the owning final checks.
+Return Gate D. CMS and ChiliSkills integration remains Step 5.
+```
+
+### Step 5 — Integrate the proven editor into both consumers
 
 **Outcome:** the same built package runs inside CMS and a ChiliSkills pilot before the API is treated as stable.
+
+**Prerequisite:** accepted Gate B2 and Step 6 Gate D. Repeat the accepted Docs writing journey in both hosts, including slash/plus insertion, properties, columns, undo/redo, source recovery, and save/reopen. Host-specific undo, persistence and assets remain real integration acceptance requirements. Before CMS adoption, establish isolated package-consumer proof using the exact CMS and V2 Content candidate archives, exercising the changed reader/validation path. The 4C registry-compatible development lane does not satisfy this. Use a documented local verification lane or appropriately attested clean candidates; do not weaken release guards, fabricate compatibility versions, or infer publication authorization.
 
 **Scope:** CMS `FieldRichtext.vue`, existing metadata/asset/preview integration and old editor removal; ChiliSkills focused script workspace/pilot and tests; narrow Editor API corrections revealed by these consumers.
 
@@ -442,6 +1290,7 @@ and metadata derived. Show real consumer registration code and return Gate B2.
 
 1. Replace CMS' internal editor imports with the shared package. Keep draft, dirty state, save/publish, permissions, asset URLs and host-preview operations in existing owners.
 2. Send authoring metadata through the existing content contract. Confirm how contracts are rebuilt/versioned and how existing Studio receives them; avoid a parallel metadata endpoint. Handle absent or malformed metadata conservatively without altering source.
+   Use the accepted Step 4 Content validity contract and body-rendering boundary directly. Host adapters own persistence, assets and workflow; they must not rebuild document validation or infer parser markers.
 3. Remove the old CMS implementation and obsolete generic tests after parity passes. Keep CMS-specific adapters/tests. Use `rg` to prove no consumers still import the removed path.
 4. Add a focused ChiliSkills script workspace using the real package. Use empty/new test content or disposable fixtures until Step 9's migration decision is complete. Do not reinterpret all existing saved text yet.
 5. Connect to the existing module editor update path. Decide how Tiptap text undo and module-level undo interact: typing should undo predictably without a full document history entry per keystroke; changing the selected slide must not undo another slide's text. Prove the behavior before general rollout.
@@ -464,37 +1313,6 @@ existing CMS contract, and remove the old CMS editor after parity is proved.
 Return Gate C with browser evidence from both consumers.
 ```
 
-### Step 6 — Complete the core writing experience
-
-**Outcome:** the initial component set is pleasant and reliable to write with in both applications.
-
-**Scope:** Editor interactions, node views, styles and tests; host integration only when required for the accepted shared contract.
-
-**Work:**
-
-1. Add slash suggestions using the current supported Tiptap mechanism. Include search, categories, labels, arrow keys, Enter, Escape, and a visible plus button. Preserve selection and focus on insert/cancel; do not trigger inside code blocks or during IME composition.
-2. Add selection formatting and block actions for move, duplicate and delete. Keyboard move controls must provide the same outcome as drag. Keep destructive block actions undoable.
-3. Implement readable two-column authoring views with editable content in both columns. Test cursor movement across boundaries, empty-slot placeholders, Enter/Backspace, nesting, paste, deleting a parent and undoing it.
-4. Build property controls from validated metadata: text, enum, boolean, number and the justified asset/advanced controls. Preserve distinctions between omitted, empty, zero and false. Invalid transient form input must not corrupt the source.
-5. Implement contextual child insertion. Prevent invalid parent/child placement in slash, drag and paste paths using the same structural rules. Do not keep these invariants only in toolbar handlers.
-6. Add stable source/visual transitions and conversion diagnostics. Ensure incomplete source remains editable and users can recover without losing what they typed.
-7. Use applicable accessibility, layout, typography and animation skills when implementing these surfaces. Respect reduced motion, touch targets and existing host design. Animate only where it improves feedback.
-
-**Acceptance:** keyboard-only authors can insert and configure a valid layout, edit both slots, move it, undo/redo and return to the host; mobile insertion works without slash typing; no selection jumps or duplicated history entries occur in the tested journeys.
-
-**Verify:** Editor unit and browser tests, including IME/paste/source-mode cases; `pnpm verify`; targeted interaction tests in both hosts. Record desktop and 390px-wide behavior and inspect a representative long document. Measure typing and preview behavior before adding performance machinery.
-
-**Gate D:** reviewer evaluates actual writing behavior, not just screenshots or implementation-shaped tests. Correct observed focus/cursor defects before accepting.
-
-**Prompt:**
-
-```text
-Execute Step 6 of /Users/matthias/Git/0_libs/ginko-editor/plan.md.
-Complete slash/plus insertion, block actions, typed property controls and
-editable two-column node views for the initial kit. Prove keyboard, touch,
-undo, paste and source recovery behavior in both hosts. Return Gate D.
-```
-
 ### Step 7 — Connect trustworthy previews
 
 **Outcome:** authors can see the actual host rendering of current content without creating a second parser or publishing drafts accidentally.
@@ -504,6 +1322,7 @@ undo, paste and source recovery behavior in both hosts. Return Gate D.
 **Work:**
 
 1. In ChiliSkills, render the current source through the accepted Content profile and actual Docs/application components. Use the component-only styles. Avoid fake full document envelopes if an existing body-render entry already fits; inspect the public API first.
+   Consume the explicit body-rendering boundary accepted in Step 4. Keep CMS collection/locale/reference context in its existing full-document adapter where it is needed.
 2. Debounce expensive work only as necessary. Cancel/ignore stale parse results. A parse error keeps the user's source intact and identifies that preview is stale or unavailable rather than presenting it as current.
 3. In CMS, reuse its authorized host draft preview. For live unsaved preview, inspect existing capabilities before adding transport. Never serialize Vue functions/components into the manifest or publish merely to preview.
 4. If an embedded host preview is needed and fits the existing host architecture, keep its payload and origin contract explicit and reuse existing authorization. Validate message origin/source, scoped document identity and payload; never use unrestricted `postMessage('*')` for drafts. Do not introduce a messaging bridge if existing preview navigation is sufficient.
@@ -912,3 +1731,481 @@ authoring metadata separate from Content policy and UI metadata, derive types
 from one source, reuse Docs tag/component authority, parse recipes with the
 canonical Content engine, and prove real registration, isolated kits, duplicate
 rejection and bounded property/slot handling. Step 5 remains blocked on Gate B2.
+
+#### 2026-09-12 — Reviewer ownership transferred
+
+Matthias transferred review, correction coordination, and orchestration to task
+`01a09564-7dee-70a1-828c-84dd6628054d`. The previous reviewer confirmed the
+handoff and will make no further assignments, file changes, or gate decisions.
+The implementor remains task `01a0943e-9f8d-7130-81e9-e09aa36cae34`, with its
+existing Step 4 assignment and settings. Accepted gates and external-action
+limits remain in force. Send subsequent review packets to the new coordinator.
+
+The incoming reviewer inspected the accepted evidence and the in-progress
+Editor/Docs changes. Independent calls against the draft `createAuthoringKit`
+confirmed that it accepted a number control for a string-only policy, a required
+implementation prop omitted from policy without a default, and a recipe value
+outside declared select options. Corrections and regression evidence were
+requested from the implementor. The reviewer also flagged manually duplicated
+enum metadata, numeric-default extraction, generated-payload drift detection,
+and the outstanding real-editor/host registration and nesting proofs. These are
+early findings against unfinished work, not a final Gate B2 verdict. Step 4
+remains `IN PROGRESS`; Step 5 is not assigned.
+
+#### 2026-09-12 — Docs playground requested
+
+Matthias requested that the docs serve as the playground for seeing and checking
+the implementation. The coordinator assigned a permanent, bounded playground
+inside the existing Editor docs app to the Step 4 implementor. The playground
+uses the actual package, Docs kit, host component and canonical rendering, with
+disposable examples and source recovery. Its scope grows with accepted editor
+features in later steps. Keep this as one maintained demonstration and manual
+review surface, with isolated packed consumers and real application adoption
+remaining separate gates. No deployment or publication was requested.
+
+#### 2026-09-12 — Content-first contract checkpoint before adoption
+
+After discussing the API opportunities, Matthias asked whether to pause and
+update the plan now or defer the changes. The coordinator recommended the bounded
+change now, before CMS and ChiliSkills adoption, and amended the active plan with
+the goal: **Ginko Content should own the document’s meaning, and Ginko Editor
+should turn that contract into a good writing experience. CMS and ChiliSkills
+should need very little integration code.**
+
+The former Step 4 aggregate assignment is paused at a safe checkpoint. Steps 0–3
+remain accepted. The latest Step 4 correction independently passed five Editor
+files with 31 tests; earlier Docs generator/kit checks passed three files with
+six tests. The coordinator independently verified actual Docs/host rendering,
+invalid-source recovery, instance isolation and a narrow viewport in the local
+playground. These are retained focused results, not full Gate B2 acceptance.
+
+Step 4A now owns the bounded contract/migration proposal; 4B requires its review
+acceptance, and 4C certifies the resulting candidate. Preserve existing source,
+fixtures and safety corrections. Slash/plus insertion and the final writing UX
+remain explicit Step 6 requirements. No production migration, application
+cutover, dependency publication or external setup is authorized by this record.
+
+#### 2026-09-12 — Step 4A contract proposal ready for review
+
+The concrete Step 4A review candidate is recorded under Step 4A above. It proposes
+one closed, discriminated Content policy V2; a resolved Content contract V2; the
+minimum node-classification and parsed-document projection operations; and one
+explicit Vue body renderer. Editor keeps its current authoring-kit aggregate and
+all UI/lifecycle ownership. No production source, package dependency, generated
+artifact, stored document, contract installation or external system was changed.
+
+The audit covered the accepted Content candidate, the published Content beta.8
+tarball, the local CMS 0.2 candidate's strict readers, hashes, transitions,
+revision/publication state and portability paths, and both the published and
+candidate Docs rc.10 package surfaces. It found that V1 cannot accept additive
+policy fields, portable V1 cannot honestly contain the V2 contract, and the
+current CMS transition would require valid published entries to be unpublished.
+The proposal therefore includes a temporary tracked dual-reader window, a V2
+portable manifest, and an exact no-write V1-to-V2/V2-to-V1 lane. That lane permits
+only the fixed V1 representation plus new V2 literal/nesting constraints, validates
+drafts and active revision snapshots through the real public projection builder,
+compares revision-backed derived rows without repair, and never treats a
+`publicEntries` row as body storage. Apply pages change bookkeeping only; the
+source bytes and every canonical content/projection row remain unchanged.
+
+Final re-review also preserves the established storage boundary: Editor source
+preparation/emission uses the exported stored validator, while Docs recipes,
+browser previews and the body renderer remain on public validation. The proposal
+records the existing image `id`/`src` round-trip and host `buildUrl` display path,
+an unresolved-identity fixture, non-mutating strict readers, builder-only type
+normalization, and bounded per-page cancellation evidence.
+
+The already-running Docs `pnpm release:verify` was allowed to finish for retained
+checkpoint evidence. It exited 0 after dependency/audit/workflow checks,
+format/lint/type checks, 30 test files with 222 tests, the 309-route production
+site build, deterministic two-pack SHA-256
+`895cf62890d5c18ea59da25cf1ecde60063cbcdc46a51e61e82131da31a0f635`, packed
+single-locale/i18n/structural fixtures, and the packed component-only kit with a
+host renderer. This certifies the preserved pre-4A Docs candidate only; 4C must
+rerun the owning final aggregate after an accepted 4B implementation.
+
+The Editor playground remains running at `http://127.0.0.1:4317/playground` with
+the previously reviewed candidate. Step 4 is still `IN PROGRESS`; this entry asks
+the coordinator for **Checkpoint 4A acceptance or changes required**. Step 4B,
+Step 5, commits and publication remain unassigned.
+
+#### 2026-09-12 — Checkpoint 4A accepted; Step 4B assigned
+
+The coordinator accepted the revised Step 4A contract plan after reviewing the
+stored/public boundary, builder-only type normalization and non-mutating readers,
+exact V1/V2 eligibility and rollback, bounded cancellation invariants, revision-
+backed public projection proof, asset-preservation fixture and focused commands.
+This is design acceptance only, not code acceptance or host migration approval.
+
+Step 4B is assigned. Implement the reviewed Content policy, operations and body
+renderer; adopt them directly in Editor, Docs and the playground; remove the
+superseded Editor document-validity/marker traversal; and make only the bounded
+CMS contract-reader/transition changes required by V2. CMS Editor adoption,
+Studio UI, ChiliSkills, deployed-host activation, aggregates/4C, commits,
+publication and Step 5 remain unassigned. Preserve active pointers, historical
+hashes and the running playground, and return focused evidence to the coordinator.
+
+#### 2026-09-12 — Step 4B implementation ready for review
+
+The reviewed Content V2 boundary is implemented as uncommitted candidate work on
+top of Content `b219f55b6a7f5d00ce134e244fa253a2dfb8aa57` and CMS
+`1b123377c1388e2bb5583c949ba911707b048208`. Editor and Docs remain the existing
+dirty Gate B2 candidates at `28f21167e662fd50e08ffcc9d86299124495afba` and
+`3e5f752ffe09e33a3fd0f641209056701ee9476f`; no unrelated candidate work was
+discarded or committed.
+
+Content now owns a closed discriminated V1/V2 component-policy contract. V2 adds
+canonical type unions, literal `allowedValues`, exclusive assets and explicit
+nesting. Builders normalize type order; strict readers reject non-canonical input
+without mutating it. Separate stored and public validators preserve unresolved
+asset identity only at the stored boundary. The media reader checks that every
+referenced alt, title and filename field is string-capable. The new document
+projection clones its input, and the new public `ContentBodyRenderer` validates
+and renders an explicit body, policy and component map. The full Content renderer
+delegates its body path to that component. V2 portability manifests and the
+module/runtime types use the same contract union, and Content exports one
+portable-policy assertion for downstream configuration boundaries.
+
+Editor now consumes those operations directly. Its source preparation and
+emission use the stored validator; recipes use public validation; kit creation
+uses Content's V2 policy assertion. The duplicate Editor policy-marker and
+nesting traversal is gone. Docs defines its component constraints once as V2,
+including the layout/column relationship and literal values, and its authoring
+tests call the Content assertion. The playground renders previews through the
+body renderer rather than the full query renderer. Its candidate preparation
+copies the exact built Content package and rewrites the copied Docs module entry
+to that candidate, preventing two Content runtimes during local review. This
+temporary local-candidate path remains recorded in `internals/migrations.md`.
+
+CMS readers, runtime policy transport and portability paths accept the V1/V2
+union without changing their ownership. The reviewed exact no-write transition
+classifier admits only a fixed representation with a policy-version change,
+recomputes from the installed and target contracts at staging, validation, every
+apply page, activation and applying-state cancellation, and validates both draft
+storage and revision-backed public projections. Eligible apply pages update only
+transition-item/run bookkeeping; canonical entry, draft, revision, publication,
+public-entry, search and asset-reference rows remain untouched. Reverse V2-to-V1,
+stale projections and incompatible type changes are covered. The temporary dual
+reader window and its exact removal condition are recorded in the CMS
+`internals/migrations.md`.
+
+Focused Content evidence passed: three unit files with 20 tests, the node
+portability-selection project with 20 tests, the Nuxt render-components contract
+with 18 tests, `pnpm typecheck:source`, the package build, and targeted ESLint.
+Focused Editor evidence passed four files with 23 tests, `pnpm typecheck`, and
+targeted ESLint. Focused Docs evidence passed three files with seven tests; the
+direct ESLint invocation only reported that these package files are ignored, so
+no Docs lint claim is made here. Focused CMS evidence passed five files with 48
+tests, Convex type checking, and targeted oxfmt/ESLint. After the final activation
+recomputation change, `contractTransitions.test.ts` passed its 20 tests again,
+Convex type checking passed again, and the changed apply file passed oxfmt and
+ESLint. Diff whitespace checks pass in all four repositories.
+
+A fresh real Chromium run exercised the live playground at 1440×1000 and
+390×844. Information, two-column and host-component recipes rendered through the
+new body renderer. The deliberately unclosed component kept its source and
+reported a stale preview. The independent kit stayed isolated. The narrow page
+had equal 390 px scroll and client widths, and no console or page errors were
+observed. The first review attempt exposed that client-only routing conflicts
+with the inherited Docs Open Graph setup; the workaround was removed, SSR was
+restored, and the same checks then passed. The playground remains running at
+`http://127.0.0.1:4317/playground`.
+
+The dependency/release limit is unchanged: registry Content beta.8 does not
+contain these candidate APIs, so local Docs review uses the tracked exact
+candidate copy. No version floor was invented, no aggregate or packed 4C check
+was run, and nothing was published or deployed. Existing historical contract
+hashes and active pointers are not rewritten; the no-write lane changes the
+installed contract pointer only after every bounded item completes. Historical
+V1 revisions remain V1 evidence and rollback is limited to the reviewed exact
+representation while the dual-reader window is active.
+
+Step 4B is **READY FOR REVIEW**. Only coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d` may accept it or require changes. Step 4C,
+Step 5, commits, publication and deployment remain blocked.
+
+#### 2026-09-12 — Step 4B review: changes required
+
+The coordinator reviewed the candidate diffs, ran independent focused probes,
+and inspected the restarted playground on desktop and at 390 by 844. Step 4B
+is not accepted; Step 4C remains unassigned.
+
+Confirmed corrections: preserve V1 URL safety when authored component names
+collide with native tags (the candidate emitted a `javascript:` anchor which the
+accepted validator rejects); enforce explicit renderer component selection;
+separate direct named-slot ownership from component ancestry; classify colon
+inline components correctly; and permit explicit policy literals supported by
+an open implementation string type without requiring a duplicate options list.
+Editor must also complete the assigned projection/classification adoption: its
+current source path still reparses the original document and interprets inline
+parser metadata directly.
+
+Existing five Editor files passed 32 tests, including stored-image preservation.
+Independent current-contract probes reproduced the findings above. The CMS
+transition suite passed 20 tests and independent multi-page cancellation,
+invalid-active-revision and staged-output probes passed three tests; no normal
+CMS transition corruption was established. Reconcile its simpler no-op proof and
+active-revision validation with the plan, and retain the meaningful additional
+tests, without adding unnecessary state or rewriting historical hashes.
+
+The ordinary Information, two-column and host-component previews rendered, and
+invalid source retained the previous preview before successful recovery. This
+browser evidence does not cover the failing contract cases. The coordinator
+restarted the stopped docs server at `http://127.0.0.1:4317/playground` and left
+it running in Visual mode; source/registry and final UI acceptance limits remain.
+
+#### 2026-09-12 — Step 4B corrections ready for re-review
+
+The requested corrections are implemented without widening Step 4B. Content now keeps native
+HTML URL, network-property and active-tag invariants in force even when a V1 or V2 component
+policy uses the same canonical name. Renderer-level regressions cover unsafe colon components
+and explicit native angle HTML under both policy versions. Authored components resolve only
+through the renderer instance's explicit map; a named explicit selector may resolve the app
+registry, while an omitted or missing implementation throws a visible
+`MissingMarkdownComponentError`. Colon and angle authored identities still select host
+components, and explicit native HTML remains native across name collisions.
+
+Named-slot validation now tracks the direct parent separately from the nearest component
+ancestor, so a native wrapper cannot borrow its ancestor's slot authority. Content annotates
+both block and inline colon parser output, projects that origin through the canonical component
+classifier, and serializes each colon form without changing it. The internal projected marker is
+excluded from agent-facing component props. Builder regressions also prove that non-finite V2
+literal values cannot reach an emitted contract.
+
+Editor now parses the original source once in visual preparation. That same parsed document is
+adapted for TipTap, projected for stored-policy validation, and used for the original side of
+semantic comparison; only the serialized result is independently reparsed. Conversion uses
+Content's classifier and the passed policy instead of reading parser block metadata directly.
+Policy `allowedValues` may narrow an implementation's open string type, while an actual closed
+implementation `options` union must still cover the policy literals. Focused form regressions
+exercise matching and mismatching colon and angle components through the real preparation path.
+
+CMS retains the simpler reviewed proof. Installed contracts are immutable inputs; each lifecycle
+boundary recomputes exact no-write eligibility, each staged item proves input and output equality,
+and the existing staged, validated, applied and pending counts establish bounded completion. No
+new summary counter or second validation authority was added. Active revision snapshots are
+projected through the same public projection builder and target policy, while derived rows are
+compared rather than repaired. The retained tests now cover cancellation after two of three
+no-write apply pages with all canonical rows unchanged, rejection of a valid draft paired with an
+invalid active revision snapshot, and rejection when staged source changes before apply.
+
+Historical revision `contentHash` values intentionally remain tied to the contract under which
+the revision was created. The transition changes only the installed active contract pointer after
+all bounded work completes. Historical restoration across policy versions therefore requires the
+corresponding contract to remain readable during the tracked V1/V2 window; it does not require a
+historical revision hash to equal the current installed hash. The dual-reader removal condition
+remains recorded in CMS `internals/migrations.md`.
+
+Focused correction evidence is green. Content source type checking, targeted ESLint, four suites
+with 114 tests, and the package build pass; the build still prints the pre-existing non-fatal
+`vue-docgen-web-types` error after the successful module build. The two intentional Comark
+snapshot updates record colon parser/projected component origin and no longer leak that marker
+into agent Markdown. Editor passes six focused files with 39 tests, type checking, targeted
+ESLint, and its production build. CMS passes the 22-test transition suite, contract and Convex
+type checks, the CMS runtime Vue type check, and targeted test lint. Diff whitespace checks pass
+in Content, Editor, Docs and CMS. Reviewer-only probe files were removed after their cases were
+promoted into the owning suites.
+
+A fresh Chromium check at 1440 by 1000 and 390 by 844 rendered the host learning-objective
+component, entered the deliberate stale-preview state for invalid source, and recovered to a
+current information preview. Both viewports had no console or page errors; the narrow document's
+scroll width equalled its 390 px client width. The refreshed playground remains running at
+`http://127.0.0.1:4317/playground`.
+
+Step 4B is **READY FOR RE-REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. Step 4C, aggregates, CMS Editor/Studio adoption,
+ChiliSkills, commits, publication and deployment remain unassigned.
+
+The coordinator's final independent probes then found two narrow regressions, both now corrected
+and promoted into the permanent Content suites. A conventional explicit selector
+`{ 'host-note': 'HostNote' }` now reaches the app registry instead of recursing through its own
+kebab-case selector. Colon serialization now follows the colon attribute grammar rather than HTML
+entity escaping, so literal ampersands and entity-looking strings preserve their exact parsed
+values across repeated serialize/reparse cycles. The permanent colon corpus also covers escaped
+brackets, formatted and nested inline content, multiple inline nodes, empty inline components,
+block properties, slots and inline children inside blocks. The temporary reviewer files and old-
+renderer comparison were removed. The corrected focused Content set passes four files with 124
+tests, source type checking, targeted ESLint and whitespace checks. Step 4B remains ready for the
+coordinator's gate decision; 4C and later work remain paused.
+
+#### 2026-09-12 — Reviewer accepts Step 4B; Step 4C assigned
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` accepts the bounded
+Step 4B implementation and corrections. Independent final Content verification
+passes 124 tests across component-policy-v2, render-components-contracts,
+cms-render-policy, and comark-conformance-contracts. The named-selector SSR
+failure and colon literal-escaping regression are resolved in permanent tests.
+The preceding independent Editor review passed six files with 49 tests; the
+bounded CMS review and promoted transition regressions remain accepted evidence.
+
+The reviewer reopened the available playground and verified the current host
+component, default content and named teaching-tip slot. Deliberately incomplete
+source remains intact in Source only mode while the last valid preview becomes
+Stale. Earlier responsive evidence remains recorded above; this final correction
+does not certify the Step 6 writing UI.
+
+Step 4C is assigned: run each owning final aggregate once through its appropriate
+certification command and verify isolated packed consumers. Record exact candidate
+revisions, dirty-source identity, archive hashes, and registry limitations. Gate B2
+is not yet accepted. Step 5, commits, publication, deployment, and production data
+changes remain unassigned.
+
+#### 2026-09-12 — User authorizes writing proof before consumer integration
+
+Matthias approved changing the sequence to prove the complete Docs writing
+experience before expanding the library through CMS and ChiliSkills integration.
+Finish the already assigned 4C foundation certification. After Gate B2 acceptance,
+assign 6A only, then review the running writing journey before 6B hardening. Step 5
+follows accepted Gate D. Current step identifiers remain stable; the table,
+dependencies and active packets above reflect the new order.
+
+The proof uses the actual packages and permanent Docs playground, including
+`/note`, real Docs and host components, properties, two columns, undo/redo, Markdown
+recovery and explicitly local save/reopen. Tests continue to protect established
+content safety; exploratory interactions are inspected in the browser before
+large test or API expansion. No separate throwaway editor or new backend is
+introduced. This authorization changes local development order, not publication,
+deployment or production migration permissions.
+
+#### 2026-09-12 — Step 4C certification ready for Gate B2 review
+
+The final dirty candidates are based on Content
+`b219f55b6a7f5d00ce134e244fa253a2dfb8aa57`, Editor
+`28f21167e662fd50e08ffcc9d86299124495afba`, Docs
+`3e5f752ffe09e33a3fd0f641209056701ee9476f`, and CMS
+`1b123377c1388e2bb5583c949ba911707b048208`. All four worktrees remain dirty by
+design; no commit, publication, deployment, or production data change was made.
+`git diff --check` passes in every repository, and source package manifests contain
+no `file:` or `link:` dependency specifiers.
+
+Content `pnpm verify` passes 130 test files with 1,361 tests, its type checks and
+builds, six E2E files with 15 tests, and the isolated packed consumer. The exact
+dirty archive is `@lupinum/ginko-content@1.0.0-beta.7`, SHA-256
+`b97c7a4aa224a7ce39c9a9190a7869247c117607e6a0d983501defb128314aa5`; its
+release artifact records `worktreeDirty: true` and `releaseEligible: false`. The
+aggregate exposed Nuxt's conversion of nested runtime-config `null` values to empty
+strings. Content now restores those policy sentinels at its renderer boundary and
+keeps the regression in `runtime-config-contracts.test.ts`. The recurring
+`vue-docgen-web-types` message remains non-fatal after the successful package build.
+
+Editor `pnpm verify` passes dependency policy, lint, Vue type checking, nine test
+files with 60 tests, the library build, and the Docs candidate build. Its final
+isolated Vue and Nuxt consumers pass against the Content archive above. The Editor
+archive is `@lupinum/ginko-editor@0.1.0`, SHA-256
+`7e92f768d8c826f8b9b3f76cda009a771fe182fb3b33e8b1d3cb6a1fbaf7a3b0`.
+
+Docs `pnpm release:verify`, with the exact Content tarball supplied through the
+verification environment, passes formatting, lint, type checking, 30 test files
+with 223 tests, a production build that prerenders 309 routes, reproducible packing,
+the single-locale and i18n fixture matrix, and the packed component-only kit with a
+host-owned renderer. The Docs archive is `@lupinum/ginko-docs@0.4.0-rc.10`, SHA-256
+`8a87d3c856109dac139e26e4abcfb4c3c88fd90d5ebc76e1473026d205b41bcd`.
+Certification records Content SHA-256
+`b97c7a4aa224a7ce39c9a9190a7869247c117607e6a0d983501defb128314aa5`,
+Nuxt/Vue 4.5.1/3.5.40 and current 4.5.2/3.5.42 lanes, and
+`releaseEvidence: false` because both inputs are dirty. Temporary physical package
+copies and candidate aliases were removed after certification; the normal root
+candidate and Docs registry links were restored. The disposable physical copies
+were moved to Trash rather than irreversibly deleted.
+
+CMS `pnpm run check` passes formatting, all policy and release-hygiene checks,
+package and Studio builds/type checks, 193 test files with one skipped, and 1,324
+tests with one skipped. The aggregate caught the intentional canonical parser
+addition of `$` component-origin metadata and two reviewed module-size overruns.
+The golden fixture now records the metadata required by V2 policy validation; the
+no-write policy classifier and transition output application were split into
+focused modules instead of raising size limits. The focused golden, size-budget,
+and transition set passes 32 tests. The supported `package:e2e:dev` lane also
+passes tarball local-specifier checks, the isolated Nuxt consumer, package imports,
+Content safety probes, portability, and pnpm use. Its exact package hashes are:
+
+- `@lupinum/ginko-cms-contract@0.2.0-rc.2`:
+  `b50eedf646a445478af592566881e12a917d513ab6ed488a7de400b7e589742a`
+- `@lupinum/ginko-cms-convex@0.2.0-rc.2`:
+  `a9a50877200555d1f8998933e1a1e4d26a4d2f8ba28f6b75f34b96f518c88128`
+- `@lupinum/ginko-cms@0.2.0-rc.2`:
+  `ea06b52f8a42443f05ea7f118241fbca3791318cf7d636347bc086c4a88295a7`
+
+The literal CMS `pnpm run package:e2e` candidate lane cannot truthfully certify
+this uncommitted stack: it requires `.pack/candidate/candidate-artifact.json`, and
+`candidate:pack` correctly requires a clean source plus immutable upstream hashes.
+CMS compatibility still pins registry Content beta.4; the local Docs install and
+the other published Content candidates do not contain this dirty V2/parser source.
+The attempted command stopped at that missing-manifest preflight. The passing
+development-source lane therefore proves the existing registry-compatible CMS
+package path only, not the unpublished V2 tuple. No release floor, compatibility
+entry, candidate attestation, or local dependency was invented to hide this limit.
+
+A refreshed real-browser check of the lasting playground rendered the two-column
+Docs component and the isolated host component at desktop and 390 by 844. Both
+previews reached `Current`; the narrow document had equal 375 px scroll/client
+width after browser chrome, and no console warnings or errors. Duplicate stale dev
+roots were stopped. The refreshed server and deliverable tab remain available at
+`http://127.0.0.1:4317/playground`.
+
+Step 4C is **READY FOR GATE B2 REVIEW** by coordinator task
+`01a09564-7dee-70a1-828c-84dd6628054d`. Step 6A must not start until the reviewer
+accepts Gate B2. Step 5, commits, publication, deployment, and production migrations
+remain unassigned.
+
+#### 2026-09-12 — Gate B2 accepted for local foundation; Step 6A assigned
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` accepts Gate B2 for
+continued local development of the shared contract and Docs writing proof. The
+reviewer inspected the aggregate-found runtime-config correction and CMS module
+extractions, then independently ran 33 Content runtime-config/renderer tests and
+32 CMS transition/golden/module-budget tests; all pass. Content, Editor and Docs
+archive hashes were independently recomputed and match the 4C packet. The Docs
+certification identifies the exact Content archive and correctly states
+`releaseEvidence: false`; the Content artifact records dirty, non-release inputs.
+The wider aggregate and browser results above are implementor evidence, not a
+claim that the reviewer reran every aggregate.
+
+The CMS candidate lane's missing clean candidate attestation is a real remaining
+certification limit. The passing development lane covers registry-compatible
+packages, not the unpublished V2 tuple. This does not block the Docs writing proof.
+Exact CMS/V2 Content archive-consumer proof is required before CMS adoption in
+Step 5, and clean release/registry certification remains required before release.
+No check is relabeled as passing, and no release guard or dependency floor is
+changed by this decision.
+
+Step 6A only is assigned now: demonstrate the complete writing journey in the
+permanent Docs playground through the actual packages. The reviewer must operate
+the running journey before assigning 6B. Preserve content-safety regressions,
+explore uncertain UI in the browser, and avoid speculative test/API expansion.
+Step 5, commits, publication, deployment and production migrations remain
+unassigned. Current candidate bases and exact archive identities are recorded in
+the preceding 4C packet.
+
+#### 2026-09-12 — User-authorized local commit checkpoint
+
+Matthias explicitly requested proper commits across the affected repositories.
+The implementor paused with no writes or checks running. The coordinator reviewed
+and committed the current source, tests and package integration in each owner;
+publication, push, tags and production changes were not requested or performed.
+
+| Repository | Branch | Source commit |
+|---|---|---|
+| Content | `fix/parser-parity` | `e484dbeffe70534002e5bb4c20e4bc1b64ed62f5` |
+| Docs | `docs/complete-mdc-author-reference` | `10fc712215b493b508ba828000e86420c60b028b` |
+| CMS | `fix/parser-parity` | `b8d6de45dfd2e4877bfa4e9fdd53e57937c9ed1a` |
+| Editor | `main` | `f9dc2180f19bcf9bcfbeea729dbc4a13734c8a4a` |
+
+Content and CMS commits preserve the reviewed foundation. Docs includes the new
+`note` search keyword. The Editor commit includes the initial Step 6A source work
+already present when the user requested the checkpoint: slash/plus insertion,
+property controls, toolbar changes and local draft playground controls. This is
+not Step 6A acceptance; the complete browser journey still needs implementation
+and review. No earlier dirty-archive evidence is relabeled as certification of
+these new clean commit IDs, and the CMS/V2 package-tuple limit still applies.
+
+Pre-commit verification independently passed all 62 Editor tests and seven focused
+Docs authoring/component-kit/generator tests. Two asset workflow tests initially
+used the former toolbar location; they now operate More → Image and retain their
+cancellation/stale-completion assertions. The disabled-feature test also opens
+More before checking the available actions. Editor typechecking and targeted test
+lint pass. Previous 4C aggregate evidence remains recorded with its exact scope.
+Both the user's ChiliSkills checkout and the implementor's ChiliSkills worktree
+were clean and required no commit. Generated builds, candidate copies and archives
+remain ignored. This plan/evidence update is committed separately after the four
+source commits so the cross-repository checkpoint has an exact durable record.
