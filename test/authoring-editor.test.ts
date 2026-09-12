@@ -605,6 +605,47 @@ describe('editor-specific authoring kits', () => {
     }
   })
 
+  it('inserts a host image beside a custom component without leaving authoring mode', async () => {
+    const kit = await createAuthoringKit(sourceFor('learning-objective'))
+    const wrapper = mount(GinkoEditor, {
+      props: {
+        authoringKit: kit,
+        imageOutput: 'markdown',
+        modelValue:
+          '<learning-objective>\nExplain Fourier.\n</learning-objective>\n\nAdditionally.\n',
+        assetProvider: {
+          buildUrl: () => 'blob:https://editor.example.test/resolved',
+          parseUrl: () => null,
+        },
+      },
+    })
+    try {
+      await flushPromises()
+      await new Promise(resolve => globalThis.setTimeout(resolve, 30))
+      let paragraphEnd = -1
+      wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'paragraph' && node.textContent === 'Additionally.') {
+          paragraphEnd = pos + node.nodeSize - 1
+        }
+      })
+      expect(paragraphEnd).toBeGreaterThan(0)
+      wrapper.vm.editor!.commands.setTextSelection(paragraphEnd)
+      expect(
+        wrapper.vm.insertImageAsset({
+          alt: 'Diagram',
+          filename: 'diagram.png',
+          id: 'asset_123',
+        }),
+      ).toBe(true)
+      await expect(wrapper.vm.flush()).resolves.toMatchObject({ ok: true })
+      expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain(
+        '![Diagram](asset_123)',
+      )
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('keeps component permissions isolated between two mounted editors', async () => {
     const [objectiveKit, noteKit] = await Promise.all([
       createAuthoringKit(sourceFor('learning-objective')),
