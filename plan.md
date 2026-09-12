@@ -842,3 +842,48 @@ A real Chromium journey at 1280×720 loaded the built Editor package with the ac
 The release blocker is explicit: the accepted Content candidate still identifies as `1.0.0-beta.7`, but the npm archive for that version does not export `parseMdcDocument` or `serializeMdcDocument`. The normal Editor manifest contains no local/file dependency. Local certification therefore used `GINKO_CONTENT_TARBALL` with the accepted Gate A candidate. A new published Content version containing those helpers, a matching Editor minimum version, and registry-only consumer proof remain required before release. Content's broader install footprint, including its Nuxt peer/dependencies, also remains a release review item even though the Editor browser bundle is pure. The accepted CMS candidate was not changed; its current editor is the documented temporary copy to remove during the Step 5 consumer cutover.
 
 Step 3 is `READY FOR REVIEW`. Only the reviewer may accept Gate B1. Do not start Step 4 or consumer adoption before that verdict.
+
+#### 2026-09-12 — Step 3 Gate B1 correction ready for re-review
+
+The first Gate B1 review returned **CHANGES REQUIRED** after real-browser and
+mounted-lifecycle probes found stale source resurrection, unsafe late asset
+completion, pending edits lost on close, permissive schema fallback, collapsed
+media block boundaries, and toolbar styles that did not reach the child
+component. The focused correction is Editor
+`7e1b81a90a3c0d5a0d33509ef8809bee4b88bd65` (`fix: harden editor lifecycle
+boundaries`).
+
+The component now exposes an async `flush()` result that hosts must await before
+close or document replacement. It drains edits that arrive during conversion,
+stays failed across repeated calls until recovery, and never claims persistence.
+Asset events carry request-scoped completion callbacks tied to the initiating
+editor, revision, document, selection, mode, editability, feature flag, and
+lifetime. Direct media operations enforce the same active visual-document
+boundary. Echo tracking is bounded to the latest emitted value; a current
+external replacement remains the source shown by both modes.
+
+Visual preparation and application now construct the document with the actual
+TipTap schema and call `check()`. Unknown or structurally invalid content fails
+closed without mutating the editor. The accepted five-fixture corpus is mounted
+through that schema: four supported fixtures open visually without emission,
+while the comment-bearing angle fixture remains byte-for-byte available in
+source mode because Step 3 has no comment node. Blockquote and named-slot inline
+runs are normalized into schema-valid paragraphs, including inline, nested and
+empty named-slot coverage. Markdown image/file media retain block boundaries at
+root and nested structural depths, so a following heading survives reparse.
+Toolbar commands are typed and their styles now live with the toolbar component.
+
+`pnpm verify` passed dependency policy, lint, type checking, 34 tests across five
+files, the Editor build, and the documentation production build. With the
+accepted Content candidate archive supplied through `GINKO_CONTENT_TARBALL`,
+`pnpm release:verify` passed the audit and aggregate checks again, then certified
+clean packed Vue and Nuxt consumers. The retained Editor archive SHA-256 is
+`d3465d39774aa7e992b84085bfdd636e4139b7d32ee401d15ebe1acb0dc93dd7`.
+
+A fresh Chromium check verified the toolbar button's computed border, radius,
+and padding; inserted an image before `# Review document`; observed exact source
+`![Sample](/sample.svg)\n\n# Review document\n\nOriginal paragraph.\n`; and switched
+back to Visual with both image and `h1` intact. The owned preview processes and
+temporary files were removed. No external action occurred. The registry Content
+helper/version blocker from the original packet remains unchanged. Step 3 is
+again `READY FOR REVIEW`; Step 4 has not started.
