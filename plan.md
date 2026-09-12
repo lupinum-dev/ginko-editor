@@ -8,7 +8,7 @@ This plan began before implementation. Steps 0–3 are now accepted, and Step 4 
 
 **Product and architecture goal:** Ginko Content should own the document’s meaning, and Ginko Editor should turn that contract into a good writing experience. CMS and ChiliSkills should need very little integration code.
 
-**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 consumer integration remains unassigned. Exact CMS + unpublished V2 Content package-consumer certification is still required before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
+**Current checkpoint, 2026-09-12:** Gate B2 and Step 6 / Gate D are accepted for local development, including the Docs writing proof and bounded interaction hardening. Step 5 consumer integration is assigned, starting with exact CMS + unpublished V2 Content package-consumer certification before CMS adoption. Publication, deployment and production migrations remain unauthorized; scoped local commits are authorized.
 
 Matthias requested a separate Ginko Editor library shared by Ginko CMS and ChiliSkills, with Ginko Docs components, custom application components, slash insertion, layout editing, source mode, and trustworthy preview. He prefers named angle-tag syntax such as `<info>...</info>` where the shared content engine can support it correctly.
 
@@ -267,7 +267,7 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 | 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | ACCEPTED |
 | 4 | Content-owned document contract, Docs kit and playground | 3 | B2: local foundation accepted; CMS tuple limit below | ACCEPTED |
 | 6 | Docs writing proof, then focused interaction hardening | 4 | D: initial-kit writing quality accepted | ACCEPTED |
-| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof | TODO |
+| 5 | CMS adoption and ChiliSkills pilot | 4, 6 | C: two-consumer proof; assigned | IN PROGRESS |
 | 7 | Exact preview in each host | 5, 6 | E: preview agreement | TODO |
 | 8 | Complete Docs component coverage | 6, 7 | F: component coverage | TODO |
 | 9 | ChiliSkills full adoption and content migration | 8 | G: application cutover | TODO |
@@ -2534,3 +2534,24 @@ probes are removed. The playground remains at
 Step 5 is the next planned milestone and remains unassigned. Its exact CMS/V2
 package-consumer prerequisite still applies before adoption. No push, tag,
 publication, deployment or production data change occurred.
+
+
+#### 2026-09-12 — Step 5 assigned after accepted Docs writing proof
+
+Matthias asked why implementation had stopped and what comes next. The
+coordinator resumes implementor task `01a0943e-9f8d-7130-81e9-e09aa36cae34`
+with Step 5 only, following accepted Gate D at `cf422e6`.
+
+First establish the exact CMS/V2 Content candidate package-consumer proof using
+the documented local lane or correctly attested clean candidates. Preserve
+release guards and record the exact artifacts and commands. After that proof
+passes, proceed with the existing Step 5 packet: shared Editor adoption in CMS
+and a safe ChiliSkills script pilot, preserving host-owned assets, persistence,
+permissions and undo. Use disposable pilot fixtures; existing saved ChiliSkills
+content is outside this step's migration scope. Remove the old CMS editor only
+after parity and import-consumer checks pass.
+
+Return Gate C with independently operable local previews, consumer API examples,
+focused behavior evidence and owning verification results. Commit scoped source,
+tests and evidence locally. Step 7 and later milestones remain unassigned. No
+push, publication, deployment or production migration is authorized.
