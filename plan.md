@@ -2269,3 +2269,44 @@ Step 6A is **READY FOR REVIEW** by coordinator task
 `http://127.0.0.1:4317/playground`. Step 6B and Step 5 remain paused pending
 reviewer operation and acceptance. No push, tag, publication, deployment or
 production data change occurred.
+
+#### 2026-09-12 — Reviewer operation of Step 6A: changes required
+
+Coordinator task `01a09564-7dee-70a1-828c-84dd6628054d` independently operated
+implementation `f9dc218` (evidence HEAD `5f12893`) through the running built
+playground. The core journey works: normal keystrokes `/note`, arrows/Enter,
+callout properties and body, two edited column slots, Undo/Redo of the second
+column, host title/toggle/named tip slot, canonical Markdown, and local
+save/new/reopen. Reopened source exactly equals the source captured before save.
+The incomplete-source fixture remains byte-identical after attempted visual
+conversion, with the previous valid preview explicitly Stale; recovery works.
+At 390px, pointer-operated + Insert successfully adds Information. Browser
+warning/error logs are empty. The second kit remains isolated.
+
+Step 6A is **CHANGES REQUIRED**, limited to these observed writing defects:
+
+1. Property edits steal focus. On the Information inspector, type in Icon and
+   press Tab: focus goes to the contenteditable document instead of the next
+   Title field. Title and select edits also return focus to the document.
+   `updateSelectedProp` unconditionally calls `instance.commands.focus()` after
+   updating the node. Keep focus and natural Tab order within property controls
+   while preserving the selected block. Recheck select, checkbox, and text edits.
+2. Narrow columns retain desktop spans. At 390px with the valid nested
+   Information → Layout recipe, the two editable columns have computed spans 4
+   and 8 and widths about 74px/161px; words in the first column break into
+   fragments. The responsive full-width rule loses to the more specific size
+   selectors in playground.vue. Stack both editable columns on narrow screens,
+   including sm/lg widths and this nested case; preserve the desktop ratio.
+3. The large marketing-style header still dominates the opening viewport. The
+   initial desktop screenshot puts the editor toolbar near the bottom with the
+   writing content below it. Replace it with a compact playground heading and
+   short help so the actual editor is immediately usable. Keep the task focused
+   on writing; do not add a new design system or another demo shell.
+
+These are corrections to the demonstrated slice, not an assignment of 6B.
+Recheck the affected browser journeys and add only focused regression coverage
+for the confirmed focus defect. Preserve the passing content/persistence journey.
+Return the running corrected desktop and 390px example for reviewer operation.
+The review document is restored in Visual mode and saved as the local demo draft;
+viewport overrides are reset. Local corrective commits remain authorized; push,
+publication, Step 6B and Step 5 remain unassigned.
