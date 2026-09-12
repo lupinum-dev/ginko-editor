@@ -242,8 +242,8 @@ Statuses: `TODO`, `IN PROGRESS`, `READY FOR REVIEW`, `ACCEPTED`, `BLOCKED`. A bl
 |---|---|---|---|---|
 | 0 | Fresh evidence, baseline and bounded work map | None | Recon review | ACCEPTED |
 | 1 | Parser agreement and angle-syntax implementation | 0 | A: content safety | ACCEPTED |
-| 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | READY FOR REVIEW |
-| 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | TODO |
+| 2 | OSS library scaffold and packed Vue foundation | 0 | Scaffold review | ACCEPTED |
+| 3 | Safe editor extraction and host boundaries | 1, 2 | B1: extraction | IN PROGRESS |
 | 4 | Authoring contract and small Docs component kit | 3 | B2: contract | TODO |
 | 5 | CMS adoption and ChiliSkills pilot | 4 | C: two-consumer proof | TODO |
 | 6 | Complete core writing interaction | 5 | D: writing quality | TODO |
@@ -820,3 +820,13 @@ The Vue package adaptation follows current official Vite library-mode and Vue Ty
 Implementation commits are `1ed1bd2` (`feat: scaffold Vue editor package`) and `070c285` (`test: complete packed consumer type setup`). `pnpm verify` passed dependency quarantine, lint, SFC type checking, one package test, the Vite library build and declarations, and the Ginko Docs production build. The first `pnpm release:verify` exposed an incomplete isolated Vue consumer harness: Vite 8 declarations required Node types and an ESNext library. The focused packed-consumer rerun passed after adding those consumer-only settings. The complete release certification then passed: zero known audit vulnerabilities, the full `pnpm verify` aggregate, an inert `0.1.0` archive, and clean archive installs plus type checks and production builds in both Vue 3.5.42/Vite 8.1.5 and Nuxt 4.5.2 consumers. Both consumers import the actual tarball, not source aliases or links, and the verifier checks the CSS marker, public entry declaration, and SFC declaration in installed output. Final archive identity and source commit are recorded in the generated ignored `release-artifacts/release.json` for local review; nothing was published.
 
 Step 2 is `READY FOR REVIEW`. A browser interaction pass is not applicable to this temporary smoke component because it exists only to certify package mechanics and will be removed before the editor UI milestone. Step 3 remains blocked until the reviewer accepts this scaffold, and the accepted Content/CMS Step 1 candidates were not changed.
+
+#### 2026-09-12 — Reviewer accepts Step 2 and assigns extraction
+
+**Step 2: ACCEPTED** at Editor `5cec45cf873049d7e335d514822a5de24dfdaffa`. The reviewer inspected repository instructions, build/type/CSS configuration, the temporary component, certification scripts, documentation, and the packed files. The retained archive SHA-256 was independently verified as `571bc903a28fcf4cd2ae8254066ca396432459783a1cc1df67fc28bda1b15307`; its manifest identifies that source revision. The emitted JavaScript imports only Vue, and the archive includes its public entry, SFC declarations and explicit CSS export.
+
+The reviewer independently ran `node scripts/verify-packed-consumer.mjs` against that retained archive: isolated Vue and Nuxt installations, declaration checks, production builds and CSS-retention checks passed. The executor's `pnpm verify` and final `pnpm release:verify` evidence remains attached above. This acceptance covers the scaffold, not editor functionality or a published package.
+
+The reviewer also served the built docs on an owned loopback-only static server and inspected the real page. Home-to-documentation navigation, searching for scaffold content, opening the matching section, the code example, and the mobile page-navigation control were verified. Screenshots were inspected at the default desktop viewport and 390 by 844. The temporary viewport was reset, the review tab closed, and the owned server stopped. The unrelated docs development process reported by the executor was neither started nor stopped by this reviewer; its ownership remains unknown.
+
+Step 3 is assigned to the existing Sol task. Extract the accepted CMS editor behavior into this package, remove the temporary scaffold component and its tests/fixtures, preserve raw source on no-op sessions and failures, and keep assets/persistence in the host. Use the shared Content parser without copying its grammar. Resolve the known distinction between browser import purity and Content's package-install footprint explicitly; do not introduce Nuxt/CMS/backend runtime coupling or a second parser to make a plain Vue consumer pass. Return Gate B1 evidence before host adoption or new writing UX.
