@@ -2618,3 +2618,43 @@ These bounded Step 5 corrections are assigned to the implementor. Commit source,
 tests and evidence locally, then return Gate C again with operable host previews.
 Step 7 and later milestones remain unassigned. No push, publication, deployment
 or production migration is authorized.
+
+
+#### 2026-09-12 — Correction review resumed; remaining lifecycle and restore defects
+
+Matthias requested continuation after the implementor task was interrupted. The
+coordinator resumed the assigned Step 5 correction work and reviewed Editor
+`ec473f4`, ChiliSkills `5cd2ebd`, and CMS `bb57906f`. Initial fixes now include
+pending-edit registration and awaited save/export/route-leave boundaries,
+separate canonical/display image URLs, explicit metadata capability, exact
+candidate bootstrap scripts and an actual V2 offline contract fixture.
+Independent focused checks passed: Editor 32 tests, ChiliSkills 10 tests, CMS
+flush-registry one test. This is progress, not Gate C acceptance.
+
+The reviewer independently confirmed a remaining data-loss path at the isolated
+`http://localhost:4321/modules/signale-spektren` origin: open the empty Fourier
+slide, enable the pilot, type “Reviewer collapse test,” immediately collapse the
+lecture, then reopen. The script is empty. CollapsibleContent unmounts the editor
+without an awaited flush. The separate `127.0.0.1` implementor fixture was not
+modified by this check.
+
+A focused reviewer test also confirms that `remapScriptAssetIds` rewrites both
+plain-text `id="asset-before"` examples and Markdown images inside fenced code
+when mapping an asset identity. A real image control case rewrites correctly.
+Backup restore must preserve text/code examples and legacy script meaning;
+reuse the canonical Content media-reference semantics rather than parallel
+regular-expression scanners. The temporary reviewer test was removed after
+recording the failure and sent to the implementor for an owning regression.
+
+Code review identified two CMS follow-ups: locale switching checks emitted
+`isDirty` before deciding to save, so pending visual edits can be missed on
+query-only navigation; secondary-editor closing and same-component route
+changes need the same lifecycle assessment. The new-entry leave guard also
+remains dirty after a successful create, causing an erroneous unsaved-changes
+prompt during its success navigation. Correct the successful ownership
+transition while retaining guards for failed saves.
+
+These are included in the existing Step 5 correction assignment. Final image
+picker/reload/export evidence, exact final-candidate checks and the real CMS
+host journey remain required. No further milestone, publication or deployment
+is assigned. Scoped local correction and evidence commits remain authorized.
