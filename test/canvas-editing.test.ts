@@ -123,6 +123,9 @@ describe('direct canvas editing', () => {
   it('edits image description inline and preserves the asset reference after reload', async () => {
     const wrapper = await setup('')
     wrapper.vm.insertImageAsset({ id: 'stable-image', alt: 'Before' })
+    await flushPromises()
+    await wrapper.get('button[aria-label="Image settings"]').trigger('click')
+    await flushPromises()
     await wrapper.get('input[aria-label="Image description"]').setValue('A clear description')
     const output = await saved(wrapper), reloaded = await setup(output)
     expect(reloaded.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props).toMatchObject({ id: 'stable-image', alt: 'A clear description' })
@@ -142,12 +145,14 @@ describe('direct canvas editing', () => {
     expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/after.png')
     expect(wrapper.vm.editor!.state.doc).toBe(document)
   })
-  it.each(['Add row above', 'Add row below', 'Add column left', 'Add column right', 'Delete column', 'Delete row', 'Use selected row as header'])('preserves tables after %s', async action => {
+  it.each(['Add row above', 'Add row below', 'Add column left', 'Add column right', 'Delete column', 'Delete row', 'Move row to header'])('preserves tables after %s', async action => {
     const wrapper = await setup('| Name | Details |\n| --- | --- |\n| Item | Description |\n| Other | Detail |')
     const editor = wrapper.vm.editor!
     let firstCell = 0
     editor.state.doc.descendants((node, pos) => { if (node.type.name === 'tableCell' && !firstCell) firstCell = pos + 2 })
     editor.commands.setTextSelection(firstCell); await flushPromises()
+    await wrapper.get(`.ginko-table__${action.includes('column') ? 'column' : 'row'}-handle button`).trigger('click')
+    await flushPromises()
     await wrapper.get(`button[aria-label="${action}"]`).trigger('click')
     const output = await saved(wrapper)
     const reloaded = await setup(output)

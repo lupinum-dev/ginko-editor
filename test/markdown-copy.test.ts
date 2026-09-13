@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { flushPromises, mount } from '@vue/test-utils'
-import { AllSelection, NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { AllSelection, NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
@@ -54,6 +54,40 @@ function blobText(blob: Blob) {
 }
 
 describe('canonical Markdown clipboard', () => {
+  it('keeps canonical copy and cut working when plugins mount and unmount', async () => {
+    const wrapper = await setup('Keep **formatting**')
+    const editor = wrapper.vm.editor!
+    const key = new PluginKey('clipboard-lifecycle-test')
+    editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
+    editor.registerPlugin(new Plugin({ key }))
+    await flushPromises()
+    expect(copy(wrapper).data.get('text/plain')?.trim()).toBe('Keep **formatting**')
+    editor.unregisterPlugin(key)
+    await flushPromises()
+    expect(copy(wrapper, 'cut').data.get('text/plain')?.trim()).toBe('Keep **formatting**')
+    expect(editor.getText()).toBe('')
+  })
+
+  it('cancels old pending cuts while a recreated plugin view supports new copies', async () => {
+    const wrapper = await setup('Keep **this**')
+    const editor = wrapper.vm.editor!
+    const clipboard = asyncClipboard()
+    const original = conversion.convertTiptapDocToMarkdown
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => { await gate; return original(...args) })
+    editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
+    copy(wrapper, 'cut')
+    editor.registerPlugin(new Plugin({ key: new PluginKey('pending-clipboard-lifecycle-test') }))
+    await flushPromises()
+    expect(copy(wrapper).data.get('text/plain')?.trim()).toBe('Keep **this**')
+    release()
+    await expect(clipboard.items[0]['text/plain']).rejects.toThrow('superseded')
+    await flushPromises()
+    expect(editor.getText()).toBe('Keep this')
+    expect(wrapper.text()).not.toContain('could not be copied as Markdown')
+  })
+
   it('copies formatted selection as raw Markdown in both text flavors', async () => {
     const wrapper = await setup('Before **important** after.')
     const editor = wrapper.vm.editor!

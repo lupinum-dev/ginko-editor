@@ -1,11 +1,13 @@
-import { shallowReactive, type InjectionKey } from 'vue'
-import type { AssetProvider, ImageUploadHandler } from '@lupinum/ginko-editor'
+import { computed, shallowReactive, type InjectionKey } from 'vue'
+import type { AssetProvider, ImageUploadHandler, EditorImagePickerItem } from '@lupinum/ginko-editor'
 
 export const playgroundImageSource: InjectionKey<(source: string) => string> = Symbol('playgroundImageSource')
 
 /** The playground owns local persistence; the Editor only receives saved references. */
 export function createPlaygroundAssets() {
   const urls = shallowReactive(new Map<string, string>())
+  const names = shallowReactive(new Map<string, string>())
+  const images = computed<EditorImagePickerItem[]>(() => [...urls].map(([id, thumbnailUrl]) => ({ key: id, label: names.get(id) ?? 'Saved image', image: { id }, thumbnailUrl })))
   let database: Promise<IDBDatabase> | undefined
   let disposed = false
   function open() {
@@ -31,7 +33,7 @@ export function createPlaygroundAssets() {
       request.onsuccess = () => {
         const cursor = request.result
         if (!cursor || disposed) return
-        if (typeof cursor.key === 'string' && cursor.value instanceof Blob) urls.set(cursor.key, URL.createObjectURL(cursor.value))
+        if (typeof cursor.key === 'string' && cursor.value instanceof Blob) { urls.set(cursor.key, URL.createObjectURL(cursor.value)); names.set(cursor.key, cursor.value instanceof File ? cursor.value.name : 'Saved image') }
         cursor.continue()
       }
       transaction.oncomplete = () => resolve()
@@ -56,12 +58,13 @@ export function createPlaygroundAssets() {
     signal.throwIfAborted()
     if (disposed) throw new Error('The playground was closed.')
     urls.set(id, URL.createObjectURL(file))
+    names.set(id, file.name)
     return { id, filename: file.name, alt: file.name, mimeType: file.type, size: file.size }
   }
   function dispose() {
     disposed = true
-    urls.forEach(url => URL.revokeObjectURL(url)); urls.clear()
+    urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); names.clear()
     void database?.then(db => db.close(), () => {})
   }
-  return { load, upload, provider, resolve, dispose }
+  return { load, upload, provider, resolve, dispose, images }
 }

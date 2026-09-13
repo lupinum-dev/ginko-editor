@@ -1,5 +1,7 @@
 import { ImageUpload } from '../extensions/image-upload'
-import type { ImageUploadHandler, AssetInfo } from '../../types'
+import type { ImageUploadHandler, ImagePicker, AssetInfo } from '../../types'
+import type { EditorMessages } from '../../ui/messages'
+import type { EditorOverlayController } from '../../ui/context'
 import type { ImageActions } from '../nodeviews/image'
 import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -8,7 +10,6 @@ import { TableCell as TiptapTableCell } from '@tiptap/extension-table-cell'
 import { TableHeader as TiptapTableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
 import StarterKit from '@tiptap/starter-kit'
-import { ref } from 'vue'
 import { tableView } from '../nodeviews/table'
 
 import type { AssetProvider, JsonRecord } from '../../types'
@@ -39,6 +40,9 @@ const TableHeader = TiptapTableHeader.extend({
 })
 
 export interface CreateEditorExtensionsOptions {
+  overlay?: EditorOverlayController
+  getMessages?: () => EditorMessages | undefined
+  getImagePicker?: () => ImagePicker | undefined
   getImageDropTarget?: () => HTMLElement | undefined
   getImageUpload?: () => ImageUploadHandler | undefined
   canUploadImage?: () => boolean
@@ -91,7 +95,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       levels: [1, 2, 3, 4, 5, 6],
       showMarkers: showMarkdownMarkers,
     }),
-    TiptapTable.extend({ addNodeView() { return tableView } }).configure({
+    TiptapTable.extend({ addNodeView() { return props => tableView(props, options.overlay) } }).configure({
       renderWrapper: true,
       resizable: false,
     }),
@@ -115,14 +119,15 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       videoOutput: options.videoOutput,
     }),
     ...(enableDebug ? [EditorDebug] : []),
-    Element.configure({ getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions }),
+    Element.configure({ getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions, overlay: options.overlay }),
     Slot.configure({ getAuthoringKit: options.getAuthoringKit }),
     InlineElement,
     CodeBlock.configure({
       theme: codeBlockTheme,
+      overlay: options.overlay,
     }),
-    ImageUpload.configure({ dropTarget: options.getImageDropTarget, upload: options.getImageUpload, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
-    Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions }),
+    ImageUpload.configure({ overlay: options.overlay, getMessages: options.getMessages, dropTarget: options.getImageDropTarget, upload: options.getImageUpload, picker: options.getImagePicker, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
+    Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions, overlay: options.overlay }),
     Video,
     File.configure({ resolveSrc: resolveAsset }),
     Binding,
@@ -130,10 +135,10 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
   ]
 }
 
-const isNormalizingTable = ref(false)
+const normalizingEditors = new WeakSet<Editor>()
 
-export function isCurrentlyNormalizingTable(): boolean {
-  return isNormalizingTable.value
+export function isCurrentlyNormalizingTable(editor: Editor): boolean {
+  return normalizingEditors.has(editor)
 }
 
 export function normalizeTableCells(editorInstance: Editor | undefined): boolean {
@@ -175,9 +180,8 @@ export function normalizeTableCells(editorInstance: Editor | undefined): boolean
   })
 
   if (hasChanges) {
-    isNormalizingTable.value = true
-    editorInstance.view.dispatch(tr)
-    isNormalizingTable.value = false
+    normalizingEditors.add(editorInstance)
+    try { editorInstance.view.dispatch(tr) } finally { normalizingEditors.delete(editorInstance) }
     editorDebug.log('Normalized table cells in editor')
   }
 

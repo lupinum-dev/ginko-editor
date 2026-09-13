@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
 import { useHead } from '#imports'
-import { GinkoEditor, type GinkoEditorHandle } from '@lupinum/ginko-editor'
+import { GinkoEditor, GinkoImagePicker, type GinkoEditorHandle, type ImagePicker, type EditorImage } from '@lupinum/ginko-editor'
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { isolatedAuthoringKit, playgroundAuthoringKit } from '../playground/contracts'
 import { createPlaygroundAssets, playgroundImageSource } from '../playground/assets'
@@ -25,6 +25,23 @@ const draftStatus = ref('Only in this browser')
 const ready = ref(false)
 const pending = ref(false)
 let saveTimer: ReturnType<typeof globalThis.setTimeout>
+const imageLibraryOpen = ref(false), imageQuery = ref('')
+const imageChoices = computed(() => assets.images.value.filter(item => item.label.toLocaleLowerCase().includes(imageQuery.value.trim().toLocaleLowerCase())))
+let finishImageChoice: ((image: EditorImage | null) => void) | undefined
+const imagePicker: ImagePicker = ({ signal }) => new Promise(resolve => {
+  finishImageChoice?.(null)
+  if (signal.aborted) { resolve(null); return }
+  const abort = () => finish(null)
+  function finish(image: EditorImage | null) {
+    signal.removeEventListener('abort', abort)
+    finishImageChoice = undefined; imageLibraryOpen.value = false
+    resolve(image)
+  }
+  finishImageChoice = finish
+  signal.addEventListener('abort', abort, { once: true })
+  imageQuery.value = ''; imageLibraryOpen.value = true
+})
+onBeforeUnmount(() => finishImageChoice?.(null))
 const wordCount = computed(() => source.value.trim().split(/\s+/).filter(Boolean).length)
 const examples = computed(() => playgroundAuthoringKit.recipes)
 
@@ -201,6 +218,7 @@ onBeforeUnmount(() => { assets.dispose(); globalThis.clearTimeout(saveTimer); sa
           :authoring-kit="playgroundAuthoringKit"
           :asset-provider="assets.provider"
           :image-upload="assets.upload"
+          :image-picker="imagePicker"
           :image-drop-target="workspace"
           :enable-files="false"
           :enable-video="false"
@@ -235,6 +253,14 @@ onBeforeUnmount(() => { assets.dispose(); globalThis.clearTimeout(saveTimer); sa
       </section>
     </div>
 
+    <GinkoImagePicker
+      :open="imageLibraryOpen"
+      :images="imageChoices"
+      :query="imageQuery"
+      @update:query="imageQuery = $event"
+      @select="finishImageChoice?.($event)"
+      @update:open="!$event && finishImageChoice?.(null)"
+    />
     <footer class="workspace-footer">
       <span role="status"><span class="save-dot" />{{ pending ? 'Updating document…' : draftStatus }}</span><span>{{ wordCount }} source words <span aria-hidden="true">·</span> Markdown + components</span>
     </footer>

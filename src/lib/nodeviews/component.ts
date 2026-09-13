@@ -1,4 +1,6 @@
 import { columnChildren, parentColumnConfig } from './columns'
+import { createEditorText } from '../../ui/messages'
+import type { EditorOverlayController } from '../../ui/context'
 import type { NodeViewRendererProps } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { TextSelection } from '@tiptap/pm/state'
@@ -8,7 +10,8 @@ import { icon } from './icons'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import type { AuthoringKitV1 } from '../../authoring'
 
-export function componentView({ node: initial, editor, getPos }: NodeViewRendererProps, getKit: () => AuthoringKitV1 | undefined, getOutputOptions: () => TiptapToMDCOptions): NodeView {
+export function componentView({ node: initial, editor, getPos }: NodeViewRendererProps, getKit: () => AuthoringKitV1 | undefined, getOutputOptions: () => TiptapToMDCOptions, overlay?: EditorOverlayController): NodeView {
+  const text = overlay?.text ?? createEditorText()
   let node = initial
   const dom = document.createElement('div')
   dom.className = 'ginko-block'
@@ -28,7 +31,7 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
   divider.contentEditable = 'false'
   divider.setAttribute('role', 'separator')
   divider.setAttribute('aria-orientation', 'vertical')
-  divider.setAttribute('aria-label', 'Column widths')
+  divider.setAttribute('aria-label', text('columnWidths'))
   divider.tabIndex = 0
   const symbol = document.createElement('span')
   symbol.className = 'ginko-block__symbol'
@@ -49,7 +52,7 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     return config?.presets.findIndex(preset => children.length === 2 && preset.values.every((value, i) => (children[i].node.attrs.props[config.sizeProp] ?? getKit()?.implementation[config.childTag]?.props[config.sizeProp]?.default) === value)) ?? -1
   }
   const parentColumns = () => { const pos = position(); return pos === undefined ? undefined : parentColumnConfig(editor.state.doc, pos, getKit()) }
-  const settings = blockSettings(editor, () => node, position, getKit, getOutputOptions, () => !!parentColumns())
+  const settings = blockSettings(editor, () => node, position, getKit, getOutputOptions, () => !!parentColumns(), overlay)
   header.append(settings.dom)
   let paintedTone = ''
   const paintRatio = (ratio: number) => { dom.style.setProperty('--column-ratio', `${ratio * 100}%`) }
@@ -60,7 +63,7 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     const preset = columns()?.presets[presetIndex()]
     paintRatio(preset?.ratio ?? .5)
     divider.setAttribute('aria-valuenow', String(Math.round((preset?.ratio ?? .5) * 100)))
-    divider.setAttribute('aria-valuetext', preset?.label ?? 'Custom widths')
+    divider.setAttribute('aria-valuetext', preset?.label ?? text('customWidths'))
   }
   function choosePreset(index: number) {
     const config = columns(), children = paired(), pos = position()
@@ -125,7 +128,7 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     dom.dataset.label = meta?.label ?? node.attrs.tag
     dom.setAttribute('tag', node.attrs.tag)
     const parentConfig = parentColumns()
-    label.textContent = isPair ? 'Columns (resize)' : parentConfig ? `${meta?.label ?? node.attrs.tag} (${node.attrs.props[parentConfig.sizeProp] ?? getKit()?.implementation[node.attrs.tag]?.props[parentConfig.sizeProp]?.default ?? 'md'})` : meta?.label ?? node.attrs.tag
+    label.textContent = isPair ? text('resizeColumns') : parentConfig ? text('columnSize', { label: meta?.label ?? node.attrs.tag, size: String(node.attrs.props[parentConfig.sizeProp] ?? getKit()?.implementation[node.attrs.tag]?.props[parentConfig.sizeProp]?.default ?? 'md') }) : meta?.label ?? node.attrs.tag
     label.hidden = !!prop && !isPair
     dom.dataset.tone = meta?.canvas?.tone ?? 'neutral'
     dom.dataset.callout = String(!!meta?.canvas?.switchGroup)
@@ -139,8 +142,9 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     const titleValue = prop ? String(node.attrs.props[prop] ?? getKit()?.implementation[node.attrs.tag]?.props[prop]?.default ?? '') : ''
     title.hidden = !prop || !!titleSlot
     title.disabled = !editor.isEditable
-    title.setAttribute('aria-label', `${meta?.label ?? node.attrs.tag} ${prop ? meta?.props?.[prop]?.label ?? prop : 'title'}`)
-    title.placeholder = 'Add a title…'
+    title.setAttribute('aria-label', text('componentTitle', { label: meta?.label ?? node.attrs.tag, field: prop ? meta?.props?.[prop]?.label ?? prop : text('title') }))
+    title.placeholder = text('addTitle')
+    divider.setAttribute('aria-label', text('columnWidths'))
     if (title.value !== titleValue) title.value = titleValue
     dom.dataset.columns = String(isPair)
     const selected = presetIndex()
@@ -150,8 +154,8 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
       divider.setAttribute('aria-valuemin', String(Math.round(config.presets[0].ratio * 100)))
       divider.setAttribute('aria-valuemax', String(Math.round(config.presets[config.presets.length - 1].ratio * 100)))
       divider.setAttribute('aria-valuenow', String(Math.round((config.presets[selected]?.ratio ?? .5) * 100)))
-      divider.setAttribute('aria-valuetext', config.presets[selected]?.label ?? 'Custom widths')
-      divider.title = `${config.presets[selected]?.label ?? 'Custom widths'} · Drag or use arrow keys`
+      divider.setAttribute('aria-valuetext', config.presets[selected]?.label ?? text('customWidths'))
+      divider.title = text('resizeColumnsHint', { label: config.presets[selected]?.label ?? text('customWidths') })
 
     }
     settings.render()
@@ -164,7 +168,7 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
   return {
     dom, contentDOM,
     update(next) { if (next.type !== node.type) return false; node = next; render(); return true },
-    stopEvent(event) { return event.target instanceof globalThis.Node && (header.contains(event.target) || divider.contains(event.target)) },
+    stopEvent(event) { return event.target instanceof globalThis.Node && (header.contains(event.target) || divider.contains(event.target) || settings.contains(event.target)) },
     ignoreMutation(mutation) { return mutation.type !== 'selection' && !contentDOM.contains(mutation.target) },
     destroy() { destroyed = true; cancelDrag(); settings.destroy(); editor.off('transaction', onTransaction); editor.off('update', onUpdate) },
   }

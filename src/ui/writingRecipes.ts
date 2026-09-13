@@ -4,7 +4,10 @@ const imageRecipe: AuthoringRecipeV1 = { id: 'ginko.image', label: 'Image', desc
 
 export function isImageRecipe(recipe: AuthoringRecipeV1) { return recipe === imageRecipe }
 
-/** Native Markdown uses the same preparation and validation path as host recipes. */
+/** Sources illustrate the preview slot. Built-in insertion runs the matching
+ * toolbar command on the current selection; it does not insert this sample text.
+ * Host recipe sources are prepared and validated as document fragments instead.
+ */
 export const writingRecipes: readonly AuthoringRecipeV1[] = [
   { id: 'ginko.heading-1', label: 'Heading 1', description: 'A large section heading.', keywords: ['h1', 'title'], source: '# Heading' },
   { id: 'ginko.heading-2', label: 'Heading 2', description: 'A medium section heading.', keywords: ['h2', 'subtitle'], source: '## Heading' },
@@ -15,7 +18,7 @@ export const writingRecipes: readonly AuthoringRecipeV1[] = [
   { id: 'ginko.code', label: 'Code block', description: 'Code with its formatting intact.', keywords: ['snippet'], source: '```text\nYour code here\n```' },
   { id: 'ginko.divider', label: 'Divider', description: 'A quiet break between sections.', keywords: ['rule', 'line', 'hr'], source: '---' },
   imageRecipe,
-  { id: 'ginko.table', label: 'Table', description: 'Compare information side by side.', keywords: ['grid'], source: '| Name | Details |\n| --- | --- |\n| Item | Description |' },
+  { id: 'ginko.table', label: 'Table', description: 'Compare information side by side.', keywords: ['grid'], source: '| Name | Details | Status |\n| --- | --- | --- |\n| First item | Description | Draft |\n| Second item | Description | Ready |' },
 ]
 
 export function recipeSymbol(recipe: AuthoringRecipeV1): string {

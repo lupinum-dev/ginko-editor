@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { parseMdcDocument } from '@lupinum/ginko-content/cms-contract'
 import GinkoEditor from '../src/GinkoEditor.vue'
@@ -35,6 +35,21 @@ async function imageRequest(wrapper: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('deep review regressions', () => {
+  it.each(['-\n', '1.\n', '>\n'])('reopens an unfinished native block in visual mode: %s', async (source) => {
+    const wrapper = await setup({ modelValue: source })
+    expect(wrapper.attributes('data-mode')).toBe('visual')
+    let firstParagraph: number | undefined
+    wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+      if (firstParagraph === undefined && node.type.name === 'paragraph') firstParagraph = pos + 1
+    })
+    wrapper.vm.editor!.commands.setTextSelection(firstParagraph!)
+    wrapper.vm.editor!.commands.insertContent('Continue writing')
+    expect(await wrapper.vm.flush()).toMatchObject({ ok: true })
+    const saved = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
+    const reloaded = await setup({ modelValue: saved })
+    expect(reloaded.attributes('data-mode')).toBe('visual')
+    expect(reloaded.vm.editor!.state.doc.textContent).toBe('Continue writing')
+  })
   it.each(writingRecipes.filter(recipe => !isImageRecipe(recipe)))('inserts, saves, reloads and undoes $label', async (recipe) => {
     const wrapper = await setup()
     await wrapper.get('button[aria-label="Insert block"]').trigger('click')
@@ -42,11 +57,15 @@ describe('deep review regressions', () => {
     await wrapper.get('[role="combobox"]').trigger('keydown', { key: 'Enter' })
     await flushPromises()
     expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
+    // Native commands format the current block without inserting sample copy.
+    // Exercise the author's next keystrokes before saving that structure.
+    wrapper.vm.editor!.commands.insertContent('Written content')
     expect((await wrapper.vm.flush()).ok).toBe(true)
     const source = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
     const reloaded = await setup({ modelValue: source })
     expect(reloaded.attributes('data-mode')).toBe('visual')
     expect(reloaded.vm.editor!.getJSON()).toEqual(wrapper.vm.editor!.getJSON())
+    wrapper.vm.editor!.commands.undo()
     wrapper.vm.editor!.commands.undo()
     expect(wrapper.vm.editor!.getText()).toBe('')
   })
@@ -199,11 +218,17 @@ describe('deep review regressions', () => {
   it('represents typed select values and boolean defaults without rewriting omitted values', async () => {
     const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: { card: { kind: 'block', props: { choice: { types: ['string', 'number', 'boolean'], required: false, allowedValues: [1, '1', false, 'false', ''] }, visible: { types: ['boolean'], required: false, allowedValues: null } }, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, implementation: { card: { componentName: 'Card', props: { choice: { types: ['string', 'number', 'boolean'], required: false }, visible: { types: ['boolean'], required: false, default: true } }, slots: ['default'] } }, authoring: { card: { label: 'Card', props: { choice: { label: 'Choice', control: 'select' }, visible: { label: 'Visible', control: 'toggle' } } } }, recipes: [] })
     const wrapper = await setup({ modelValue: '<card>\nContent\n</card>', authoringKit: kit })
-    wrapper.vm.editor!.commands.setTextSelection(2)
+    wrapper.vm.editor!.commands.setNodeSelection(0)
     await wrapper.vm.$nextTick()
-    expect(wrapper.get<HTMLInputElement>('input[type="checkbox"]').element.checked).toBe(true)
+    const trigger = wrapper.get('.ginko-settings button')
+    await trigger.trigger('click')
+    await flushPromises()
+    const panel = document.getElementById(trigger.attributes('aria-controls')!)
+    expect(panel).not.toBeNull()
+    const settings = new DOMWrapper(panel!)
+    expect(settings.get<HTMLInputElement>('input[type="checkbox"]').element.checked).toBe(true)
     for (const choice of [1, '1', false, 'false', '']) {
-      await wrapper.get('select').setValue(JSON.stringify(choice))
+      await settings.get('select').setValue(JSON.stringify(choice))
       expect((await wrapper.vm.flush()).ok).toBe(true)
       const output = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
       const parsed = await parseMdcDocument(output)

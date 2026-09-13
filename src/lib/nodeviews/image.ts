@@ -6,41 +6,48 @@ import type { NodeView } from '@tiptap/pm/view'
 import type { JsonRecord } from '../../types'
 import { icon } from './icons'
 import { inlinePopover } from './popover'
+import { createEditorText, type EditorMessageKey } from '../../ui/messages'
+import type { EditorOverlayController } from '../../ui/context'
 
 export type ImageActions = (props: JsonRecord) => { replace?: () => void; metadata?: () => void }
 
-export function imageView({ node: initial, editor, getPos }: NodeViewRendererProps, getActions?: ImageActions): NodeView {
+export function imageView({ node: initial, editor, getPos }: NodeViewRendererProps, getActions?: ImageActions, overlay?: EditorOverlayController): NodeView {
+  const text = overlay?.text ?? createEditorText()
   let node = initial
   const dom = document.createElement('figure')
   dom.className = 'ginko-image'
   const picture = document.createElement('div')
   picture.className = 'ginko-image__picture'
-  const settings = inlinePopover('Image settings', 'settings')
+  const settings = inlinePopover(text('imageSettings'), 'settings', overlay)
   const fields = document.createElement('div')
   fields.className = 'ginko-editor__fields'
   const altLabel = document.createElement('label'), altText = document.createElement('span'), alt = document.createElement('input')
-  altText.textContent = 'Image description'; alt.type = 'text'; alt.setAttribute('aria-label', 'Image description')
+  alt.type = 'text'
   altLabel.append(altText, alt); fields.append(altLabel); settings.panel.append(fields)
   function select() {
     const pos = getPos()
     if (pos !== undefined && editor.isEditable) editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)))
   }
   settings.dom.addEventListener('focusin', select)
+  settings.panel.addEventListener('focusin', select)
   alt.addEventListener('input', () => {
     const pos = getPos()
     if (pos !== undefined && editor.isEditable) editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, props: { ...node.attrs.props, alt: alt.value } }))
   })
-  settings.dom.addEventListener('keydown', event => {
+  const handleUndo = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) editor.commands.redo(); else editor.commands.undo() }
-  })
-  function action(label: string, symbol: 'settings' | 'copy' | 'trash', run: () => void) {
-    const button = document.createElement('button'); button.type = 'button'; button.append(icon(symbol), document.createTextNode(label)); button.setAttribute('aria-label', label)
+  }
+  settings.dom.addEventListener('keydown', handleUndo)
+  settings.panel.addEventListener('keydown', handleUndo)
+  const actionLabels: { button: HTMLButtonElement; label: Text; key: EditorMessageKey }[] = []
+  function action(key: EditorMessageKey, symbol: 'settings' | 'copy' | 'trash', run: () => void) {
+    const button = document.createElement('button'); button.type = 'button'; const label = document.createTextNode(text(key)); button.append(icon(symbol), label); button.setAttribute('aria-label', text(key)); actionLabels.push({ button, label, key })
     button.addEventListener('click', () => { if (!editor.isEditable) return; select(); settings.close(); run() })
     settings.panel.append(button); return button
   }
-  const replace = action('Replace image', 'copy', () => getActions?.(node.attrs.props).replace?.())
-  const metadata = action('Image metadata', 'settings', () => getActions?.(node.attrs.props).metadata?.())
-  action('Remove image', 'trash', () => {
+  const replace = action('replaceImage', 'copy', () => getActions?.(node.attrs.props).replace?.())
+  const metadata = action('imageMetadata', 'settings', () => getActions?.(node.attrs.props).metadata?.())
+  action('removeImage', 'trash', () => {
     const pos = getPos()
     if (pos !== undefined) editor.view.dispatch(closeHistory(editor.state.tr).delete(pos, pos + node.nodeSize))
     editor.view.focus()
@@ -61,6 +68,8 @@ export function imageView({ node: initial, editor, getPos }: NodeViewRendererPro
     } else picture.replaceChildren(next)
   }
   function render() {
+    settings.setLabel(text('imageSettings')); altText.textContent = text('imageDescription'); alt.setAttribute('aria-label', text('imageDescription'))
+    actionLabels.forEach(({ button, label, key }) => { label.data = text(key); button.setAttribute('aria-label', text(key)) })
     paint()
     alt.value = typeof node.attrs.props.alt === 'string' ? node.attrs.props.alt : ''
     settings.dom.hidden = !editor.isEditable
@@ -73,7 +82,7 @@ export function imageView({ node: initial, editor, getPos }: NodeViewRendererPro
   return {
     dom,
     update(next) { if (next.type !== node.type) return false; node = next; render(); return true },
-    stopEvent(event) { return event.target instanceof globalThis.Node && settings.dom.contains(event.target) },
+    stopEvent(event) { return event.target instanceof globalThis.Node && settings.contains(event.target) },
     ignoreMutation: () => true,
     destroy() { settings.destroy(); editor.off('transaction', render); editor.off('update', render) },
   }

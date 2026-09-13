@@ -2,6 +2,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { AssetInfo, ImageUploadHandler } from '../src/types'
 
 beforeAll(() => {
@@ -85,6 +86,20 @@ describe('inline image uploads', () => {
     expect(source).toContain('/saved-photo'); expect(source).not.toContain('blob:'); expect(source).not.toContain('cdn.test')
   })
 
+  it('refreshes a completed asset URL in place without adding an undo step', async () => {
+    const wrapper = await mountEditor(async () => ({ id: '/stored-photo', alt: 'Keep this description' }))
+    await wrapper.setProps({ assetProvider: { buildUrl: () => '/first-display.png', parseUrl: () => null } })
+    const editor = wrapper.vm.editor!, before = editor.state.doc
+    await add(wrapper); await choose(wrapper)
+    const image = wrapper.get('.ginko-image img').element, uploaded = editor.state.doc
+    await wrapper.setProps({ assetProvider: { buildUrl: () => '/refreshed-display.png', parseUrl: () => null } })
+    expect(wrapper.get('.ginko-image img').element).toBe(image)
+    expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/refreshed-display.png')
+    expect(editor.state.doc).toBe(uploaded)
+    expect(editor.state.doc.child(1).attrs.props).toMatchObject({ id: '/stored-photo', alt: 'Keep this description' })
+    editor.commands.undo(); expect(editor.state.doc.eq(before)).toBe(true)
+  })
+
   it('validates dropped files and allows retry after a host failure', async () => {
     const upload = vi.fn<ImageUploadHandler>().mockRejectedValueOnce(new Error('Storage is full.')).mockResolvedValue({ url: '/retried.png' })
     const wrapper = await mountEditor(upload); await add(wrapper)
@@ -154,6 +169,75 @@ describe('inline image uploads', () => {
     task.resolve({ url: '/stale.png' }); await flushPromises()
     expect(editor.state.doc.firstChild!.type.name).toBe('paragraph')
     expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+  })
+
+  it('closes competing settings for replacement and aborts replacement when another surface opens', async () => {
+    const task = deferred(); let signal: AbortSignal | undefined
+    const wrapper = await mountEditor((_file, context) => { signal = context.signal; return task.promise }), editor = wrapper.vm.editor!
+    wrapper.vm.insertImageAsset({ url: '/original.png', alt: 'Original' }); await flushPromises()
+    const original = editor.state.doc, image = wrapper.get('.ginko-image img').element
+    await wrapper.get('button[aria-label="Image settings"]').trigger('click'); await flushPromises()
+    expect(wrapper.find('input[aria-label="Image description"]').exists()).toBe(true)
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } }); await flushPromises()
+    expect(wrapper.find('input[aria-label="Image description"]').exists()).toBe(false)
+    expect(wrapper.find('[data-replacement]').exists()).toBe(true)
+    expect(editor.view.dom.contains(wrapper.get('[data-replacement]').element)).toBe(false)
+    await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
+    await wrapper.get('button[aria-label="Image settings"]').trigger('click'); await flushPromises()
+    expect(signal?.aborted).toBe(true)
+    expect(wrapper.find('[data-replacement]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="Image description"]').exists()).toBe(true)
+    task.resolve({ url: '/stale.png' }); await flushPromises()
+    expect(editor.state.doc).toBe(original)
+    expect(wrapper.get('.ginko-image img').element).toBe(image)
+    expect(wrapper.vm.hasPendingChanges()).toBe(false)
+  })
+
+  it('keeps the original image and replacement surface through failure and retry', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockRejectedValueOnce(new Error('Storage is full.')).mockResolvedValueOnce({ url: '/retry.png' })
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    wrapper.vm.insertImageAsset({ url: '/original.png' }); await flushPromises()
+    const original = editor.state.doc
+    editor.commands.setNodeSelection(0); await add(wrapper); await choose(wrapper)
+    expect(editor.state.doc).toBe(original)
+    expect(wrapper.get('[data-replacement]').text()).toContain('Storage is full.')
+    expect(upload.mock.calls[0]?.[1].signal.aborted).toBe(true)
+    await choose(wrapper)
+    expect(upload.mock.calls[1]?.[1].signal.aborted).toBe(false)
+    expect(wrapper.find('[data-replacement]').exists()).toBe(false)
+    expect(editor.state.doc.firstChild!.attrs.props.src).toBe('/retry.png')
+    editor.commands.undo(); expect(editor.state.doc.eq(original)).toBe(true)
+    // Success releases ownership, so the next surface is usable normally.
+    await wrapper.get('button[aria-label="Image settings"]').trigger('click'); await flushPromises()
+    expect(wrapper.find('input[aria-label="Image description"]').exists()).toBe(true)
+  })
+
+  it('aborts when the editor becomes non-editable outside the component prop API', async () => {
+    const task = deferred(); let signal: AbortSignal | undefined
+    const wrapper = await mountEditor((_file, context) => { signal = context.signal; return task.promise }), editor = wrapper.vm.editor!
+    await add(wrapper); await choose(wrapper)
+    editor.setEditable(false); await flushPromises()
+    expect(signal?.aborted).toBe(true)
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    task.resolve({ url: '/stale.png' }); await flushPromises()
+    expect(editor.state.doc.textContent).toBe('FirstSecond')
+  })
+
+  it('keeps pending uploads and drop listeners alive when another plugin is registered or removed', async () => {
+    const task = deferred(); let signal: AbortSignal | undefined
+    const wrapper = await mountEditor((_file, context) => { signal = context.signal; return task.promise }), editor = wrapper.vm.editor!
+    await add(wrapper); await choose(wrapper)
+    const pluginKey = new PluginKey('uploadLifecycleTest')
+    editor.registerPlugin(new Plugin({ key: pluginKey })); await flushPromises()
+    expect(signal?.aborted).toBe(false)
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(true)
+    expect(wrapper.vm.hasPendingChanges()).toBe(true)
+    editor.unregisterPlugin(pluginKey); await flushPromises()
+    expect(signal?.aborted).toBe(false)
+    task.resolve({ url: '/after-reconfigure.png' }); await flushPromises()
+    expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/after-reconfigure.png')
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    expect(wrapper.get('[data-replacement]').text()).toContain('Replace this image?')
   })
 
   it('keeps Add and Replace distinct at the same document boundary', async () => {

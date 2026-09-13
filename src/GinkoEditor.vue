@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { closeHistory } from '@tiptap/pm/history'
+import type { Selection } from '@tiptap/pm/state'
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, useId, watch } from 'vue'
 
 import type { AuthoringKitV1, AuthoringRecipeV1 } from './authoring'
 import { createEditorExtensions, isCurrentlyNormalizingTable, normalizeTableCells } from './lib/config/editorConfig'
@@ -17,17 +17,27 @@ import type {
   EditorFlushResult,
   VideoInfo,
   ImageUploadHandler,
+  ImagePicker,
 } from './types'
-import { parentColumnConfig } from './lib/nodeviews/columns'
-import { actOnBlock } from './lib/nodeviews/block-actions'
 import GinkoToolbar from './ui/GinkoToolbar.vue'
+import GinkoSelectionToolbar from './ui/GinkoSelectionToolbar.vue'
+import GinkoBlockControls from './ui/GinkoBlockControls.vue'
+import { observeEditorOperations, waitForEditorOperations, type BlockMovementContext } from './lib/block-movement'
+import { useEditorActions, handleActionShortcut, hasCustomActionShortcut, matchesShortcut, type EditorMessages, type EditorShortcuts, type EditorToolbarGroup } from './ui/commands'
+import { createEditorOverlayController, editorOverlayKey } from './ui/context'
 import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
+import { runRecipeCommand } from './ui/recipe-command'
 
 defineOptions({ name: 'GinkoEditor' })
 
 const props = withDefaults(defineProps<{
+  toolbarItems?: readonly EditorToolbarGroup[]
+  messages?: EditorMessages
+  shortcuts?: EditorShortcuts
+  overlayContainer?: globalThis.HTMLElement
   imageDropTarget?: globalThis.HTMLElement
   imageUpload?: ImageUploadHandler
+  imagePicker?: ImagePicker
   ariaLabel?: string
   assetProvider?: AssetProvider
   authoringKit?: AuthoringKitV1
@@ -47,6 +57,11 @@ const props = withDefaults(defineProps<{
   videoOutput?: 'html' | 'mdc'
 }>(), {
   codeBlockTheme: 'github-dark',
+  toolbarItems: undefined,
+  messages: undefined,
+  shortcuts: undefined,
+  overlayContainer: undefined,
+  imagePicker: undefined,
   ariaLabel: undefined,
   assetProvider: undefined,
   imageUpload: undefined,
@@ -83,8 +98,9 @@ const conversionError = ref<ConversionErrorPayload | null>(null)
 const clipboardError = ref<string>()
 const hasPendingVisualChanges = ref(false)
 const pendingImages = ref(0)
+const pendingCommands = ref(0)
 const imageUploadNotice = ref('')
-const hasPendingChanges = computed(() => hasPendingVisualChanges.value || pendingImages.value > 0)
+const hasPendingChanges = computed(() => hasPendingVisualChanges.value || pendingImages.value > 0 || pendingCommands.value > 0)
 let pendingEcho: string | undefined
 let revision = 0
 let syncTimer: ReturnType<typeof globalThis.setTimeout> | undefined
@@ -92,6 +108,8 @@ let pendingVisualUpdate: Promise<EditorFlushResult> | undefined
 let disposed = false
 let applyingDocument = false
 const selectionRevision = ref(0)
+const blockControls = ref<InstanceType<typeof GinkoBlockControls>>()
+const insertOverlayOwner = {}
 const insertMenuOpen = ref(false)
 const insertMenuOrigin = ref<'button' | 'slash'>('button')
 const insertQuery = ref('')
@@ -104,6 +122,8 @@ type BrowserKeyboardEvent = InstanceType<typeof globalThis.KeyboardEvent>
 const insertSearch = ref<BrowserInputElement>()
 const insertMenuId = useId()
 const editorRoot = ref<InstanceType<typeof globalThis.HTMLElement>>()
+const overlays = createEditorOverlayController({ getContainer: () => props.overlayContainer ?? editorRoot.value, getThemeElement: () => editorRoot.value, getMessages: () => props.messages })
+provide(editorOverlayKey, overlays)
 const insertMenu = ref<InstanceType<typeof globalThis.HTMLElement>>()
 let menuResizeObserver: InstanceType<typeof globalThis.ResizeObserver> | undefined
 watch(insertMenu, (element) => {
@@ -111,7 +131,7 @@ watch(insertMenu, (element) => {
   if (element) menuResizeObserver?.observe(element)
 })
 const insertPosition = ref({ left: '8px', top: '48px', maxHeight: '420px' })
-let insertSelection: { from: number; to: number } | undefined
+let insertSelection: Selection | undefined
 
 const outputOptions = computed(() => ({
   enableDebug: props.enableDebug,
@@ -129,6 +149,8 @@ const editor = useEditor({
   editable: !props.disabled,
   editorProps: { attributes: { 'aria-label': props.ariaLabel ?? 'Content' } },
   extensions: createEditorExtensions({
+    overlay: overlays,
+    getMessages: () => props.messages,
     assetProvider: {
       buildUrl: asset => resolvedAssetProvider.value.buildUrl(asset),
       parseUrl: url => resolvedAssetProvider.value.parseUrl(url),
@@ -145,6 +167,7 @@ const editor = useEditor({
     onCopyError: message => { clipboardError.value = message },
     getImageDropTarget: () => props.imageDropTarget,
     getImageUpload: () => props.imageUpload,
+    getImagePicker: () => props.imagePicker,
     canUploadImage: () => canMutateVisualContent(props.enableImages),
     insertUploadedImage: insertUploadedImageAt,
     onImageUploadPending: count => { pendingImages.value = count; if (!count) imageUploadNotice.value = '' },
@@ -163,12 +186,29 @@ const editor = useEditor({
   }),
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
-    if (!isCurrentlyNormalizingTable() && normalizeTableCells(instance)) return
+    if (transaction.docChanged && insertMenuOpen.value) closeInsertMenu(false)
+    if (!isCurrentlyNormalizingTable(instance) && normalizeTableCells(instance)) return
     if (!applyingDocument && transaction.docChanged) scheduleVisualUpdate(instance)
   },
   onSelectionUpdate: () => {
     selectionRevision.value += 1
   },
+})
+
+watch(editor, (instance, _, cleanup) => {
+  pendingCommands.value = 0
+  if (instance) cleanup(observeEditorOperations(instance, count => { pendingCommands.value = count }))
+}, { immediate: true, flush: 'sync' })
+
+const movementContext: BlockMovementContext = { getAuthoringKit: () => props.authoringKit, getOutputOptions: () => outputOptions.value, canMutate: () => canMutateVisualContent() }
+const actions = useEditorActions(editor, {
+  enabled: () => canMutateVisualContent(),
+  messages: () => props.messages,
+  shortcuts: () => props.shortcuts,
+  image: requestImage, file: requestFile, video: requestVideo,
+  insert: () => { void openInsertMenu('button') },
+  mediaEnabled: kind => kind === 'image' ? props.enableImages : kind === 'file' ? props.enableFiles : props.enableVideo,
+  context: movementContext,
 })
 
 const filteredRecipes = computed(() => {
@@ -187,41 +227,6 @@ watch(filteredRecipes, () => {
   insertIndex.value = Math.min(insertIndex.value, Math.max(0, filteredRecipes.value.length - 1))
 })
 
-function currentElement(instance: TiptapEditor, trackedRevision = 0) {
-  const selection = instance.state.selection as typeof instance.state.selection & {
-    node?: ProseMirrorNode
-  }
-  if (selection.node?.type.name === 'element') {
-    return { node: selection.node, pos: selection.from, trackedRevision }
-  }
-  for (let depth = selection.$from.depth; depth > 0; depth -= 1) {
-    const node = selection.$from.node(depth)
-    if (node.type.name === 'element') {
-      return { node, pos: selection.$from.before(depth), trackedRevision }
-    }
-  }
-  return undefined
-}
-
-const selectedComponent = computed(() => {
-  const instance = editor.value
-  const kit = props.authoringKit
-  if (!instance || !kit) return undefined
-  const selected = currentElement(instance, selectionRevision.value)
-  const tag = selected?.node.attrs.tag
-  if (!selected || typeof tag !== 'string') return undefined
-  const metadata = kit.authoring[tag]
-  const definition = kit.policy.components[tag]
-  if (!metadata || !definition) return undefined
-  return {
-    ...selected,
-    definition,
-    description: metadata.description,
-    label: metadata.label,
-    tag,
-  }
-})
-
 const activeRecipe = computed(() => filteredRecipes.value[insertIndex.value])
 watch([insertQuery, activeRecipe], () => { void nextTick(positionInsertMenu) })
 
@@ -229,6 +234,7 @@ function positionInsertMenu() {
   const instance = editor.value
   const root = editorRoot.value
   if (!instance || !root || !insertMenuOpen.value) return
+  if (insertSelection?.$from.doc !== instance.state.doc) { closeInsertMenu(false); return }
   const bounds = root.getBoundingClientRect()
   const anchor = insertMenuOrigin.value === 'slash'
     ? instance.view.coordsAtPos(insertSelection?.from ?? instance.state.selection.from)
@@ -240,8 +246,8 @@ function positionInsertMenu() {
   const height = Math.min(insertMenu.value?.getBoundingClientRect().height || available, available)
   const top = opensAbove ? Math.max(12, anchor.top - height - 8) : anchor.bottom + 8
   insertPosition.value = {
-    left: `${Math.max(8 - bounds.left, Math.min(anchor.left, globalThis.innerWidth - (insertMenu.value?.getBoundingClientRect().width || 320) - 12) - bounds.left)}px`,
-    top: `${top - bounds.top}px`,
+    left: `${Math.max(8, Math.min(anchor.left, globalThis.innerWidth - (insertMenu.value?.getBoundingClientRect().width || 320) - 12))}px`,
+    top: `${top}px`,
     maxHeight: `${available}px`,
   }
 }
@@ -261,11 +267,12 @@ function canOpenSlashMenu(instance: TiptapEditor) {
 async function openInsertMenu(origin: 'button' | 'slash') {
   const instance = editor.value
   if (!instance || !canMutateVisualContent()) return
-  insertSelection = { from: instance.state.selection.from, to: instance.state.selection.to }
+  insertSelection = instance.state.selection
   insertMenuOrigin.value = origin
   insertQuery.value = ''
   insertIndex.value = 0
   insertError.value = null
+  overlays.open(insertOverlayOwner, () => closeInsertMenu(false))
   insertMenuOpen.value = true
   const openingSelection = insertSelection
   await nextTick()
@@ -276,14 +283,15 @@ async function openInsertMenu(origin: 'button' | 'slash') {
 
 function restoreInsertSelection(selection = insertSelection) {
   const instance = editor.value
-  if (!instance || !selection) return
-  instance.chain().setTextSelection(selection).run()
+  if (!instance || !selection || selection.$from.doc !== instance.state.doc) return
+  instance.view.dispatch(instance.state.tr.setSelection(selection))
   instance.view.focus()
 }
 
 function closeInsertMenu(restore = true) {
   const selection = insertSelection
   insertMenuOpen.value = false
+  overlays.release(insertOverlayOwner)
   insertQuery.value = ''
   insertError.value = null
   insertSelection = undefined
@@ -295,61 +303,6 @@ function moveInsertSelection(offset: number) {
   if (!count) return
   insertIndex.value = (insertIndex.value + offset + count) % count
   void nextTick(() => insertMenu.value?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }))
-}
-
-function parentComponentTag(instance: TiptapEditor): string | undefined {
-  const resolved = instance.state.selection.$from
-  for (let depth = resolved.depth; depth > 0; depth -= 1) {
-    const node = resolved.node(depth)
-    if (node.type.name === 'element' && typeof node.attrs.tag === 'string') {
-      return node.attrs.tag
-    }
-  }
-  return undefined
-}
-
-function placementError(instance: TiptapEditor, document: JSONContent): string | undefined {
-  const kit = props.authoringKit
-  if (!kit) return undefined
-  const parent = parentComponentTag(instance)
-  const parentPolicy = parent ? kit.policy.components[parent] : undefined
-  for (const node of document.content ?? []) {
-    const tag = node.type === 'element' && typeof node.attrs?.tag === 'string' ? node.attrs.tag : undefined
-    if (!tag) continue
-    const policy = kit.policy.components[tag]
-    if (!policy) return `${tag} is not registered in this editor.`
-    if (policy.allowedParents && (!parent || !policy.allowedParents.includes(parent))) {
-      return `${tag} cannot be inserted here.`
-    }
-    if (parentPolicy?.allowedChildren && !parentPolicy.allowedChildren.includes(tag)) {
-      return `${tag} is not allowed inside ${parent}.`
-    }
-  }
-  return undefined
-}
-
-function moveSelectedComponent(offset: -1 | 1) {
-  const instance = editor.value, selected = selectedComponent.value
-  if (instance && selected && !props.disabled) actOnBlock(instance, selected.node, selected.pos, offset < 0 ? 'up' : 'down')
-}
-function duplicateSelectedComponent() {
-  const instance = editor.value, selected = selectedComponent.value
-  if (instance && selected && !props.disabled && !parentColumnConfig(instance.state.doc, selected.pos, props.authoringKit)) actOnBlock(instance, selected.node, selected.pos, 'duplicate')
-}
-
-function handleComponentShortcut(event: BrowserKeyboardEvent) {
-  if (!event.altKey || !selectedComponent.value) return false
-  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-    event.preventDefault()
-    moveSelectedComponent(event.key === 'ArrowUp' ? -1 : 1)
-    return true
-  }
-  if (event.shiftKey && event.key.toLocaleLowerCase() === 'd') {
-    event.preventDefault()
-    duplicateSelectedComponent()
-    return true
-  }
-  return false
 }
 
 function isAtComponentBoundary(instance: TiptapEditor, direction: 'end' | 'start') {
@@ -385,8 +338,8 @@ function protectComponentBoundary(instance: TiptapEditor, event: BrowserKeyboard
 async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
   const instance = editor.value
   if (!recipe || !instance || !insertSelection || insertBusy.value) return
-  const documentAtStart = instance.state.doc
   const selectionAtStart = insertSelection
+  if (selectionAtStart.$from.doc !== instance.state.doc) { closeInsertMenu(false); return }
   if (isImageRecipe(recipe)) {
     restoreInsertSelection()
     closeInsertMenu(false)
@@ -396,26 +349,15 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
   insertBusy.value = true
   insertError.value = null
   try {
-    const prepared = await prepareMarkdownForVisualEditing(
-      recipe.source,
-      outputOptions.value,
-      instance.schema,
-      props.authoringKit,
-    )
-    if (disposed || !insertMenuOpen.value || insertSelection !== selectionAtStart || instance.state.doc !== documentAtStart || !canMutateVisualContent()) return
-    if (!prepared.ok || !prepared.value) {
-      insertError.value = 'This block cannot be prepared safely.'
-      return
-    }
-    const reason = placementError(instance, prepared.value)
-    if (reason) {
-      insertError.value = reason
-      return
-    }
-    const content = prepared.value.content ?? []
-    instance.chain().setTextSelection(insertSelection).focus().insertContent(content).run()
-    closeInsertMenu(false)
-    instance.view.focus()
+    restoreInsertSelection(selectionAtStart)
+    const result = await runRecipeCommand(instance, recipe, {
+      ...movementContext,
+      canMutate: () => !disposed && insertMenuOpen.value && insertSelection === selectionAtStart && canMutateVisualContent(),
+    })
+    if (disposed) return
+    if (result.ok) { closeInsertMenu(false); instance.view.focus(); return }
+    if (!insertMenuOpen.value || insertSelection !== selectionAtStart) return
+    if (result.reason !== 'stale') insertError.value = 'This block cannot be inserted safely here.'
   } finally {
     insertBusy.value = false
   }
@@ -448,10 +390,14 @@ function handleInsertKeys(event: BrowserKeyboardEvent) {
 function handleEditorKeydown(event: BrowserKeyboardEvent) {
   const instance = editor.value
   if (!instance || event.isComposing) return
+  if (hasCustomActionShortcut(event, props.shortcuts) && handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
+  const customBlockShortcut = (['moveUp', 'moveDown', 'blockMenu', 'duplicate'] as const).some(key => typeof props.shortcuts?.[key] === 'string' && matchesShortcut(event, props.shortcuts[key]))
+  if (customBlockShortcut && !insertMenuOpen.value && blockControls.value?.handleKeydown(event)) return
+  if (handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
   if (protectComponentBoundary(instance, event)) return
-  if (handleComponentShortcut(event)) return
+  if (!insertMenuOpen.value && blockControls.value?.handleKeydown(event)) return
   if (!insertMenuOpen.value) {
-    if (event.key !== '/' || !canOpenSlashMenu(instance)) return
+    if (event.metaKey || event.ctrlKey || event.altKey || event.key !== '/' || !canOpenSlashMenu(instance)) return
     event.preventDefault()
     void openInsertMenu('slash')
     return
@@ -584,9 +530,11 @@ async function emitVisualDocument(
 }
 
 async function flush(): Promise<EditorFlushResult> {
+  const currentEditor = editor.value
+  if (currentEditor) await waitForEditorOperations(currentEditor)
   if (viewMode.value === 'raw') return { emitted: false, ok: true }
   if (pendingImages.value) {
-    imageUploadNotice.value = 'Finish or remove the image upload before leaving the editor.'
+    imageUploadNotice.value = overlays.text('finishImageUpload')
     return { ok: false, error: { code: 'image_upload_pending', phase: 'validate', message: imageUploadNotice.value, recoverable: true, traceId: 'image-upload', issues: [], timeline: [] } }
   }
 
@@ -618,7 +566,10 @@ async function flush(): Promise<EditorFlushResult> {
     if (currentRevision !== revision) continue
   }
 
-  if (pendingImages.value) return flush()
+  if (pendingImages.value || pendingCommands.value) {
+    const result = await flush()
+    return result.ok ? { ok: true, emitted: emitted || result.emitted } : result
+  }
   if (conversionError.value) return { error: conversionError.value, ok: false }
   return { emitted, ok: true }
 }
@@ -626,6 +577,7 @@ async function flush(): Promise<EditorFlushResult> {
 async function showSource() {
   const result = await flush()
   if (!result.ok || disposed) return
+  overlays.close()
   closeInsertMenu(false)
   viewMode.value = 'raw'
 }
@@ -733,7 +685,7 @@ function createAssetRequest<T>(complete: (value: T) => boolean): EditorAssetRequ
 
 function requestImage() {
   if (!canMutateVisualContent(props.enableImages)) return
-  if (props.imageUpload) { editor.value?.commands.insertImageUpload(); return }
+  if (props.imageUpload || props.imagePicker) { editor.value?.commands.insertImageUpload(); return }
   emit('request-image', createAssetRequest(insertImageAsset))
 }
 
@@ -759,11 +711,11 @@ let assetContextRevision = 0
 watch([viewMode, () => props.disabled, () => props.enableImages, () => props.enableFiles, () => props.enableVideo, () => props.assetProvider], () => {
   assetContextRevision += 1
 }, { flush: 'sync' })
-watch([() => props.imageDropTarget, () => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages], () => {
+watch([() => props.imageDropTarget, () => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages, () => props.messages], () => {
   const instance = editor.value
   if (instance && !instance.isDestroyed) instance.view.dispatch(instance.state.tr)
-})
-watch([() => props.imageUpload, () => props.disabled, () => props.enableImages, () => props.assetProvider, () => props.authoringKit], () => { editor.value?.commands.clearImageUploads() }, { flush: 'sync' })
+}, { deep: true })
+watch([() => props.imageUpload, () => props.imagePicker, () => props.disabled, () => props.enableImages, () => props.assetProvider, () => props.authoringKit], () => { editor.value?.commands.clearImageUploads() }, { flush: 'sync' })
 watch(() => props.disabled, (disabled) => {
   editor.value?.setEditable(!disabled)
   if (disabled) closeInsertMenu(false)
@@ -789,14 +741,15 @@ onBeforeUnmount(() => {
   globalThis.removeEventListener('scroll', positionInsertMenu, true)
   menuResizeObserver?.disconnect()
   disposed = true
+  overlays.destroy()
   cancelPendingUpdate()
   editor.value?.destroy()
 })
 
 const statusLabel = computed(() => {
-  if (conversionError.value) return viewMode.value === 'visual' ? 'Changes need attention' : 'Source only'
-  if (hasPendingVisualChanges.value) return 'Converting changes'
-  return viewMode.value === 'visual' ? 'Visual editor' : 'Markdown source'
+  if (conversionError.value) return overlays.text(viewMode.value === 'visual' ? 'changesNeedAttention' : 'sourceOnly')
+  if (hasPendingVisualChanges.value) return overlays.text('convertingChanges')
+  return overlays.text(viewMode.value === 'visual' ? 'visualEditor' : 'markdownSource')
 })
 
 defineExpose({
@@ -826,16 +779,16 @@ defineExpose({
         type="button"
         :aria-controls="insertMenuId"
         :aria-expanded="insertMenuOpen"
-        aria-label="Insert block"
+        :aria-label="actions.text('insert')"
         :disabled="disabled"
         @click="insertMenuOpen ? closeInsertMenu() : openInsertMenu('button')"
       >
         <span aria-hidden="true">+</span>
-        <span>Insert</span>
+        <span>{{ actions.text('insertShort') }}</span>
       </button>
       <div
         class="ginko-editor__modes"
-        aria-label="Editing mode"
+        :aria-label="actions.text('editingMode')"
       >
         <button
           type="button"
@@ -843,7 +796,7 @@ defineExpose({
           :disabled="disabled"
           @click="showVisual"
         >
-          Visual
+          {{ actions.text('visual') }}
         </button>
         <button
           type="button"
@@ -851,7 +804,7 @@ defineExpose({
           :disabled="disabled"
           @click="showSource"
         >
-          Markdown
+          {{ actions.text('markdown') }}
         </button>
       </div>
       <span
@@ -859,83 +812,87 @@ defineExpose({
         role="status"
       >{{ statusLabel }}</span>
     </div>
-    <div
+    <Teleport
       v-if="insertMenuOpen"
-      ref="insertMenu"
-      class="ginko-editor__insert-menu"
-      :class="{ 'ginko-editor__insert-menu--preview': activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview'] }"
-      :style="insertPosition"
-      @keydown="handleInsertSearchKeydown"
+      :to="overlays.getContainer()!"
     >
-      <label class="ginko-editor__insert-search">
-        <span aria-hidden="true">/</span>
-        <span class="ginko-editor__sr-only">Search blocks</span>
-        <input
-          ref="insertSearch"
-          v-model="insertQuery"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded="true"
-          :aria-controls="insertMenuId"
-          :aria-activedescendant="activeRecipe ? `${insertMenuId}-${insertIndex}` : undefined"
-          autocomplete="off"
-          placeholder="Search blocks"
-        >
-      </label>
       <div
-        :id="insertMenuId"
-        class="ginko-editor__insert-results"
-        role="listbox"
-        aria-label="Available blocks"
+        ref="insertMenu"
+        class="ginko-editor__insert-menu"
+        :class="{ 'ginko-editor__insert-menu--preview': activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview'] }"
+        :style="insertPosition"
+        @keydown="handleInsertSearchKeydown"
       >
-        <button
-          v-for="(recipe, index) in filteredRecipes"
-          :id="`${insertMenuId}-${index}`"
-          :key="`${index}-${recipe.id}`"
-          tabindex="-1"
-          type="button"
-          role="option"
-          :aria-selected="index === insertIndex"
-          @mouseenter="insertIndex = index"
-          @click="insertRecipe(recipe)"
+        <label class="ginko-editor__insert-search">
+          <span aria-hidden="true">/</span>
+          <span class="ginko-editor__sr-only">{{ actions.text('searchBlocks') }}</span>
+          <input
+            ref="insertSearch"
+            v-model="insertQuery"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            :aria-controls="insertMenuId"
+            :aria-activedescendant="activeRecipe ? `${insertMenuId}-${insertIndex}` : undefined"
+            autocomplete="off"
+            :placeholder="actions.text('searchBlocks')"
+          >
+        </label>
+        <div
+          :id="insertMenuId"
+          class="ginko-editor__insert-results"
+          role="listbox"
+          :aria-label="actions.text('availableBlocks')"
         >
-          <span
-            class="ginko-editor__recipe-symbol"
-            aria-hidden="true"
-          >{{ recipeSymbol(recipe) }}</span>
-          <span class="ginko-editor__recipe-text"><strong>{{ recipe.label }}</strong><small>{{ recipe.description || (recipe.keywords?.length ? `/${recipe.keywords[0]}` : `Insert ${recipe.label.toLocaleLowerCase()}`) }}</small></span>
-          <span
-            v-if="index === insertIndex"
-            aria-hidden="true"
-          >↵</span>
-        </button>
+          <button
+            v-for="(recipe, index) in filteredRecipes"
+            :id="`${insertMenuId}-${index}`"
+            :key="`${index}-${recipe.id}`"
+            tabindex="-1"
+            type="button"
+            role="option"
+            :aria-selected="index === insertIndex"
+            @mouseenter="insertIndex = index"
+            @click="insertRecipe(recipe)"
+          >
+            <span
+              class="ginko-editor__recipe-symbol"
+              aria-hidden="true"
+            >{{ recipeSymbol(recipe) }}</span>
+            <span class="ginko-editor__recipe-text"><strong>{{ recipe.label }}</strong><small>{{ recipe.description || (recipe.keywords?.length ? `/${recipe.keywords[0]}` : `Insert ${recipe.label.toLocaleLowerCase()}`) }}</small></span>
+            <span
+              v-if="index === insertIndex"
+              aria-hidden="true"
+            >↵</span>
+          </button>
+          <p
+            v-if="filteredRecipes.length === 0"
+            class="ginko-editor__insert-empty"
+          >
+            {{ actions.text('noBlocks') }}
+          </p>
+        </div>
+        <div
+          v-if="activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview']"
+          class="ginko-editor__recipe-preview"
+        >
+          <slot
+            name="recipe-preview"
+            :recipe="activeRecipe"
+          />
+        </div>
         <p
-          v-if="filteredRecipes.length === 0"
-          class="ginko-editor__insert-empty"
+          v-if="insertError"
+          class="ginko-editor__insert-error"
+          role="alert"
         >
-          No matching blocks.
+          {{ insertError }}
+        </p>
+        <p class="ginko-editor__insert-help">
+          <span><kbd>↑</kbd><kbd>↓</kbd> {{ actions.text('navigate') }}</span><span><kbd>↵</kbd> {{ actions.text('insertHelp') }}</span><span><kbd>esc</kbd> {{ actions.text('closeHelp') }}</span>
         </p>
       </div>
-      <div
-        v-if="activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview']"
-        class="ginko-editor__recipe-preview"
-      >
-        <slot
-          name="recipe-preview"
-          :recipe="activeRecipe"
-        />
-      </div>
-      <p
-        v-if="insertError"
-        class="ginko-editor__insert-error"
-        role="alert"
-      >
-        {{ insertError }}
-      </p>
-      <p class="ginko-editor__insert-help">
-        <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> insert</span><span><kbd>esc</kbd> close</span>
-      </p>
-    </div>
+    </Teleport>
     <div
       v-if="clipboardError"
       class="ginko-editor__warning"
@@ -948,7 +905,7 @@ defineExpose({
       class="ginko-editor__warning"
       role="alert"
     >
-      <strong>{{ viewMode === 'visual' ? 'Your changes are still here. Correct the document or use Undo before switching modes.' : 'Visual editing is unavailable for this source.' }}</strong>
+      <strong>{{ actions.text(viewMode === 'visual' ? 'visualRecovery' : 'sourceUnavailable') }}</strong>
       <span>{{ conversionError.message }}</span>
     </div>
     <p
@@ -959,15 +916,28 @@ defineExpose({
       {{ imageUploadNotice }}
     </p>
     <template v-if="viewMode === 'visual' && editor">
-      <GinkoToolbar
+      <slot
+        v-if="!disabled"
+        name="toolbar"
+        :actions="actions"
+      >
+        <GinkoToolbar
+          :actions="actions"
+          :items="toolbarItems"
+        />
+      </slot>
+      <GinkoSelectionToolbar
         v-if="!disabled"
         :editor="editor"
-        :enable-files="enableFiles"
-        :enable-images="enableImages"
-        :enable-video="enableVideo"
-        @request-file="requestFile"
-        @request-image="requestImage"
-        @request-video="requestVideo"
+        :actions="actions"
+      />
+      <GinkoBlockControls
+        v-if="!disabled"
+        ref="blockControls"
+        :editor="editor"
+        :actions="actions"
+        :context="movementContext"
+        :shortcuts="shortcuts"
       />
       <div
         class="ginko-editor__surface-frame"
@@ -992,7 +962,7 @@ defineExpose({
 </template>
 
 <style scoped>
-.ginko-editor { --ginko-border: var(--border, #e5e5e3); --ginko-bg: var(--card, #fff); --ginko-muted: var(--muted, #f3f3f1); --ginko-muted-text: var(--muted-foreground, #6f6f6b); --ginko-text: var(--foreground, #292925); position: relative; overflow: visible; border: 1px solid var(--ginko-border); border-radius: .85rem; background: var(--ginko-bg); color: var(--ginko-text); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.ginko-editor { --ginko-border: var(--border, #e5e5e3); --ginko-bg: var(--background, #fff); --ginko-muted: var(--muted, #f3f3f1); --ginko-muted-text: var(--muted-foreground, #6f6f6b); --ginko-text: var(--foreground, #292925); position: relative; overflow: visible; border: 1px solid var(--ginko-border); border-radius: var(--radius, .625rem); background: var(--ginko-bg); color: var(--ginko-text); font-family: inherit; font-size: 14px; line-height: 1.5; }
 .ginko-editor button { min-height: 2.25rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; cursor: pointer; padding: .35rem .65rem; white-space: nowrap; }
 .ginko-editor button:hover, .ginko-editor button[aria-pressed='true'] { background: var(--ginko-muted); }
 .ginko-editor button:focus-visible, .ginko-editor input:focus-visible, .ginko-editor select:focus-visible, .ginko-editor textarea:focus-visible { outline-offset: 2px; }
@@ -1003,7 +973,7 @@ defineExpose({
 .ginko-editor__status { color: var(--ginko-muted-text); font-size: .78rem; white-space: nowrap; }
 .ginko-editor__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* The menu overlays the page without changing the writer's document geometry. */
-.ginko-editor__insert-menu { position: absolute; z-index: 50; display: flex; flex-direction: column; width: min(320px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--ginko-border); border-radius: .75rem; background: var(--ginko-bg); box-shadow: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06); padding: .35rem; }
+.ginko-editor__insert-menu { position: fixed; z-index: 50; display: flex; flex-direction: column; width: min(320px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--ginko-border); border-radius: .75rem; background: var(--ginko-bg); box-shadow: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06); padding: .35rem; }
 @media (min-width: 700px) {
   .ginko-editor__insert-menu--preview { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; width: min(620px, calc(100vw - 24px)); }
   .ginko-editor__insert-menu--preview .ginko-editor__insert-search, .ginko-editor__insert-menu--preview .ginko-editor__insert-results, .ginko-editor__insert-menu--preview .ginko-editor__insert-help, .ginko-editor__insert-menu--preview .ginko-editor__insert-error { grid-column: 1; }

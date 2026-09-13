@@ -36,22 +36,22 @@
 .ginko-editor .ginko-icon-button { box-sizing: border-box; display: inline-flex; flex: 0 0 auto; justify-content: center; align-items: center; width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 5px; list-style: none; background: transparent; color: var(--ginko-muted-text); cursor: pointer; }
 .ginko-editor .ginko-icon-button::-webkit-details-marker { display: none; }
 .ginko-editor .ginko-icon-button:hover, .ginko-editor .ginko-icon-button[aria-pressed='true'], .ginko-editor .ginko-popover[open] > .ginko-icon-button { background: var(--ginko-muted); color: var(--ginko-text); }
-.ginko-editor .ginko-settings > summary { opacity: .15; transition: opacity 120ms; }
-.ginko-editor .ginko-block:hover > .ginko-block__header > .ginko-settings > summary, .ginko-editor .ginko-block:focus-within > .ginko-block__header > .ginko-settings > summary, .ginko-editor .ginko-settings[open] > summary { opacity: 1; }
-.ginko-editor .ginko-popover__panel { position: fixed; z-index: 200; box-sizing: border-box; padding: .5rem; border: 1px solid var(--ginko-border); border-radius: .7rem; background: var(--ginko-bg); box-shadow: 0 8px 28px rgb(0 0 0 / .13), 0 2px 6px rgb(0 0 0 / .05); color: var(--ginko-text); overflow: auto; font: 13px/1.5 ui-sans-serif, system-ui, sans-serif; }
-.ginko-editor .ginko-popover__panel > strong { display: block; padding: .35rem .45rem .65rem; font-size: .8rem; }
-.ginko-editor .ginko-popover__panel button { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 32px; padding: .35rem .5rem; border: 0; border-radius: .3rem; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.ginko-editor .ginko-popover__panel button:hover { background: var(--ginko-muted); }
-.ginko-editor .ginko-popover__panel button:disabled { opacity: .4; cursor: default; }
-.ginko-editor .ginko-popover__panel button.ginko-danger { color: #c25245; }
-.ginko-editor .ginko-editor__fields { display: grid; gap: .7rem; padding: 0 .4rem .5rem; }
-.ginko-editor .ginko-editor__fields label { display: grid; gap: .2rem; }
-.ginko-editor .ginko-editor__fields label > span { color: var(--ginko-muted-text); font-size: .72rem; }
-.ginko-editor .ginko-editor__fields input:not([type='checkbox']), .ginko-editor .ginko-editor__fields select { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--ginko-border); border-radius: .35rem; padding: .35rem .5rem; background: var(--ginko-bg); color: inherit; font: inherit; }
-.ginko-editor .ginko-editor__fields input[type='checkbox'] { accent-color: var(--ginko-text); width: 15px; height: 15px; }
-.ginko-editor .ginko-editor__fields small { color: var(--ginko-muted-text); font-size: .7rem; }
-.ginko-editor .ginko-editor__block-actions { border-top: 1px solid var(--ginko-border); padding-top: .35rem; margin-top: .3rem; }
-.ginko-editor .ginko-editor__field-error { font-size: .72rem; color: #b34c3b; padding: .3rem .4rem; margin: 0; }
+.ginko-editor .ginko-settings > .ginko-icon-button { opacity: .15; transition: opacity 120ms; }
+.ginko-editor .ginko-block:hover > .ginko-block__header > .ginko-settings > .ginko-icon-button, .ginko-editor .ginko-block:focus-within > .ginko-block__header > .ginko-settings > .ginko-icon-button, .ginko-editor .ginko-settings[data-state='open'] > summary { opacity: 1; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel { position: fixed; z-index: 200; box-sizing: border-box; padding: .5rem; border: 1px solid var(--ginko-border); border-radius: .7rem; background: var(--ginko-bg); box-shadow: 0 8px 28px rgb(0 0 0 / .13), 0 2px 6px rgb(0 0 0 / .05); color: var(--ginko-text); overflow: auto; font: 13px/1.5 ui-sans-serif, system-ui, sans-serif; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel > strong { display: block; padding: .35rem .45rem .65rem; font-size: .8rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel button { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 32px; padding: .35rem .5rem; border: 0; border-radius: .3rem; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel button:hover { background: var(--ginko-muted); }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel button:disabled { opacity: .4; cursor: default; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel button.ginko-danger { color: #c25245; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields { display: grid; gap: .7rem; padding: 0 .4rem .5rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields label { display: grid; gap: .2rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields label > span { color: var(--ginko-muted-text); font-size: .72rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields input:not([type='checkbox']), :is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields select { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--ginko-border); border-radius: .35rem; padding: .35rem .5rem; background: var(--ginko-bg); color: inherit; font: inherit; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields input[type='checkbox'] { accent-color: var(--ginko-text); width: 15px; height: 15px; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields small { color: var(--ginko-muted-text); font-size: .7rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__block-actions { border-top: 1px solid var(--ginko-border); padding-top: .35rem; margin-top: .3rem; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__field-error { font-size: .72rem; color: #b34c3b; padding: .3rem .4rem; margin: 0; }
 .ginko-editor .ginko-table { position: relative; max-width: 100%; }
 .ginko-editor .ginko-table__viewport { overflow-x: auto; border: 1px solid var(--ginko-border); border-radius: .4rem; }
 .ginko-editor .ginko-table table { margin: 0; width: 100%; min-width: 18rem; border-style: hidden; }
@@ -67,14 +67,14 @@
 .ginko-editor .ginko-code__tools input, .ginko-editor .ginko-code__tools select { min-width: 0; background: transparent; color: var(--ginko-muted-text); border: 0; padding: .2rem 0; font: .72rem/1.5 ui-monospace, monospace; }
 .ginko-editor .ginko-code__tools input { flex: 1; width: 8rem; }
 .ginko-editor [hidden] { display: none !important; }
-@media (hover: none) { .ginko-editor .ginko-settings > summary { opacity: .65; } .ginko-editor .ginko-icon-button { min-width: 36px; min-height: 36px; } .ginko-editor .ginko-block__divider::after { opacity: .6; } }
-@media (prefers-reduced-motion: reduce) { .ginko-editor .ginko-block__label, .ginko-editor .ginko-settings > summary, .ginko-editor .ginko-block__divider::after { transition: none; } }
+@media (hover: none) { .ginko-editor .ginko-settings > .ginko-icon-button { opacity: .65; } .ginko-editor .ginko-icon-button { min-width: 36px; min-height: 36px; } .ginko-editor .ginko-block__divider::after { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .ginko-editor .ginko-block__label, .ginko-editor .ginko-settings > .ginko-icon-button, .ginko-editor .ginko-block__divider::after { transition: none; } }
 
 .ginko-editor .ginko-image { position: relative; margin-inline: 0; }
 .ginko-editor .ginko-image__picture img { display: block; max-width: 100%; }
 .ginko-editor .ginko-image > .ginko-popover { position: absolute; right: .5rem; top: .5rem; }
-.ginko-editor .ginko-image > .ginko-popover > summary { background: var(--ginko-bg); border: 1px solid var(--ginko-border); opacity: .3; }
-.ginko-editor .ginko-image:hover > .ginko-popover > summary, .ginko-editor .ginko-image:focus-within > .ginko-popover > summary { opacity: 1; }
+.ginko-editor .ginko-image > .ginko-popover > .ginko-icon-button { background: var(--ginko-bg); border: 1px solid var(--ginko-border); opacity: .3; }
+.ginko-editor .ginko-image:hover > .ginko-popover > .ginko-icon-button, .ginko-editor .ginko-image:focus-within > .ginko-popover > .ginko-icon-button { opacity: 1; }
 
 .ginko-editor .ginko-image-upload { position: relative; box-sizing: border-box; margin: 1rem 0; border: 1px dashed var(--ginko-border); border-radius: .65rem; background: color-mix(in srgb, var(--ginko-muted) 45%, var(--ginko-bg)); transition: border-color 120ms, background 120ms; }
 .ginko-editor .ginko-image-upload__dropzone { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: .45rem; width: 100%; min-height: 180px; padding: 1.5rem 2rem; color: var(--ginko-text); background: transparent; border: 0; border-radius: inherit; font: inherit; cursor: pointer; }
@@ -107,3 +107,87 @@
 .ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__confirmation h3 { font-size: .875rem; line-height: 1.4; letter-spacing: normal; }
 .ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__dropzone { min-height: 160px; padding: 1.25rem 1rem; }
 .ginko-editor .ginko-image--replacing { outline: 2px solid var(--ginko-border); outline-offset: 4px; border-radius: .5rem; }
+
+/* Shared controls use semantic shadcn tokens; no host utility CSS is required. */
+:where(.ginko-editor, .ginko-toolbar, .ginko-menu, .ginko-tooltip, .ginko-popover__panel, .ginko-image-picker) {
+  --ginko-bg: var(--background, #fff);
+  --ginko-text: var(--foreground, #171717);
+  --ginko-muted: var(--muted, #f5f5f5);
+  --ginko-muted-text: var(--muted-foreground, #737373);
+  --ginko-border: var(--border, #e5e5e5);
+  --ginko-popover: var(--popover, var(--ginko-bg));
+  --ginko-popover-text: var(--popover-foreground, var(--ginko-text));
+  --ginko-accent-bg: var(--accent, #f5f5f5);
+  --ginko-accent-text: var(--accent-foreground, var(--ginko-text));
+  --ginko-ring: var(--ring, #737373);
+  --ginko-radius: var(--radius, .625rem);
+}
+.ginko-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; padding: .5rem .65rem; border-bottom: 1px solid var(--ginko-border); color: var(--ginko-text); font-size: 13px; line-height: 1.4; }
+.ginko-toolbar__group { display: flex; align-items: center; gap: .125rem; }
+.ginko-toolbar__separator { width: 1px; height: 22px; background: var(--ginko-border); margin-inline: .25rem; }
+.ginko-control { display: inline-flex; justify-content: center; align-items: center; gap: .4rem; min-height: 32px; min-width: 32px; padding: .35rem .5rem; border: 0; border-radius: calc(var(--ginko-radius) - 2px); background: transparent; color: inherit; font: inherit; cursor: pointer; white-space: nowrap; }
+.ginko-control:hover, .ginko-control[data-state='open'], .ginko-control[aria-pressed='true'] { background: var(--ginko-accent-bg); color: var(--ginko-accent-text); }
+.ginko-control:disabled, .ginko-menu__item[data-disabled] { opacity: .4; cursor: default; }
+.ginko-control:focus-visible, .ginko-menu__item:focus-visible, .ginko-menu input:focus-visible, .ginko-button:focus-visible, .ginko-table-size button:focus-visible { outline: 2px solid var(--ginko-ring); outline-offset: 2px; }
+.ginko-control svg, .ginko-menu__item svg { flex: 0 0 18px; }
+.ginko-menu { z-index: 250; min-width: 180px; max-width: min(320px, calc(100vw - 24px)); max-height: var(--reka-popper-available-height, 400px); overflow: auto; border: 1px solid var(--ginko-border); border-radius: var(--ginko-radius); padding: .3rem; background: var(--ginko-popover); color: var(--ginko-popover-text); box-shadow: 0 4px 14px rgb(0 0 0 / .09); font-family: inherit; font-size: 13px; line-height: 1.5; }
+.ginko-menu__item { display: flex; align-items: center; gap: .6rem; padding: .45rem .55rem; border-radius: calc(var(--ginko-radius) - 3px); outline: none; cursor: default; user-select: none; }
+.ginko-menu__item[data-highlighted], .ginko-menu__item[data-active] { background: var(--ginko-accent-bg); color: var(--ginko-accent-text); }
+.ginko-tooltip { z-index: 300; display: flex; gap: .7rem; border: 1px solid var(--ginko-border); border-radius: calc(var(--ginko-radius) - 2px); padding: .3rem .5rem; background: var(--ginko-popover); color: var(--ginko-popover-text); box-shadow: 0 2px 6px rgb(0 0 0 / .08); font: 12px/1.4 ui-sans-serif, system-ui, sans-serif; }
+.ginko-tooltip kbd { color: var(--ginko-muted-text); font: inherit; }
+.ginko-toolbar__form { padding: .85rem; min-width: 260px; }
+.ginko-toolbar__form form { display: grid; gap: .75rem; }
+.ginko-toolbar__form label { display: grid; gap: .35rem; font-size: 12px; }
+.ginko-toolbar__form input { width: 100%; min-width: 0; box-sizing: border-box; padding: .45rem .6rem; border: 1px solid var(--input, var(--ginko-border)); border-radius: calc(var(--ginko-radius) - 2px); background: transparent; color: inherit; font: inherit; }
+.ginko-toolbar__form [role='alert'] { margin: 0; color: var(--destructive, #b42318); }
+.ginko-toolbar__form-actions, .ginko-toolbar__dimensions { display: flex; align-items: center; gap: .5rem; justify-content: space-between; }
+.ginko-toolbar__dimensions label { flex: 1; min-width: 0; }
+.ginko-button { display: inline-flex; align-items: center; justify-content: center; padding: .45rem .7rem; border: 1px solid transparent; border-radius: calc(var(--ginko-radius) - 2px); color: var(--primary-foreground, #fff); background: var(--primary, #171717); font: inherit; cursor: pointer; }
+.ginko-table-size { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.ginko-table-size button { aspect-ratio: 1.4; border: 1px solid var(--ginko-border); border-radius: 3px; background: transparent; cursor: pointer; }
+.ginko-table-size button[data-active] { background: var(--ginko-accent-bg); border-color: var(--ginko-ring); }
+.ginko-toolbar--compact { border: 0; padding: .25rem; flex-wrap: nowrap; }
+@media (max-width: 640px) { .ginko-toolbar { gap: .2rem; padding: .35rem; } .ginko-toolbar__separator { margin-inline: .1rem; } .ginko-control { min-height: 36px; } }
+.ginko-selection-toolbar { position: fixed; z-index: 100; border: 1px solid var(--ginko-border); border-radius: var(--ginko-radius); background: var(--ginko-popover); color: var(--ginko-popover-text); box-shadow: 0 4px 14px rgb(0 0 0 / .1); }
+.ginko-table__row-handle, .ginko-table__column-handle { position: absolute; z-index: 9; }
+.ginko-table__row-handle { transform: translate(-100%, -50%); }
+.ginko-table__column-handle { transform: translate(-50%, -100%); }
+.ginko-editor .ginko-table__tools { max-width: calc(100% - 20px); flex-wrap: wrap; align-items: center; font-size: 12px; }
+.ginko-table__scope { padding: .2rem .4rem; color: var(--ginko-muted-text); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ginko-editor .ginko-table__alignment { border: 0; padding: 0; margin: 0; gap: 1px; }
+.ginko-table__add { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; font: inherit; }
+.ginko-table__header-hint { margin: .25rem .45rem .65rem; color: var(--ginko-muted-text); font-size: 12px; line-height: 1.5; }
+.ginko-node-popover-content { z-index: 250; width: min(260px, calc(100vw - 24px)); max-height: var(--reka-popover-content-available-height, calc(100vh - 24px)); overflow: auto; }
+:is(.ginko-editor, .ginko-node-popover-content) .ginko-popover__panel, .ginko-node-popover-content .ginko-popover__panel { position: static; width: 100%; box-sizing: border-box; }
+.ginko-editor .ginko-settings > .ginko-icon-button { opacity: .25; }
+.ginko-editor .ginko-block:hover > .ginko-block__header > .ginko-settings > .ginko-icon-button,
+.ginko-editor .ginko-block:focus-within > .ginko-block__header > .ginko-settings > .ginko-icon-button,
+.ginko-editor .ginko-settings > .ginko-icon-button[data-state='open'] { opacity: 1; }
+.ginko-editor .ginko-image > .ginko-popover > .ginko-icon-button { background: var(--ginko-bg); border: 1px solid var(--ginko-border); opacity: .35; }
+.ginko-editor .ginko-image:hover > .ginko-popover > .ginko-icon-button, .ginko-editor .ginko-image:focus-within > .ginko-popover > .ginko-icon-button { opacity: 1; }
+@media (hover: none) { .ginko-editor .ginko-settings > .ginko-icon-button { opacity: .75; } }
+
+/* The gutter handle uses TipTap's nested target; every operation uses the
+   shared movement contract, including the pointer destination chooser. */
+.ginko-block-handle { z-index: 20; margin-inline-start: -4px; color: var(--ginko-muted-text); }
+.ginko-block-handle__button { width: 28px; min-width: 28px; min-height: 28px; padding: 4px; cursor: grab; touch-action: manipulation; border-radius: .35rem; }
+.ginko-block-handle__button:active { cursor: grabbing; }
+.ginko-block-handle__button:hover, .ginko-block-handle__button:focus-visible, .ginko-block-handle__button[aria-expanded='true'] { color: var(--ginko-text); background: var(--ginko-muted); }
+.ginko-block-handle__button:focus-visible { outline: 2px solid var(--ginko-ring); outline-offset: 2px; }
+.ginko-block-menu { width: 280px; }
+.ginko-block-menu__title { display: block; max-width: 100%; overflow-wrap: anywhere; padding: .55rem .6rem .7rem; font-size: 12px; line-height: 1.5; color: var(--ginko-muted-text); font-weight: 500; }
+.ginko-block-menu > button.ginko-menu__item { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.ginko-block-menu > button.ginko-menu__item:hover:not(:disabled) { background: var(--ginko-accent-bg); color: var(--ginko-accent-text); }
+.ginko-block-menu > button.ginko-menu__item:disabled { opacity: .4; cursor: default; }
+.ginko-block-menu > button.ginko-danger { color: var(--destructive, #b42318); }
+.ginko-block-menu > input { box-sizing: border-box; width: calc(100% - 1rem); margin: .3rem .5rem .5rem; padding: .5rem .6rem; border: 1px solid var(--ginko-border); border-radius: .4rem; background: transparent; color: inherit; font: inherit; }
+.ginko-block-menu__destinations { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
+.ginko-block-menu__destination { padding: .55rem .5rem; border-top: 1px solid var(--ginko-border); }
+.ginko-block-menu__destination > span { display: block; margin-bottom: .3rem; font-size: 12px; overflow-wrap: anywhere; }
+.ginko-block-menu__destination > div { display: flex; gap: .2rem; flex-wrap: wrap; }
+.ginko-block-menu__destination button { min-height: 30px; padding: .25rem .4rem; border: 1px solid var(--ginko-border); font-size: 11px; }
+.ginko-block-menu [role='alert'] { margin: .6rem; font-size: 12px; color: var(--destructive, #b42318); }
+.ginko-block-menu [role='status'] { margin: .6rem; font-size: 12px; color: var(--ginko-muted-text); }
+.ginko-block-insertion-line { position: fixed; z-index: 260; height: 2px; border-radius: 2px; background: var(--primary, #2563eb); pointer-events: none; }
+.ginko-block-insertion-line::before { content: ''; position: absolute; left: -3px; top: -2px; width: 6px; height: 6px; border: 1.5px solid var(--primary, #2563eb); border-radius: 50%; background: var(--ginko-bg, #fff); box-sizing: border-box; }
+@media (hover: none) { .ginko-block-handle__button { min-width: 32px; min-height: 36px; } }

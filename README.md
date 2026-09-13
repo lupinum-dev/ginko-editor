@@ -49,8 +49,8 @@ Opening, closing, or changing modes does not rewrite `source`. A real visual edi
 emits normalized MDC. An invalid or unsupported value remains byte-for-byte
 available in the Markdown textarea.
 
-The host owns persistence and asset selection. Supply `image-upload` for the inline
-upload flow below, or listen for `request-image`,
+The host owns persistence and asset selection. Supply `image-upload` and/or `image-picker` for the inline
+image flow below, or listen for `request-image`,
 `request-file`, or `request-video`, then call the event request's `complete`
 method after the user selects an asset. Pass `null` when selection is cancelled.
 Each request can complete once. Cancellation is permanent. Completion returns
@@ -63,8 +63,8 @@ external replacement, the current external source remains authoritative; hosts
 should not replay older editor emissions as intentional replacements.
 Before closing the editor or replacing its document, await the exposed `flush()`
 method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
-result means conversion failed or an image upload is unfinished: keep the editor
-open so the user can correct the document, finish the upload, or remove it. A failed flush blocks switching to Markdown, which
+result means conversion failed or an image operation is unfinished: keep the editor
+open so the user can correct the document, finish the image operation, or remove it. A failed flush blocks switching to Markdown, which
 would otherwise replace pending visual edits with older source. `flush()` emits
 the latest converted source but does
 not persist it; the host still owns and must await its save operation.
@@ -90,11 +90,13 @@ document. An unsupported paste leaves the document unchanged and explains why.
 validation. Pass a fresh object if the application must keep an editable draft
 of the configuration.
 
-## Inline image uploads
+## Images: upload and browse
 
 Provide one callback to enable an upload placeholder for **Add image**, `/image`,
 and **Replace image**. The editor accepts one non-empty image file up to 10 MB
-per placeholder, from the file chooser or drag and drop. Drop a file directly
+per placeholder, from the file chooser or drag and drop. Add `image-picker` to
+show **Browse images** in the same placeholder. A picker can also run without
+an upload callback. Drop a file directly
 onto the editor to see its preview and confirm **Add image**. Drop onto an
 existing editor image to confirm **Replace image** in a compact popover attached
 to that image, without moving the document. Cancel preserves the original;
@@ -135,15 +137,22 @@ preserves supported image dimensions and crop/focal metadata.
 
 The host validates and persists files. Reject with a user-facing error to keep
 the placeholder available for retry. Respect `signal` to cancel work when the
-placeholder, document, upload handler, or editor lifetime changes. A failed or
+placeholder, document, active handler, or editor lifetime changes. A failed or
 cancelled replacement keeps the original image. Completion follows the original
 insertion point as text changes and does not interrupt typing elsewhere.
 
 Pending placeholders are temporary view state, never Markdown or document nodes.
 `hasPendingChanges()` and `pending-change` include them; `flush()` returns
-`image_upload_pending` until they finish or are removed. Preserve this guard when
-saving, leaving, or changing documents. Without `image-upload`, the existing
-`request-image` host-picker contract applies.
+`image_upload_pending` until upload or browse operations finish or are removed. Preserve this guard when
+saving, leaving, or changing documents. When neither `image-upload` nor `image-picker` is provided, the existing
+`request-image` event applies. The callback flow takes precedence over that event.
+
+`ImagePicker` receives `{ signal, current? }` and resolves an `EditorImage` or
+`null`. Return a stored `{ id }` or a durable `{ url }`, plus optional presentation
+metadata. Use the exported `GinkoImagePicker` for a controlled library dialog, or
+provide your own picker. The host owns its images, search, pagination, and uploads.
+See the [image picker guide](docs/content/docs/1.getting-started/3.images.md) for a
+complete callback adapter and cancellation rules.
 
 The docs playground stores uploaded files in this browser's IndexedDB. Its local
 image references survive reloads in that browser, but do not publish images or
@@ -199,6 +208,18 @@ row is the Markdown header; another row can be promoted to that position.
 Merged cells and arbitrary header placement are outside the Markdown table
 contract. Code blocks expose their language and file name above the code. Images have a
 cog for their description, replacement, host metadata, and removal.
+
+## Toolbar and host controls
+
+Use `toolbar-items` to group the built-in commands. Replace individual controls
+through `GinkoToolbar` slots, or render your toolbar with the editor
+`#toolbar="{ actions }"` slot. The same actions expose labels, active and disabled
+states, and guarded `run()` operations. `messages`, `shortcuts`, and
+`overlay-container` configure each editor independently. Compiled styles use
+shadcn semantic color tokens and work without Tailwind.
+
+- [Customize the editor](docs/content/docs/1.getting-started/2.customize.md): Vue, Nuxt, toolbar actions, messages, shortcuts, and overlays.
+- [Component coverage](docs/content/docs/1.getting-started/4.component-coverage.md): current Docs tags, named slots, and source-mode limits.
 
 ## Documentation
 

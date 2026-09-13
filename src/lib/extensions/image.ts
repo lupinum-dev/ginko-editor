@@ -4,8 +4,10 @@ import { mergeAttributes, Node } from '@tiptap/core'
 
 import type { JsonRecord } from '../../types'
 import { readStoredMediaProps, sanitizeImageUrl, sanitizeResolvedImageUrl } from '../props'
+import type { EditorOverlayController } from '../../ui/context'
 
 export interface ImageOptions {
+  overlay?: EditorOverlayController
   actions?: ImageActions
   allowBase64: boolean
   HTMLAttributes: JsonRecord
@@ -105,7 +107,7 @@ export const Image = Node.create<ImageOptions>({
   },
 
   addNodeView() {
-    return props => imageView(props, this.options.actions)
+    return props => imageView(props, this.options.actions, this.options.overlay)
   },
 
   renderHTML({ node }) {

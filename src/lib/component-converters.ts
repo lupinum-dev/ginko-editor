@@ -110,7 +110,9 @@ export function createBlockquoteNode(
 ): JSONContent {
   const element = node as MDCElement
   return createTipTapNodeFn(element, 'blockquote', {
-    children: normalizeBlockChildren(element.children || []),
+    children: element.children?.length
+      ? normalizeBlockChildren(element.children)
+      : [{ type: 'element', tag: 'p', props: {}, children: [] }],
   })
 }
 
@@ -204,6 +206,7 @@ export function createOlNode(
   const element = node as MDCElement
   return createTipTapNodeFn(element, 'orderedList', {
     attrs: { start: element.props?.start },
+    children: element.children?.length ? element.children : [{ type: 'element', tag: 'li', props: {}, children: [] }],
   })
 }
 
@@ -218,7 +221,10 @@ export function createUlNode(
     extra?: { attrs?: JsonRecord; children?: MDCNode[] },
   ) => JSONContent,
 ): JSONContent {
-  return createTipTapNodeFn(node as MDCElement, 'bulletList')
+  const element = node as MDCElement
+  return createTipTapNodeFn(element, 'bulletList', {
+    children: element.children?.length ? element.children : [{ type: 'element', tag: 'li', props: {}, children: [] }],
+  })
 }
 
 /**

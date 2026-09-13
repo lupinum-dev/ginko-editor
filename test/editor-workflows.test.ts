@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
@@ -26,8 +26,9 @@ beforeAll(() => {
   }
 })
 
+const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => {
-  document.body.innerHTML = ''
+  wrappers.splice(0).forEach(wrapper => wrapper.unmount())
 })
 
 async function waitFor(condition: () => boolean, timeoutMs = 1000) {
@@ -43,13 +44,25 @@ async function mountEditor(modelValue: string, syncDebounceMs = 0) {
     attachTo: document.body,
     props: { modelValue, syncDebounceMs },
   })
+  wrappers.push(wrapper)
   await flushPromises()
   await waitFor(() => Boolean(wrapper.vm.editor))
   return wrapper
 }
 
+async function imageSettings(wrapper: Awaited<ReturnType<typeof mountEditor>>) {
+  // TipTap restores caret focus on the next animation frame after asset insertion.
+  await new Promise(resolve => globalThis.requestAnimationFrame(resolve))
+  const trigger = wrapper.get('button[aria-label="Image settings"]')
+  if (trigger.attributes('aria-expanded') !== 'true') await trigger.trigger('click')
+  await flushPromises()
+  const panel = document.getElementById(trigger.attributes('aria-controls')!)
+  if (!panel) throw new Error('The image settings did not open.')
+  return new DOMWrapper(panel)
+}
+
 async function clickButton(wrapper: Awaited<ReturnType<typeof mountEditor>>, label: string) {
-  const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)
+  const button = (await imageSettings(wrapper)).findAll('button').find((candidate) => candidate.text() === label)
   if (!button) throw new Error(`Button "${label}" is not available.`)
   await button.trigger('click')
 }
@@ -64,7 +77,7 @@ describe('GinkoEditor browser journey', () => {
     const wrapper = await mountEditor(source)
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
 
-    await wrapper.get('button[aria-pressed="false"]').trigger('click')
+    await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
     await flushPromises()
     expect(wrapper.get('textarea').element.value).toBe(source)
     await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
@@ -220,6 +233,7 @@ describe('GinkoEditor browser journey', () => {
         syncDebounceMs: 0,
       },
     })
+    wrappers.push(wrapper)
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
     expect(wrapper.vm.insertImageAsset({
@@ -256,7 +270,7 @@ describe('GinkoEditor browser journey', () => {
     })
     wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
     await wrapper.vm.$nextTick()
-    expect(wrapper.get('button[aria-label="Image metadata"]').attributes('hidden')).toBeDefined()
+    expect((await imageSettings(wrapper)).get('button[aria-label="Image metadata"]').attributes('hidden')).toBeDefined()
   })
 
   it('keeps block separation when a markdown file is inserted before a heading', async () => {
@@ -268,6 +282,7 @@ describe('GinkoEditor browser journey', () => {
         syncDebounceMs: 120,
       },
     })
+    wrappers.push(wrapper)
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
     expect(
@@ -335,6 +350,7 @@ describe('GinkoEditor browser journey', () => {
       attachTo: document.body,
       props: { enableFiles: false, enableVideo: false, modelValue: 'Features\n', syncDebounceMs: 0 },
     })
+    wrappers.push(wrapper)
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
     expect(wrapper.find('button[aria-label="Add image"]').exists()).toBe(true)

@@ -1,0 +1,103 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { ToolbarButton } from 'reka-ui'
+import {
+  GinkoEditor, GinkoToolbar, GinkoImagePicker,
+  type EditorImage, type EditorImagePickerItem, type GinkoEditorHandle,
+  type ImagePicker, type ImageUploadHandler, type EditorMessages,
+  type EditorShortcuts, type EditorToolbarGroup,
+} from '@lupinum/ginko-editor'
+import { createAuthoringKit, type AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
+import Button from './Button.vue'
+
+const source = ref('# Default toolbar\n')
+const customSource = ref('# Custom toolbar\n')
+const editor = ref<GinkoEditorHandle>()
+const overlay = ref<HTMLElement>()
+const authoringKit = shallowRef<AuthoringKitV1>()
+const error = ref('')
+const messages = { bold: 'Strong', chooseImage: 'Choose a library image' } satisfies EditorMessages
+const shortcuts = { bold: 'Mod-Shift-b', duplicate: false } satisfies EditorShortcuts
+const toolbar = [
+  [{ kind: 'undo' }, { kind: 'redo' }],
+  [{ kind: 'menu', label: 'textStyle', items: [{ kind: 'paragraph' }, { kind: 'heading', level: 2 }] }],
+  [{ kind: 'mark', mark: 'bold' }, { kind: 'link' }, { kind: 'image' }, { kind: 'table', rows: 2, columns: 3 }],
+] as const satisfies readonly EditorToolbarGroup[]
+const uploadImage: ImageUploadHandler = async (_file, { signal }) => {
+  signal.throwIfAborted()
+  return { url: '/host-image.png' }
+}
+const open = ref(false)
+const query = ref('')
+const library: readonly EditorImagePickerItem[] = [
+  { key: 'host', label: 'Host image', image: { url: '/host-image.png', alt: 'Host image' } },
+]
+const images = computed(() => library.filter(item => item.label.toLowerCase().includes(query.value.toLowerCase())))
+let finish: (image: EditorImage | null) => void = () => {}
+const pickImage: ImagePicker = ({ signal }) => {
+  finish(null)
+  return new Promise(resolve => {
+    let settled = false
+    const abort = () => complete(null)
+    function complete(image: EditorImage | null) {
+      if (settled) return
+      settled = true
+      signal.removeEventListener('abort', abort)
+      open.value = false
+      finish = () => {}
+      resolve(image)
+    }
+    finish = complete
+    if (signal.aborted) return complete(null)
+    signal.addEventListener('abort', abort, { once: true })
+    query.value = ''
+    open.value = true
+  })
+}
+onBeforeUnmount(() => finish(null))
+onMounted(async () => {
+  authoringKit.value = await createAuthoringKit({
+    version: 1,
+    implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default', 'tip'] } },
+    policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default', 'tip'], allowedParents: null, allowedChildren: null, media: null } } },
+    authoring: { note: { label: 'Note', slots: { tip: { label: 'Tip' } } } },
+    recipes: [{ id: 'note', label: 'Note', description: 'Useful context', source: '<note>\nText\n\n<template #tip>\nTip\n</template>\n</note>' }],
+  })
+})
+async function flush() {
+  const result = await editor.value?.flush()
+  error.value = result?.ok === false ? result.error.message : ''
+}
+</script>
+<template>
+  <main class="host-theme">
+    <GinkoEditor v-model="source" :enable-images="false" :enable-files="false" :enable-video="false" />
+    <GinkoEditor v-if="authoringKit" ref="editor" v-model="customSource"
+      :authoring-kit="authoringKit" :image-upload="uploadImage" :image-picker="pickImage"
+      :messages="messages" :shortcuts="shortcuts" :overlay-container="overlay"
+      :enable-files="false" :enable-video="false">
+      <template #toolbar="{ actions }">
+        <GinkoToolbar :actions="actions" :items="toolbar">
+          <template #bold="{ action }">
+            <ToolbarButton v-if="action" as-child>
+              <Button type="button" :variant="action.active ? 'secondary' : 'ghost'"
+                :disabled="action.disabled" :aria-pressed="action.active"
+                :aria-label="action.label" :title="action.shortcut"
+                @mousedown.prevent @click="action.run()">{{ action.label }}</Button>
+            </ToolbarButton>
+          </template>
+        </GinkoToolbar>
+      </template>
+      <template #recipe-preview="{ recipe }"><p>{{ recipe.description ?? recipe.label }}</p></template>
+    </GinkoEditor>
+    <GinkoImagePicker :open="open" v-model:query="query" :images="images"
+      :messages="messages" :overlay-container="overlay" :has-more="false"
+      :loading="false" :enable-upload="false" :error="error || undefined"
+      @select="finish" @update:open="value => { if (!value) finish(null) }" />
+    <div ref="overlay" />
+    <button type="button" @click="flush">Flush changes</button><p>{{ error }}</p>
+  </main>
+</template>
+<style>
+.host-theme { --background: #fff; --foreground: #171717; --border: #e5e5e5; --muted: #f5f5f5; --muted-foreground: #737373; --accent: #f5f5f5; --accent-foreground: #171717; --popover: #fff; --popover-foreground: #171717; --ring: #737373; --radius: .625rem; }
+</style>

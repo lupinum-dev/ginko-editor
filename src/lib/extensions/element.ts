@@ -5,8 +5,10 @@ import { InputRule, mergeAttributes, Node } from '@tiptap/core'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import type { AuthoringKitV1 } from '../../authoring'
 import type { JsonRecord } from '../../types'
+import type { EditorOverlayController } from '../../ui/context'
 
 export interface ElementOptions {
+  overlay?: EditorOverlayController
   getOutputOptions?: () => TiptapToMDCOptions
   getAuthoringKit?: () => AuthoringKitV1 | undefined
   HTMLAttributes: JsonRecord
@@ -111,7 +113,7 @@ export const Element = Node.create<ElementOptions>({
   },
 
   addNodeView() {
-    return props => componentView(props, () => this.options.getAuthoringKit?.(), () => this.options.getOutputOptions?.() ?? {})
+    return props => componentView(props, () => this.options.getAuthoringKit?.(), () => this.options.getOutputOptions?.() ?? {}, this.options.overlay)
   },
 
   renderHTML({ HTMLAttributes }) {

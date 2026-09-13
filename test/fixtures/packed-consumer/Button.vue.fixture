@@ -1,0 +1,17 @@
+<script setup lang="ts">
+import { Primitive, type PrimitiveProps } from 'reka-ui'
+// A host-owned primitive with the same as/asChild and variant surface used by
+// shadcn-vue buttons. The fixture does not install a registry or require Tailwind.
+withDefaults(defineProps<PrimitiveProps & { variant?: 'secondary' | 'ghost' }>(), {
+  as: 'button', variant: 'ghost',
+})
+</script>
+<template>
+  <Primitive :as="as" :as-child="asChild" class="host-button" :data-variant="variant"><slot /></Primitive>
+</template>
+<style scoped>
+.host-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.25rem; padding: .5rem .75rem; border: 0; border-radius: var(--radius); color: var(--foreground); background: transparent; font: inherit; cursor: pointer; }
+.host-button:hover, .host-button[data-variant="secondary"] { background: var(--accent); color: var(--accent-foreground); }
+.host-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.host-button:disabled { opacity: .5; pointer-events: none; }
+</style>

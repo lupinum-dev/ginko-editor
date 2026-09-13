@@ -1,35 +1,80 @@
+import { createApp, shallowReactive, type CSSProperties } from 'vue'
+import GinkoNodePopover from '../../ui/GinkoNodePopover.vue'
+import type { EditorOverlayController } from '../../ui/context'
 import { icon, type IconName } from './icons'
 
-/** Native disclosure semantics with viewport-aware placement and dismissal. */
-export function inlinePopover(label: string, symbol: IconName) {
-  const dom = document.createElement('details')
+let nextPopoverId = 0
+
+/** Reka owns placement and dismissal; callers retain their native form controls. */
+export function inlinePopover(label: string, symbol: IconName, controller?: EditorOverlayController) {
+  const dom = document.createElement('div')
   dom.className = 'ginko-popover'; dom.contentEditable = 'false'
-  const toggle = document.createElement('summary')
-  toggle.className = 'ginko-icon-button'; toggle.append(icon(symbol))
   const panel = document.createElement('div')
   panel.className = 'ginko-popover__panel'; panel.setAttribute('role', 'group')
-  dom.append(toggle, panel)
-  const setLabel = (text: string) => { toggle.title = text; toggle.setAttribute('aria-label', text); panel.setAttribute('aria-label', text) }
-  const close = (focus = false) => { dom.open = false; if (focus) toggle.focus() }
-  const position = () => {
-    if (!dom.open) return
-    const bounds = toggle.getBoundingClientRect(), width = Math.min(260, window.innerWidth - 24)
-    panel.style.width = `${width}px`
-    panel.style.left = `${Math.max(12, Math.min(bounds.right - width, window.innerWidth - width - 12))}px`
-    const below = window.innerHeight - bounds.bottom - 20, above = bounds.top - 20
-    const height = Math.min(panel.scrollHeight, window.innerHeight - 24)
-    const upward = height > below && above > below
-    const available = Math.max(80, upward ? above : below)
-    panel.style.maxHeight = `${available}px`
-    panel.style.top = `${upward ? Math.max(12, bounds.top - Math.min(height, available) - 8) : bounds.bottom + 8}px`
+  panel.contentEditable = 'false'
+  const owner = {}
+  const listeners = new Set<(open: boolean) => void>()
+  const state = shallowReactive({ open: false, label, container: 'body' as HTMLElement | string, theme: {} as CSSProperties, restoreFocus: true })
+  let destroyed = false
+  let themeObserver: MutationObserver | undefined
+  function position() {
+    if (!state.open) return
+    const themeElement = controller?.getThemeElement() ?? dom.closest<HTMLElement>('.ginko-editor')
+    state.container = controller?.getContainer() ?? themeElement ?? 'body'
+    if (!themeElement) return
+    const computed = getComputedStyle(themeElement)
+    const theme: Record<string, string> = {}
+    // Portals can leave the editor's CSS inheritance tree. Carry its resolved
+    // custom properties without copying layout or altering the host container.
+    for (let index = 0; index < computed.length; index++) {
+      const name = computed.item(index)
+      if (name.startsWith('--')) theme[name] = computed.getPropertyValue(name)
+    }
+    theme.colorScheme = computed.colorScheme
+    state.theme = theme
   }
-  dom.addEventListener('toggle', position)
-  dom.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true) } })
-  const outside = (event: Event) => { if (event.target instanceof globalThis.Node && !dom.contains(event.target)) close() }
-  document.addEventListener('pointerdown', outside, true)
-  document.addEventListener('focusin', outside)
-  window.addEventListener('resize', position)
-  window.addEventListener('scroll', position, true)
+  function setOpen(open: boolean) {
+    if (destroyed || open === state.open) return
+    if (open) {
+      controller?.open(owner, () => close())
+      state.restoreFocus = true
+    } else {
+      controller?.release(owner)
+      themeObserver?.disconnect()
+    }
+    state.open = open
+    dom.dataset.state = open ? 'open' : 'closed'
+    position()
+    if (open) {
+      themeObserver ??= new MutationObserver(position)
+      let ancestor = controller?.getThemeElement() ?? dom.closest<HTMLElement>('.ginko-editor')
+      while (ancestor) {
+        themeObserver.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style'] })
+        ancestor = ancestor.parentElement
+      }
+    }
+    listeners.forEach(listener => listener(open))
+  }
+  function close(focus = false) {
+    state.restoreFocus = focus
+    setOpen(false)
+  }
+  const app = createApp(GinkoNodePopover, { panel, state, 'onUpdate:open': setOpen, onRestoreFocus: (restore: boolean) => { state.restoreFocus = restore } })
+  // Each node view is a small Vue root. Distinct prefixes keep Reka's generated
+  // trigger/content IDs unique across nodes and editor instances.
+  app.config.idPrefix = `ginko-node-${++nextPopoverId}`
+  app.mount(dom)
+  const toggle = dom.querySelector<HTMLButtonElement>('button')!
+  toggle.append(icon(symbol))
+  const setLabel = (text: string) => { state.label = text; panel.setAttribute('aria-label', text) }
   setLabel(label)
-  return { dom, toggle, panel, close, position, setLabel, destroy() { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('focusin', outside); window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true) } }
+  return {
+    dom, toggle, panel, close, position, setLabel,
+    isOpen: () => state.open,
+    contains: (target: globalThis.Node) => dom.contains(target) || panel.contains(target),
+    onOpenChange(listener: (open: boolean) => void) { listeners.add(listener); return () => listeners.delete(listener) },
+    destroy() {
+      close(); destroyed = true; themeObserver?.disconnect(); controller?.release(owner); listeners.clear(); app.unmount()
+    },
+  }
 }

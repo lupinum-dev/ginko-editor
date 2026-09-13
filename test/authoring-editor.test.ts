@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
@@ -134,6 +134,15 @@ function layoutSource(): AuthoringKitSourceV1 {
   }
 }
 
+async function openSettings(wrapper: ReturnType<typeof mount<typeof GinkoEditor>>) {
+  const trigger = wrapper.get('.ProseMirror-selectednode .ginko-settings button')
+  if (trigger.attributes('aria-expanded') !== 'true') await trigger.trigger('click')
+  await flushPromises()
+  const panel = document.getElementById(trigger.attributes('aria-controls')!)
+  if (!panel) throw new Error('The selected component settings did not open.')
+  return new DOMWrapper(panel)
+}
+
 function pasteMarkdown(element: Element, markdown: string) {
   const event = new Event('paste', { bubbles: true, cancelable: true })
   Object.defineProperty(event, 'clipboardData', {
@@ -161,18 +170,19 @@ describe('editor-specific authoring kits', () => {
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
 
-      const icon = wrapper.get('input[type="text"]')
+      const settings = await openSettings(wrapper)
+      const icon = settings.get('input[type="text"]')
       ;(icon.element as HTMLInputElement).focus()
       await icon.setValue('info')
       expect(document.activeElement).toBe(icon.element)
       expect(wrapper.find('.ginko-settings').exists()).toBe(true)
 
-      const appearance = wrapper.get('select')
+      const appearance = settings.get('select')
       ;(appearance.element as HTMLSelectElement).focus()
-      await appearance.setValue('quiet')
+      await appearance.setValue(JSON.stringify('quiet'))
       expect(document.activeElement).toBe(appearance.element)
 
-      const visible = wrapper.get('input[type="checkbox"]')
+      const visible = settings.get('input[type="checkbox"]')
       ;(visible.element as HTMLInputElement).focus()
       await visible.setValue(false)
       expect(document.activeElement).toBe(visible.element)
@@ -265,19 +275,22 @@ describe('editor-specific authoring kits', () => {
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
-      const actions = () => wrapper.get('.ginko-editor__block-actions')
+      const actions = async () => (await openSettings(wrapper)).get('.ginko-editor__block-actions')
 
-      await actions().get('button[data-action="down"]').trigger('click')
+      await (await actions()).get('button[data-action="down"]').trigger('click')
+      await flushPromises()
       await wrapper.vm.flush()
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/Second[\s\S]*First/)
       wrapper.vm.editor!.commands.undo()
       await wrapper.vm.flush()
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/First[\s\S]*Second/)
 
-      await actions().get('button[data-action="duplicate"]').trigger('click')
+      await (await actions()).get('button[data-action="duplicate"]').trigger('click')
+      await flushPromises()
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(2)
-      await actions().get('button[data-action="delete"]').trigger('click')
+      await (await actions()).get('button[data-action="delete"]').trigger('click')
+      await flushPromises()
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(1)
       wrapper.vm.editor!.commands.undo()
@@ -303,7 +316,8 @@ describe('editor-specific authoring kits', () => {
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
 
-      const inputs = wrapper.findAll('.ginko-editor__fields input[type="text"]')
+      const settings = await openSettings(wrapper)
+      const inputs = settings.findAll('.ginko-editor__fields input[type="text"]')
       const icon = inputs.find(input => input.attributes('inputmode') === undefined)
       const count = inputs.find(input => input.attributes('inputmode') === 'decimal')
       if (!icon || !count) throw new Error('Expected text and number authoring controls.')
@@ -341,14 +355,15 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       wrapper.vm.editor!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
-      await wrapper.get('input[inputmode="decimal"]').setValue('5')
+      const settings = await openSettings(wrapper)
+      await settings.get('input[inputmode="decimal"]').setValue('5')
       await wrapper.vm.flush()
       expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(5)
 
       wrapper.vm.editor!.commands.undo()
       await wrapper.vm.$nextTick()
       expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1)
-      expect((wrapper.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('1')
+      expect((settings.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('1')
     } finally {
       wrapper.unmount()
     }
@@ -367,7 +382,7 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       wrapper.vm.editor!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
-      const input = wrapper.get('input[inputmode="decimal"]')
+      const input = (await openSettings(wrapper)).get('input[inputmode="decimal"]')
 
       await input.setValue('1.')
       expect((input.element as HTMLInputElement).value).toBe('1.')
@@ -399,14 +414,14 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       wrapper.vm.editor!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
-      await wrapper.get('input[inputmode="decimal"]').setValue('bad')
+      await (await openSettings(wrapper)).get('input[inputmode="decimal"]').setValue('bad')
       await wrapper.setProps({ modelValue: '<info :count="42">\nReplacement\n</info>' })
       await flushPromises()
       wrapper.vm.editor!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
 
       expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(42)
-      expect((wrapper.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('42')
+      expect(((await openSettings(wrapper)).get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('42')
       expect(wrapper.text()).not.toContain('Enter a valid number.')
     } finally {
       wrapper.unmount()
@@ -514,7 +529,8 @@ describe('editor-specific authoring kits', () => {
 
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
-      await wrapper.get('button[data-action="delete"]').trigger('click')
+      await (await openSettings(wrapper)).get('button[data-action="delete"]').trigger('click')
+      await flushPromises()
       expect(columnPositions()).toHaveLength(0)
       wrapper.vm.editor!.commands.undo()
       expect(columnPositions()).toHaveLength(2)
@@ -550,9 +566,10 @@ describe('editor-specific authoring kits', () => {
       wrapper.vm.editor!.chain().setNodeSelection(columnPosition).run()
       await wrapper.vm.$nextTick()
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
+      await wrapper.get('input[placeholder="Search blocks"]').setValue('Two columns')
       await wrapper.get('input[placeholder="Search blocks"]').trigger('keydown', { key: 'Enter' })
       await flushPromises()
-      expect(wrapper.text()).toContain('layout is not allowed inside layout.')
+      expect(wrapper.text()).toContain('This block cannot be inserted safely here.')
       let layouts = 0
       wrapper.vm.editor!.state.doc.descendants((node) => {
         if (node.type.name === 'element' && node.attrs.tag === 'layout') layouts += 1

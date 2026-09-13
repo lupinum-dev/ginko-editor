@@ -41,18 +41,29 @@ export const MarkdownClipboard = Extension.create<MarkdownClipboardOptions>({
       return []
     }
 
-    const copying = createMarkdownCopy(this.editor, this.options)
+    const editor = this.editor, options = this.options
+    let copying: ReturnType<typeof createMarkdownCopy> | undefined
     return [
       new Plugin({
         view(view) {
-          copying.prepare(view)
-          return { update: copying.prepare, destroy: copying.destroy }
+          // Registering another plugin recreates every plugin view. Each view
+          // needs fresh copy state while its pending writes remain cancelled.
+          const current = createMarkdownCopy(editor, options)
+          copying = current
+          current.prepare(view)
+          return {
+            update: current.prepare,
+            destroy() {
+              current.destroy()
+              if (copying === current) copying = undefined
+            },
+          }
         },
         key: markdownClipboardPluginKey,
         props: {
           handleDOMEvents: {
-            copy: (view, event) => copying.handle(view, event, false),
-            cut: (view, event) => copying.handle(view, event, true),
+            copy: (view, event) => copying?.handle(view, event, false) ?? false,
+            cut: (view, event) => copying?.handle(view, event, true) ?? false,
             paste: (view, event) => {
               return handleMarkdownPaste(this.editor, event, this.options)
             },

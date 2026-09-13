@@ -44,6 +44,23 @@ export interface AssetProvider {
 /** Host-owned persistence for an inline image upload. Reject to show a retryable error. */
 export type ImageUploadHandler = (file: File, context: { signal: AbortSignal }) => Promise<Partial<AssetInfo>>
 
+/** An image's stored identity and presentation. Storage and temporary display URLs stay with the host. */
+export type EditorImage = Partial<Pick<AssetInfo,
+  'alt' | 'title' | 'width' | 'height' | 'fit' | 'quality' |
+  'focalX' | 'focalY' | 'cropX' | 'cropY' | 'cropWidth' | 'cropHeight'
+>> & ({ id: string; url?: string } | { id?: never; url: string })
+
+/** Host-supplied library display data, separate from the image stored in the document. */
+export interface EditorImagePickerItem {
+  key: string
+  label: string
+  image: EditorImage
+  thumbnailUrl?: string
+}
+
+/** Choose an existing image. Null cancels; rejection leaves the placeholder available for retry. */
+export type ImagePicker = (context: { signal: AbortSignal; current?: EditorImage }) => Promise<EditorImage | null>
+
 export interface EditorAssetRequest<T> {
   /** Complete once. Null cancels permanently; false means nothing was applied. */
   complete: (value: T | null) => boolean

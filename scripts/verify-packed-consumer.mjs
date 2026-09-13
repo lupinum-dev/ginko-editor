@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { URL } from 'node:url'
 
 const release = JSON.parse(await readFile('release-artifacts/release.json', 'utf8'))
 const pkg = release.packages[0]
@@ -43,7 +44,9 @@ async function verifyDeclarations(consumer) {
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
   if (manifest.exports?.['./style.css'] !== './dist/style.css') throw new Error('The packed CSS export is missing.')
   const entryTypes = await readFile(join(packageRoot, 'dist', 'index.d.ts'), 'utf8')
-  if (!entryTypes.includes('GinkoEditor')) throw new Error('The packed public declaration is missing.')
+  for (const name of ['GinkoEditor', 'GinkoToolbar', 'GinkoImagePicker', 'EditorActions', 'EditorCommand', 'EditorMessages', 'EditorShortcuts', 'EditorToolbarGroup', 'EditorImage', 'EditorImagePickerItem', 'ImagePicker']) {
+    if (!entryTypes.includes(name)) throw new Error(`The packed public declaration is missing: ${name}.`)
+  }
   const authoringEntry = manifest.exports?.['./authoring']
   if (authoringEntry?.import !== './dist/authoring.js' || authoringEntry?.types !== './dist/authoring.d.ts') {
     throw new Error('The packed authoring export is missing.')
@@ -53,6 +56,15 @@ async function verifyDeclarations(consumer) {
     throw new Error('The authoring-only entry imports UI or framework runtime code.')
   }
   await readFile(join(packageRoot, 'dist', 'GinkoEditor.vue.d.ts'), 'utf8')
+}
+
+// The same source exercises default and host-owned controls in both frameworks.
+// It imports only packed exports; its extension keeps repository typechecking
+// from accidentally resolving this fixture against the previous local dist.
+async function writeEditorExample(consumer, appName) {
+  const fixtureRoot = new URL('../test/fixtures/packed-consumer/', import.meta.url)
+  await write(join(consumer, appName), await readFile(new URL('App.vue.fixture', fixtureRoot), 'utf8'))
+  await write(join(consumer, 'Button.vue'), await readFile(new URL('Button.vue.fixture', fixtureRoot), 'utf8'))
 }
 
 async function verifyVueConsumer(consumer) {
@@ -67,6 +79,7 @@ async function verifyVueConsumer(consumer) {
         '@tiptap/pm': '3.31.3',
         '@tiptap/vue-3': '3.31.3',
         vue: '3.5.42',
+        'reka-ui': '2.10.1',
       },
       devDependencies: {
         '@types/node': '26.1.1',
@@ -82,33 +95,7 @@ async function verifyVueConsumer(consumer) {
     join(consumer, 'src.ts'),
     "import { createApp } from 'vue'\nimport App from './App.vue'\nimport '@lupinum/ginko-editor/style.css'\n\ncreateApp(App).mount('#app')\n",
   )
-  await write(
-    join(consumer, 'App.vue'),
-    `<script setup lang="ts">
-import { onMounted, ref, shallowRef } from 'vue'
-import { GinkoEditor, type GinkoEditorHandle, type ImageUploadHandler } from '@lupinum/ginko-editor'
-import { createAuthoringKit, type AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
-const source = ref('# Vue consumer\\n')
-const editor = ref<GinkoEditorHandle>()
-const uploadImage: ImageUploadHandler = async (_file, { signal }) => { signal.throwIfAborted(); return { url: '/host-image.png' } }
-const authoringKit = shallowRef<AuthoringKitV1>()
-const error = ref('')
-onMounted(async () => {
-  authoringKit.value = await createAuthoringKit({ version: 1, implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default'] } }, policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, authoring: { note: { label: 'Note' } }, recipes: [{ id: 'note', label: 'Note', description: 'Useful context', source: '<note>\\nText\\n</note>' }] })
-})
-async function flush() {
-  const result = await editor.value?.flush()
-  error.value = result?.ok === false ? result.error.message : ''
-}
-</script>
-<template>
-  <GinkoEditor v-if="authoringKit" ref="editor" v-model="source" :authoring-kit="authoringKit" :image-upload="uploadImage" :enable-images="true" :enable-files="false" :enable-video="false">
-    <template #recipe-preview="{ recipe }"><p>{{ recipe.description ?? recipe.label }}</p></template>
-  </GinkoEditor>
-  <button @click="flush">Flush changes</button><p>{{ error }}</p>
-</template>
-`,
-  )
+  await writeEditorExample(consumer, 'App.vue')
   await write(
     join(consumer, 'vite.config.ts'),
     "import vue from '@vitejs/plugin-vue'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({ plugins: [vue()] })\n",
@@ -121,7 +108,7 @@ async function flush() {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-editor__toolbar-group']) {
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-toolbar', '.ginko-image-picker', '.host-button']) {
     if (!(await containsCss(join(consumer, 'dist'), marker))) throw new Error(`The Vue production build dropped package CSS: ${marker}.`)
   }
 }
@@ -139,6 +126,7 @@ async function verifyNuxtConsumer(consumer) {
         '@tiptap/vue-3': '3.31.3',
         nuxt: '4.5.2',
         vue: '3.5.42',
+        'reka-ui': '2.10.1',
       },
       devDependencies: { typescript: '5.9.3', 'vue-tsc': '3.3.7' },
     }, null, 2)}\n`,
@@ -147,17 +135,14 @@ async function verifyNuxtConsumer(consumer) {
     join(consumer, 'nuxt.config.ts'),
     "export default defineNuxtConfig({ css: ['@lupinum/ginko-editor/style.css'] })\n",
   )
-  await write(
-    join(consumer, 'app.vue'),
-    "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nimport { GinkoEditor } from '@lupinum/ginko-editor'\nconst source = ref('# Nuxt consumer\\n')\n</script>\n\n<template><GinkoEditor v-model=\"source\" /></template>\n",
-  )
+  await writeEditorExample(consumer, 'app.vue')
   await write(join(consumer, 'tsconfig.json'), '{ "extends": "./.nuxt/tsconfig.json" }\n')
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
   run('npm', ['run', 'prepare'], consumer)
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-editor__toolbar-group']) {
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-toolbar', '.ginko-image-picker', '.host-button']) {
     if (!(await containsCss(join(consumer, '.output'), marker))) throw new Error(`The Nuxt production build dropped package CSS: ${marker}.`)
   }
 }

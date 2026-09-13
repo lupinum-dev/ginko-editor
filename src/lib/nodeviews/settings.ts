@@ -8,9 +8,12 @@ import { convertTiptapDocToMarkdown, validateMarkdownForAuthoring } from '../con
 import { actOnBlock, canActOnBlock, type BlockAction } from './block-actions'
 import { inlinePopover } from './popover'
 import { icon } from './icons'
+import { createEditorText } from '../../ui/messages'
+import type { EditorOverlayController } from '../../ui/context'
 
-export function blockSettings(editor: Editor, getNode: () => Node, getPos: () => number | undefined, getKit: () => AuthoringKitV1 | undefined, getOutputOptions: () => TiptapToMDCOptions, isPairedColumn: () => boolean) {
-  const popover = inlinePopover('Block settings', 'settings')
+export function blockSettings(editor: Editor, getNode: () => Node, getPos: () => number | undefined, getKit: () => AuthoringKitV1 | undefined, getOutputOptions: () => TiptapToMDCOptions, isPairedColumn: () => boolean, overlay?: EditorOverlayController) {
+  const text = overlay?.text ?? createEditorText()
+  const popover = inlinePopover(text('blockSettings'), 'settings', overlay)
   const { dom, panel, close } = popover
   dom.classList.add('ginko-settings')
   const heading = document.createElement('strong')
@@ -23,13 +26,15 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
   let previousEditable = editor.isEditable, previousKit = getKit()
   let renderedNode = getNode()
   const report = (message = '') => { error.textContent = message; error.hidden = !message }
-  dom.addEventListener('toggle', () => { if (dom.open) render() })
-  dom.addEventListener('keydown', event => {
+  popover.onOpenChange(open => { if (open) render() })
+  const handleUndo = (event: KeyboardEvent) => {
     if (!event.isComposing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault(); event.stopPropagation()
       if (event.shiftKey) editor.commands.redo(); else editor.commands.undo()
     }
-  })
+  }
+  dom.addEventListener('keydown', handleUndo)
+  panel.addEventListener('keydown', handleUndo)
   function updateProperty(name: string, value: JsonValue | undefined) {
     const pos = getPos(), node = getNode()
     if (pos === undefined || !editor.isEditable) return
@@ -51,17 +56,18 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
     try {
       const result = await convertTiptapDocToMarkdown(tr.doc.toJSON(), output)
       if (!current()) return
-      const issue = result.ok && result.value !== undefined ? await validateMarkdownForAuthoring(result.value, kit) : 'The component could not be converted.'
+      const issue = result.ok && result.value !== undefined ? await validateMarkdownForAuthoring(result.value, kit) : text('componentConversionFailed')
       if (!current()) return
-      if (issue) { report(`Cannot switch with these properties. ${typeof issue === 'string' ? issue : issue.message}`); render(); return }
+      if (issue) { report(text('variantInvalid', { reason: typeof issue === 'string' ? issue : issue.message })); render(); return }
       report(); editor.view.dispatch(tr)
     } catch {
-      if (current()) { report('The component could not be changed. Your document is unchanged.'); render() }
+      if (current()) { report(text('variantFailed')); render() }
     }
   }
-  for (const [action, text, symbol] of [['up', 'Move up', 'up'], ['down', 'Move down', 'down'], ['duplicate', 'Duplicate', 'copy'], ['delete', 'Delete', 'trash']] as const) {
+  const actionLabels: { label: Text; key: 'moveUp' | 'moveDown' | 'duplicate' | 'delete' }[] = []
+  for (const [action, key, symbol] of [['up', 'moveUp', 'up'], ['down', 'moveDown', 'down'], ['duplicate', 'duplicate', 'copy'], ['delete', 'delete', 'trash']] as const) {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.action = action
-    button.append(icon(symbol), document.createTextNode(text))
+    const label = document.createTextNode(text(key)); actionLabels.push({ label, key }); button.append(icon(symbol), label)
     if (action === 'delete') button.className = 'ginko-danger'
     button.addEventListener('click', () => { const pos = getPos(); if (pos === undefined || isPairedColumn()) return; close(); actOnBlock(editor, getNode(), pos, action) })
     actions.append(button)
@@ -75,33 +81,34 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
     renderedNode = node
     dom.hidden = !editor.isEditable || paired
     if (dom.hidden) close()
-    popover.setLabel(`${metadata?.label ?? node.attrs.tag} settings`)
+    popover.setLabel(text('componentSettings', { label: metadata?.label ?? node.attrs.tag }))
+    actionLabels.forEach(({ label, key }) => { label.data = text(key) })
     heading.textContent = metadata?.label ?? node.attrs.tag
     const variants = metadata?.canvas?.switchGroup
       ? Object.entries(kit?.authoring ?? {}).filter(([, meta]) => meta.canvas?.switchGroup === metadata.canvas?.switchGroup).map(([tag, meta]) => ({ tag, label: meta.label }))
       : []
-    const nextSignature = JSON.stringify([node.attrs.tag, metadata, kit?.policy.components[node.attrs.tag], variants])
+    const nextSignature = JSON.stringify([node.attrs.tag, metadata, kit?.policy.components[node.attrs.tag], variants, text('calloutType'), text('defaultValue'), text('emptyText')])
     if (signature !== nextSignature) {
       signature = nextSignature; inputs.clear(); fields.replaceChildren()
       if (metadata?.canvas?.switchGroup) {
-        const label = document.createElement('label'), text = document.createElement('span'), select = document.createElement('select')
-        text.textContent = 'Callout type'; select.setAttribute('aria-label', 'Callout type')
+        const label = document.createElement('label'), caption = document.createElement('span'), select = document.createElement('select')
+        caption.textContent = text('calloutType'); select.setAttribute('aria-label', text('calloutType'))
         variants.forEach(variant => {
           const option = document.createElement('option'); option.value = variant.tag; option.textContent = variant.label; select.append(option)
         })
         select.addEventListener('change', () => { void switchVariant(select.value) }); inputs.set('$variant', select)
-        label.append(text, select); fields.append(label)
+        label.append(caption, select); fields.append(label)
       }
       for (const [name, field] of Object.entries(metadata?.props ?? {})) {
         if (!field || name === metadata?.canvas?.titleProp) continue
-        const label = document.createElement('label'), text = document.createElement('span')
-        text.textContent = field.label
+        const label = document.createElement('label'), caption = document.createElement('span')
+        caption.textContent = field.label
         const input = document.createElement(field.control === 'select' ? 'select' : 'input')
         input.setAttribute('aria-label', field.label)
         const values = kit?.policy.components[node.attrs.tag]?.props[name]?.allowedValues ?? []
         if (input instanceof HTMLSelectElement) {
-          const option = document.createElement('option'); option.value = ''; option.textContent = 'Default'; input.append(option)
-          values.forEach(value => { const option = document.createElement('option'); option.value = JSON.stringify(value); option.textContent = typeof value === 'string' ? value || 'Empty text' : String(value); input.append(option) })
+          const option = document.createElement('option'); option.value = ''; option.textContent = text('defaultValue'); input.append(option)
+          values.forEach(value => { const option = document.createElement('option'); option.value = JSON.stringify(value); option.textContent = typeof value === 'string' ? value || text('emptyText') : String(value); input.append(option) })
           input.addEventListener('change', () => updateProperty(name, values.find(value => JSON.stringify(value) === input.value)))
         } else {
           input.type = field.control === 'toggle' ? 'checkbox' : 'text'
@@ -111,10 +118,10 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
             if (field.control !== 'number') { updateProperty(name, input.value); return }
             if (!input.value.trim()) { updateProperty(name, undefined); return }
             if (/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(input.value.trim()) && Number.isFinite(Number(input.value))) updateProperty(name, Number(input.value))
-            else report('Enter a valid number.')
+            else report(text('invalidNumber'))
           })
         }
-        inputs.set(name, input); label.append(text, input)
+        inputs.set(name, input); label.append(caption, input)
         if (field.help) { const help = document.createElement('small'); help.textContent = field.help; label.append(help) }
         fields.append(label)
       }
@@ -130,5 +137,5 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
     popover.position()
   }
   render()
-  return { dom, render, destroy() { disposed = true; variantRequest += 1; popover.destroy() } }
+  return { dom, render, contains: popover.contains, destroy() { disposed = true; variantRequest += 1; popover.destroy() } }
 }

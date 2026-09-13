@@ -2,6 +2,71 @@
 
 # Ginko Editor implementation and rollout plan
 
+## Active refactor — 2026-09-13
+
+**Owner and implementer: coordinating Astra. Status: local implementation verified; authenticated CMS and Windows/Linux acceptance remain open.** Matthias approved the coherent writing experience and shadcn-vue refactor in full. This section supersedes the historical executor/model assignments and step pauses below. All five local stages are authorized, including host integration and atomic local commits. Independent review remains required. No push, external issue/PR creation, publication, deployment, or production migration is authorized.
+
+Keep one Vue package and Content's parser/policy as the sole document contract. Keep Docs/host component appearance and recipes in their kits. Hosts own storage, authorization, persistence, document switching and application history. Preserve the user's playground draft and unrelated work.
+
+| Stage | Deliverable | Acceptance |
+| --- | --- | --- |
+| 1 | Shared guarded commands; Reka controls; shadcn theme; grouped toolbar with Insert table, Add image and Code block; scoped table tools | Active/disabled states, focus preservation, insertion and table scope verified in a real browser |
+| 2 | General block handles and valid nested moves; cross-platform shortcuts; inline components, three-stop columns, slash recipes and previews | Invalid moves rejected, one-step undo, cancellation, no layout shift, title/variant/slot preservation |
+| 3 | Upload and imagePicker together; mapped lifecycle; controlled shared image picker; CMS/ChiliSkills adapters | Add/replace/browse/cancel/retry, stable references, host flush/save/reload and asset recovery |
+| 4 | toolbarItems, toolbar/actions slot, exported GinkoToolbar, messages, shortcut overrides and overlayContainer | Default and custom shadcn toolbar; independent packed Vue/Nuxt; hydration, cleanup and multiple instances |
+| 5 | Consumer acceptance, documentation, independent review and clean local commits | Editor aggregate/packed gates; owning host checks; browser desktop/narrow/light/dark; genuine platform evidence |
+
+### Interaction and compatibility requirements
+
+- Text-selection bubble and node controls coordinate through editor-local state. Image replacement stays attached to its image. Preserve clipboard Markdown/MDC, rich HTML compatibility, cut failure safety and literal code paste.
+- Six-dot handles distinguish blocks, nested list items and containers. Tiptap drag support must use the same policy-checked movement operation as menus and keys. Paired columns swap contents; widths stay with positions. Provide single-pointer move alternatives.
+- Keep exactly Small/Large, Medium/Medium and Large/Small presets, edited by a central divider with preview/cancellation and atomic commit. Preserve custom layouts on load. Inline titles and cog settings replace detached inspectors.
+- Tables expose alignment and add-row/add-column directly, target actual rows/columns, preserve the required header and portable format. No merge cells or persisted widths.
+- Default styling follows shadcn semantic tokens with scoped compiled CSS, Reka behavior, Lucide icons and standalone fallbacks. No mandatory Tailwind, Nuxt UI, new Nuxt module or separate package.
+- New imagePicker resolves a focused EditorImage (stable id or durable URL plus presentation metadata). Preserve existing imageUpload/provider/events and flush contract. Callback takes precedence over the legacy picker event; complete exactly once. Hosts own unused-file cleanup and retain assets needed by undo.
+- CMS uses Content's asset reference collector and a real renderer preview. ChiliSkills preserves module history, local files, export/import and immediate-close flushing. A shared controlled image picker receives host data without queries or global management policy.
+- Preserve existing public routes and stored data; record necessary bridges in internals/migrations.md. No headless lifecycle API, arbitrary extension injection, collaboration, universal asset manager, registry service or implicit heading-section grouping.
+
+### Verification record
+
+The local refactor is implemented and independently reviewed. Final Editor checks
+passed dependency policy, ESLint, TypeScript, 281 tests across 22 files, library
+and declarations build, and production Docs build. Tests used `pnpm test
+--maxWorkers 2` to keep host verification from causing worker contention; a
+focused toolbar rerun also passed all 18 tests. Fresh packed Vue and Nuxt
+consumers passed, including public customization types and compiled styles.
+
+CMS `pnpm check` passed formatting, lint, type/build checks, package specifiers
+and 1,291 tests (one configured skip). After installing the exact Editor and
+Content archives, 73 relevant host tests and the package type/build checks passed
+again. The host reader bridge preserves Vue injections and reactive effects,
+locale updates, independent preview ownership, error recovery and teardown.
+
+ChiliSkills passed lint, formatting, typecheck, all 68 tests and production build.
+Existing slide scripts now use the shared editor by default. Actual macOS browser
+checks verified immediate lecture collapse/reopen, module undo/redo and reload;
+upload rejection and retry; ZIP export and restoration into an independent origin
+with the image's 640 × 400 bytes rendered. Source, assets and module history still
+use their existing ownership paths.
+
+Editor browser checks covered desktop light and 390 × 844 dark layouts, slash
+search/insertion, column-width keyboard changes and one-step undo, guarded layout
+movement and undo, table creation/row addition/alignment, source reload, upload,
+anchored replacement/library cancellation, and independent authoring kits. The
+existing user draft on port 4317 was preserved; disposable origins hosted tests.
+
+Remaining acceptance: the CMS development owner is `x@me.com`; membership remains
+unchanged at Matthias's request. Authenticated save/reload and locale switching
+need a working session for that account. Actual Windows/Linux keyboard and native
+OS-drag evidence is still unavailable. Tests simulating modifiers are not platform
+certification. Public package release, production migration and deployment remain
+outside this task's authorization. Complex grouped Docs components still require
+separate editing contracts, as documented in component coverage.
+
+---
+
+## Historical implementation plan
+
 Prepared: 2026-09-12. Owner: Matthias / Lupinum. Intended executor: GPT 5.6 Sol, medium reasoning. Reviewer: the coordinating agent that assigns each milestone.
 
 ## 1. Current authorization and how to use this plan

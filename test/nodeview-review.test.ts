@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { joinBackward, joinForward } from '@tiptap/pm/commands'
 import { TextSelection } from '@tiptap/pm/state'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -27,6 +27,14 @@ async function setup(source = '<info title="Keep this title" icon="before">\nBod
   const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: source, syncDebounceMs: 10000, authoringKit: await createAuthoringKit(kit) } })
   wrappers.push(wrapper); await flushPromises(); return wrapper
 }
+async function settings(wrapper: ReturnType<typeof mount<typeof GinkoEditor>>) {
+  const trigger = wrapper.get('.ginko-settings button')
+  if (trigger.attributes('aria-expanded') !== 'true') await trigger.trigger('click')
+  await flushPromises()
+  const panel = document.getElementById(trigger.attributes('aria-controls')!)
+  if (!panel) throw new Error('The component settings did not open.')
+  return new DOMWrapper(panel)
+}
 function delayedConversion() {
   const original = conversion.convertTiptapDocToMarkdown
   let release!: () => void
@@ -49,8 +57,8 @@ describe('nodeview review regressions', () => {
 
   it('applies the latest variant choice even when an earlier conversion finishes last', async () => {
     const wrapper = await setup(), release = delayedConversion()
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning')
-    await wrapper.get('select[aria-label="Callout type"]').setValue('success')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('success')
     await flushPromises()
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('success')
     release(); await flushPromises()
@@ -60,15 +68,15 @@ describe('nodeview review regressions', () => {
 
   it('cancels a pending change when the user chooses the current variant again', async () => {
     const wrapper = await setup(), release = delayedConversion()
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning')
-    await wrapper.get('select[aria-label="Callout type"]').setValue('info')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('info')
     release(); await flushPromises()
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
   it('rejects a pending variant after a temporary read-only transition', async () => {
     const wrapper = await setup(), release = delayedConversion()
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await wrapper.setProps({ disabled: true }); await wrapper.setProps({ disabled: false })
     release(); await flushPromises()
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
@@ -76,7 +84,7 @@ describe('nodeview review regressions', () => {
 
   it('rejects a pending variant after output settings change', async () => {
     const wrapper = await setup(), release = delayedConversion()
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning')
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await wrapper.setProps({ fileOutput: 'markdown' })
     release(); await flushPromises()
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
@@ -86,10 +94,10 @@ describe('nodeview review regressions', () => {
     const first = kitSource()
     delete first.authoring.success; delete first.implementation.success; delete first.policy.components.success
     const wrapper = await setup(undefined, first)
-    expect(wrapper.get('select[aria-label="Callout type"]').findAll('option').map(option => option.attributes('value'))).toEqual(['info', 'warning'])
+    expect((await settings(wrapper)).get('select[aria-label="Callout type"]').findAll('option').map(option => option.attributes('value'))).toEqual(['info', 'warning'])
     const next = kitSource(); next.authoring.warning.label = 'Caution'
     await wrapper.setProps({ authoringKit: await createAuthoringKit(next) }); await flushPromises()
-    expect(wrapper.get('select[aria-label="Callout type"]').findAll('option').map(option => option.text())).toEqual(['info', 'Caution', 'success'])
+    expect((await settings(wrapper)).get('select[aria-label="Callout type"]').findAll('option').map(option => option.text())).toEqual(['info', 'Caution', 'success'])
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
@@ -97,22 +105,22 @@ describe('nodeview review regressions', () => {
     const kit = kitSource()
     kit.policy.components.warning.props.title.allowedValues = ['A different title']
     const wrapper = await setup(undefined, kit), before = wrapper.vm.editor!.state.doc
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
     expect(wrapper.vm.editor!.state.doc).toBe(before)
-    expect(wrapper.get('.ginko-editor__field-error').text()).toContain('This document violates the editor authoring kit.')
+    expect((await settings(wrapper)).get('.ginko-editor__field-error').text()).toContain('This document violates the editor authoring kit.')
     expect(wrapper.text()).not.toContain('[object Object]')
   })
 
   it('handles a conversion exception visibly without changing the component', async () => {
     const wrapper = await setup(), before = wrapper.vm.editor!.state.doc
     vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockRejectedValueOnce(new Error('Controlled failure'))
-    await wrapper.get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
+    await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
     expect(wrapper.vm.editor!.state.doc).toBe(before)
-    expect(wrapper.get('.ginko-editor__field-error').text()).toContain('Your document is unchanged.')
+    expect((await settings(wrapper)).get('.ginko-editor__field-error').text()).toContain('Your document is unchanged.')
   })
 
   it('undoes and redoes a property edit while its settings input has focus', async () => {
-    const wrapper = await setup(), input = wrapper.get('input[aria-label="Icon"]')
+    const wrapper = await setup(), input = (await settings(wrapper)).get('input[aria-label="Icon"]')
     await input.setValue('after')
     await input.trigger('keydown', { key: 'z', ctrlKey: true })
     expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.props.icon).toBe('before')
