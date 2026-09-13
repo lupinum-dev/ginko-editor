@@ -4,6 +4,7 @@ import { parseMdcBody, validatePublicMarkdownAst, type ParseMdcBodyResult } from
 import type { AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import LearningObjective from './LearningObjective.vue'
+import PlaygroundImage from './PlaygroundImage.vue'
 import HostNote from './HostNote.vue'
 
 const props = defineProps<{ source: string; kit: AuthoringKitV1; compact?: boolean }>()
@@ -11,7 +12,7 @@ const body = shallowRef<ParseMdcBodyResult['body'] | null>(null)
 const error = ref('')
 const parsing = ref(false)
 const renderKey = ref(0)
-const components = computed(() => ({ ...Object.fromEntries(Object.entries(props.kit.implementation).map(([tag, implementation]) => [tag, implementation.componentName])), 'learning-objective': LearningObjective, 'host-note': HostNote }))
+const components = computed(() => ({ ...Object.fromEntries(Object.entries(props.kit.implementation).map(([tag, implementation]) => [tag, implementation.componentName])), 'learning-objective': LearningObjective, 'host-note': HostNote, img: PlaygroundImage }))
 let revision = 0
 let timer: ReturnType<typeof globalThis.setTimeout>
 watch(() => [props.source, props.kit] as const, ([source, kit]) => {

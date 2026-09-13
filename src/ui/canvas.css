@@ -75,3 +75,16 @@
 .ginko-editor .ginko-image > .ginko-popover { position: absolute; right: .5rem; top: .5rem; }
 .ginko-editor .ginko-image > .ginko-popover > summary { background: var(--ginko-bg); border: 1px solid var(--ginko-border); opacity: .3; }
 .ginko-editor .ginko-image:hover > .ginko-popover > summary, .ginko-editor .ginko-image:focus-within > .ginko-popover > summary { opacity: 1; }
+
+.ginko-editor .ginko-image-upload { position: relative; box-sizing: border-box; margin: 1rem 0; border: 1px dashed var(--ginko-border); border-radius: .65rem; background: color-mix(in srgb, var(--ginko-muted) 45%, var(--ginko-bg)); transition: border-color 120ms, background 120ms; }
+.ginko-editor .ginko-image-upload__dropzone { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: .45rem; width: 100%; min-height: 180px; padding: 1.5rem 2rem; color: var(--ginko-text); background: transparent; border: 0; border-radius: inherit; font: inherit; cursor: pointer; }
+.ginko-editor .ginko-image-upload__symbol { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: .35rem; border: 1px solid var(--ginko-border); border-radius: .75rem; background: var(--ginko-bg); box-shadow: 0 2px 5px rgb(0 0 0 / .04); color: var(--ginko-muted-text); }
+.ginko-editor .ginko-image-upload__symbol svg { width: 25px; height: 25px; }
+.ginko-editor .ginko-image-upload__label { font-size: .875rem; font-weight: 550; }
+.ginko-editor .ginko-image-upload__hint { font-size: .75rem; color: var(--ginko-muted-text); }
+.ginko-editor .ginko-image-upload__cancel { position: absolute; top: .5rem; right: .5rem; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: .35rem; background: transparent; color: var(--ginko-muted-text); cursor: pointer; }
+.ginko-editor .ginko-image-upload__cancel:hover { color: var(--ginko-text); background: var(--ginko-muted); }
+.ginko-editor .ginko-image-upload:has(.ginko-image-upload__dropzone:hover), .ginko-editor .ginko-image-upload[data-dragging='true'] { border-color: var(--ginko-text); background: var(--ginko-muted); }
+.ginko-editor .ginko-image-upload__dropzone:disabled { cursor: progress; }
+.ginko-editor .ginko-image-upload__error { margin: 0; padding: 0 1rem 1rem; color: #b34c3b; font-size: .8rem; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .ginko-editor .ginko-image-upload { transition: none; } }

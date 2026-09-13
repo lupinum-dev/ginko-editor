@@ -2860,3 +2860,42 @@ The final production playground is running at
 `http://127.0.0.1:4317/playground`. Its existing saved draft was preserved and
 opened with the new controls; the final browser reported no console errors.
 The isolated `localhost:4318` test preview was cleaned up after verification.
+
+## Toolbar and inline uploads — 2026-09-13
+
+The writing bar now groups history, block formatting, text formatting, and media
+behind consistent icons. Heading and list menus support keyboard navigation;
+the link popover retains the selected text, validates destinations, and closes
+when its editing context becomes stale. Only supported Markdown actions appear.
+
+The optional `imageUpload(file, { signal })` host callback supplies persistence
+for Add image, `/image`, and Replace image. The inline placeholder accepts one
+image up to 10 MB, supports drop and file selection, reports errors, and permits
+retry or removal. Pending UI is a mapped view decoration, never saved source.
+New uploads keep their document-level position while adjacent blocks change;
+replacement retains the original until success. Cancellation aborts the host
+signal, late results are ignored, and successful insertion preserves typing
+selection and its own undo step. Pending uploads participate in the public
+flush/navigation guard. Existing host-picker consumers require no API change.
+
+The playground replaces its URL dialog with this upload capability. It stores
+files in IndexedDB under local site-relative identities and resolves temporary
+display URLs through the same host provider in the editor and reader. Files and
+references survive reload in this browser. They are not published assets or
+portable across devices. Provider display URLs now take precedence over a safe
+stored image path. Content remains the parser and validation authority.
+
+Validation: `pnpm verify` passed with 185 tests, lint, types, dependency policy,
+library declarations/build, and production docs build. Independent review found
+and verified fixes for flush races, successful replacement cancellation, mapped
+block boundaries, transform metadata, inert command probes, and conflicting
+Add/Replace anchors. Actual browser checks covered grouped toolbar appearance,
+keyboard heading selection, Tab dismissal, selection-preserving links, a
+390-pixel viewport without horizontal overflow and with 44-pixel touch targets,
+Add and slash image placeholders, file chooser upload, replacement, reader
+preview, and reload persistence. Native drop events, retry, size/type rejection,
+concurrency, cancellation, and history are covered by focused component tests.
+
+This pass changes Editor and its docs host only. Docs `d6a6910`, Content
+`2789113`, CMS `4da0a230`, and ChiliSkills `ce2de51` remain clean. The previously
+recorded authenticated CMS acceptance and public release gates remain separate.

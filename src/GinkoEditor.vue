@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { closeHistory } from '@tiptap/pm/history'
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
@@ -15,6 +16,7 @@ import type {
   EditorAssetRequest,
   EditorFlushResult,
   VideoInfo,
+  ImageUploadHandler,
 } from './types'
 import { parentColumnConfig } from './lib/nodeviews/columns'
 import { actOnBlock } from './lib/nodeviews/block-actions'
@@ -24,6 +26,7 @@ import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes
 defineOptions({ name: 'GinkoEditor' })
 
 const props = withDefaults(defineProps<{
+  imageUpload?: ImageUploadHandler
   ariaLabel?: string
   assetProvider?: AssetProvider
   authoringKit?: AuthoringKitV1
@@ -45,6 +48,7 @@ const props = withDefaults(defineProps<{
   codeBlockTheme: 'github-dark',
   ariaLabel: undefined,
   assetProvider: undefined,
+  imageUpload: undefined,
   authoringKit: undefined,
   disabled: false,
   enableDebug: false,
@@ -76,6 +80,9 @@ const rawContent = ref(props.modelValue)
 const conversionError = ref<ConversionErrorPayload | null>(null)
 const clipboardError = ref<string>()
 const hasPendingVisualChanges = ref(false)
+const pendingImages = ref(0)
+const imageUploadNotice = ref('')
+const hasPendingChanges = computed(() => hasPendingVisualChanges.value || pendingImages.value > 0)
 let pendingEcho: string | undefined
 let revision = 0
 let syncTimer: ReturnType<typeof globalThis.setTimeout> | undefined
@@ -134,6 +141,10 @@ const editor = useEditor({
     canPaste: () => canMutateVisualContent(),
     onPasteError: message => { clipboardError.value = message },
     onCopyError: message => { clipboardError.value = message },
+    getImageUpload: () => props.imageUpload,
+    canUploadImage: () => canMutateVisualContent(props.enableImages),
+    insertUploadedImage: insertUploadedImageAt,
+    onImageUploadPending: count => { pendingImages.value = count; if (!count) imageUploadNotice.value = '' },
     imageActions: imageProps => {
       const source = typeof imageProps.src === 'string' ? imageProps.src : ''
       const id = typeof imageProps.id === 'string' && imageProps.id ? imageProps.id : resolvedAssetProvider.value.parseUrl(source)?.id
@@ -493,6 +504,7 @@ function clearFailure(traceId: string) {
 }
 
 async function loadSource(value: string, options: { initial?: boolean; switchToVisual?: boolean } = {}) {
+  editor.value?.commands.clearImageUploads()
   clipboardError.value = undefined
   closeInsertMenu(false)
   cancelPendingUpdate()
@@ -570,6 +582,10 @@ async function emitVisualDocument(
 
 async function flush(): Promise<EditorFlushResult> {
   if (viewMode.value === 'raw') return { emitted: false, ok: true }
+  if (pendingImages.value) {
+    imageUploadNotice.value = 'Finish or remove the image upload before leaving the editor.'
+    return { ok: false, error: { code: 'image_upload_pending', phase: 'validate', message: imageUploadNotice.value, recoverable: true, traceId: 'image-upload', issues: [], timeline: [] } }
+  }
 
   let emitted = false
   while (hasPendingVisualChanges.value) {
@@ -583,7 +599,7 @@ async function flush(): Promise<EditorFlushResult> {
       if (!result.ok) return result
       emitted ||= result.emitted
       if (inFlightRevision !== revision) continue
-      if (!hasPendingVisualChanges.value) return { emitted, ok: true }
+      if (!hasPendingVisualChanges.value) break
     }
 
     const instance = editor.value
@@ -599,6 +615,7 @@ async function flush(): Promise<EditorFlushResult> {
     if (currentRevision !== revision) continue
   }
 
+  if (pendingImages.value) return flush()
   if (conversionError.value) return { error: conversionError.value, ok: false }
   return { emitted, ok: true }
 }
@@ -633,15 +650,28 @@ function storedAssetSource(asset: Partial<AssetInfo>) {
   return asset.url || asset.id || resolvedAssetProvider.value.buildUrl(asset)
 }
 
+function imagePayload(asset: Partial<AssetInfo>) {
+  const src = storedAssetSource(asset)
+  if (!src.trim()) return
+  return { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src, title: asset.title, width: asset.width, fit: asset.fit, quality: asset.quality, focalX: asset.focalX, focalY: asset.focalY, cropX: asset.cropX, cropY: asset.cropY, cropWidth: asset.cropWidth, cropHeight: asset.cropHeight }
+}
+
 function insertImageAsset(asset: Partial<AssetInfo>): boolean {
   const instance = editor.value
   if (!instance || !canMutateVisualContent(props.enableImages)) return false
-  const src = storedAssetSource(asset)
-  if (!src.trim()) return false
-  const payload = { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src, title: asset.title, width: asset.width }
+  const payload = imagePayload(asset)
+  if (!payload) return false
   return instance.isActive('image')
     ? instance.chain().focus().updateAttributes('image', { props: payload }).run()
     : instance.chain().focus().setImage(payload).run()
+}
+
+function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSize = 0): boolean {
+  const instance = editor.value
+  if (!instance || !canMutateVisualContent(props.enableImages)) return false
+  const payload = imagePayload(asset)
+  if (!payload) return false
+  return instance.chain().command(({ tr }) => { closeHistory(tr); return true }).insertContentAt({ from: pos, to: pos + replaceSize }, { type: 'image', attrs: { props: payload } }, { updateSelection: false }).run()
 }
 
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
@@ -700,6 +730,7 @@ function createAssetRequest<T>(complete: (value: T) => boolean): EditorAssetRequ
 
 function requestImage() {
   if (!canMutateVisualContent(props.enableImages)) return
+  if (props.imageUpload) { editor.value?.commands.insertImageUpload(); return }
   emit('request-image', createAssetRequest(insertImageAsset))
 }
 
@@ -718,7 +749,7 @@ watch(() => props.modelValue, (value, previous) => {
   if (consumeEcho(value)) return
   void loadSource(value)
 })
-watch(hasPendingVisualChanges, (pending) => emit('pending-change', pending), {
+watch(hasPendingChanges, (pending) => emit('pending-change', pending), {
   flush: 'sync',
 })
 let assetContextRevision = 0
@@ -729,6 +760,7 @@ watch([() => props.assetProvider, () => props.enableImageMetadata, () => props.e
   const instance = editor.value
   if (instance && !instance.isDestroyed) instance.view.dispatch(instance.state.tr)
 })
+watch([() => props.imageUpload, () => props.disabled, () => props.enableImages, () => props.assetProvider, () => props.authoringKit], () => { editor.value?.commands.clearImageUploads() }, { flush: 'sync' })
 watch(() => props.disabled, (disabled) => {
   editor.value?.setEditable(!disabled)
   if (disabled) closeInsertMenu(false)
@@ -767,7 +799,7 @@ const statusLabel = computed(() => {
 defineExpose({
   editor,
   flush,
-  hasPendingChanges: () => hasPendingVisualChanges.value,
+  hasPendingChanges: () => hasPendingChanges.value,
   insertFileAsset,
   insertImageAsset,
   insertVideo,
@@ -916,6 +948,13 @@ defineExpose({
       <strong>{{ viewMode === 'visual' ? 'Your changes are still here. Correct the document or use Undo before switching modes.' : 'Visual editing is unavailable for this source.' }}</strong>
       <span>{{ conversionError.message }}</span>
     </div>
+    <p
+      v-if="imageUploadNotice"
+      class="ginko-editor__clipboard-error"
+      role="alert"
+    >
+      {{ imageUploadNotice }}
+    </p>
     <template v-if="viewMode === 'visual' && editor">
       <GinkoToolbar
         v-if="!disabled"

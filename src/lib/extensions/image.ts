@@ -116,7 +116,7 @@ export const Image = Node.create<ImageOptions>({
     attrs['data-ginko-props'] = JSON.stringify(props)
     const resolvedSrc = this.options.resolveSrc?.(props)
     const displaySrc =
-      sanitizeImageUrl(rawSrc) ?? sanitizeResolvedImageUrl(String(resolvedSrc || ''))
+      sanitizeResolvedImageUrl(String(resolvedSrc || '')) ?? sanitizeImageUrl(rawSrc)
     if (displaySrc) {
       attrs.src = displaySrc
     }

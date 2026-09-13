@@ -55,8 +55,7 @@ async function clickButton(wrapper: Awaited<ReturnType<typeof mountEditor>>, lab
 }
 
 async function requestImage(wrapper: Awaited<ReturnType<typeof mountEditor>>) {
-  await clickButton(wrapper, 'More')
-  await clickButton(wrapper, 'Image')
+  await wrapper.get('button[aria-label="Add image"]').trigger('click')
 }
 
 describe('GinkoEditor browser journey', () => {
@@ -338,11 +337,9 @@ describe('GinkoEditor browser journey', () => {
     })
     await flushPromises()
     await waitFor(() => Boolean(wrapper.vm.editor))
-    await clickButton(wrapper, 'More')
-    const actions = wrapper.findAll('button').map((button) => button.text())
-    expect(actions).toContain('Image')
-    expect(actions).not.toContain('File')
-    expect(actions).not.toContain('Video')
+    expect(wrapper.find('button[aria-label="Add image"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Add file"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Add video"]').exists()).toBe(false)
     expect(wrapper.vm.insertFileAsset({ url: '/file.pdf' })).toBe(false)
     expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
   })

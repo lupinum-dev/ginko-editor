@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
 import { useHead } from '#imports'
-import { validatePublicMarkdownAst } from '@lupinum/ginko-content/cms-contract'
-import { GinkoEditor, type GinkoEditorHandle, type EditorAssetRequest, type AssetInfo } from '@lupinum/ginko-editor'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { GinkoEditor, type GinkoEditorHandle } from '@lupinum/ginko-editor'
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { isolatedAuthoringKit, playgroundAuthoringKit } from '../playground/contracts'
+import { createPlaygroundAssets, playgroundImageSource } from '../playground/assets'
 import PlaygroundPreview from '../components/PlaygroundPreview.vue'
 
 defineOptions({ name: 'EditorPlaygroundPage' })
 useHead({ title: 'Writing playground · Ginko Editor' })
 const example = '# A little structure. A lot of possibility.\n\nGood documents make room for the important things. Start with a thought, give it a shape, and make it your own.\n\n<info title="Make yourself at home" appearance="tint">\nEverything on this page is editable. Type **/** on a new line to add a block, or select some text to format it.\n</info>\n\n## From an idea to a clear page\n\n- Write naturally, with Markdown shortcuts.\n- Add a callout, columns, or a learning objective.\n- See the actual components in the live preview.\n\n> The best tool gets out of the way of your next thought.\n\n'
 const source = ref(example)
+const assets = createPlaygroundAssets()
+provide(playgroundImageSource, assets.resolve)
 const editor = ref<GinkoEditorHandle>()
 const view = ref<'write' | 'split' | 'preview'>('split')
 const showLibrary = ref(false)
@@ -21,34 +23,12 @@ const draftKey = 'ginko-editor:docs-playground:draft:v1'
 const draftStatus = ref('Only in this browser')
 const ready = ref(false)
 const pending = ref(false)
-const imageDialog = ref<InstanceType<typeof globalThis.HTMLDialogElement>>()
-const imageUrl = ref('')
-const imageAlt = ref('')
-const imageError = ref('')
-let imageRequest: EditorAssetRequest<Partial<AssetInfo>> | undefined
-function requestImage(request: EditorAssetRequest<Partial<AssetInfo>>) {
-  imageRequest = request
-  imageUrl.value = ''
-  imageAlt.value = ''
-  imageError.value = ''
-  imageDialog.value?.showModal()
-}
-function insertImage() {
-  try {
-    const url = imageUrl.value.trim()
-    const validation = validatePublicMarkdownAst({ type: 'root', children: [{ type: 'element', tag: 'img', props: { src: url, alt: imageAlt.value }, children: [] }] }, playgroundAuthoringKit.policy)
-    if (!url || !validation.ok) throw new Error('Use a public HTTPS image URL or a path such as /image.png.')
-    if (!imageRequest?.complete({ url, alt: imageAlt.value })) throw new Error('The document changed. Select your insertion point and try again.')
-    imageRequest = undefined
-    imageDialog.value?.close()
-  } catch (cause) { imageError.value = cause instanceof Error ? cause.message : 'Check the image URL.' }
-}
-function cancelImage() { imageRequest?.complete(null); imageRequest = undefined; imageDialog.value?.close() }
 let saveTimer: ReturnType<typeof globalThis.setTimeout>
 const wordCount = computed(() => source.value.trim().split(/\s+/).filter(Boolean).length)
 const examples = computed(() => playgroundAuthoringKit.recipes)
 
-onMounted(() => {
+onMounted(async () => {
+  try { await assets.load() } catch { draftStatus.value = 'Browser image storage is unavailable' }
   try {
     const saved = globalThis.localStorage.getItem(draftKey)
     if (saved !== null) { source.value = saved; draftStatus.value = 'Local draft restored' }
@@ -67,7 +47,7 @@ function saveDraft() {
 }
 async function replaceDocument(value: string) {
   const result = await editor.value?.flush()
-  if (result && !result.ok) { draftStatus.value = 'Fix the source warning before changing documents.'; return false }
+  if (result && !result.ok) { draftStatus.value = result.error.message; return false }
   previousDocument.value = source.value
   source.value = value
   view.value = 'split'
@@ -97,7 +77,7 @@ function protectPendingChanges(event: InstanceType<typeof globalThis.BeforeUnloa
 }
 function saveOnExit() { if (ready.value && !pending.value) saveDraft() }
 onMounted(() => { globalThis.addEventListener('pagehide', saveOnExit); globalThis.addEventListener('beforeunload', protectPendingChanges) })
-onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); globalThis.removeEventListener('pagehide', saveOnExit); globalThis.removeEventListener('beforeunload', protectPendingChanges) })
+onBeforeUnmount(() => { assets.dispose(); globalThis.clearTimeout(saveTimer); saveOnExit(); globalThis.removeEventListener('pagehide', saveOnExit); globalThis.removeEventListener('beforeunload', protectPendingChanges) })
 </script>
 
 <template>
@@ -217,12 +197,13 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
           ref="editor"
           v-model="source"
           :authoring-kit="playgroundAuthoringKit"
+          :asset-provider="assets.provider"
+          :image-upload="assets.upload"
           :enable-files="false"
           :enable-video="false"
           image-output="markdown"
           aria-label="Main playground editor"
           placeholder="Write something, or type / for blocks…"
-          @request-image="requestImage"
           @pending-change="pending = $event"
         >
           <template #recipe-preview="{ recipe }">
@@ -263,56 +244,6 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
       </button>
     </div>
 
-    <dialog
-      ref="imageDialog"
-      class="image-dialog"
-      aria-labelledby="image-dialog-title"
-      @cancel="cancelImage"
-    >
-      <form @submit.prevent="insertImage">
-        <div class="library-heading">
-          <div>
-            <h2 id="image-dialog-title">
-              Add an image
-            </h2><p>Give your readers something to see.</p>
-          </div><button
-            type="button"
-            aria-label="Close image dialog"
-            @click="cancelImage"
-          >
-            ×
-          </button>
-        </div>
-        <label>Image URL<input
-          v-model="imageUrl"
-          type="text"
-          inputmode="url"
-          required
-          placeholder="https://example.com/image.jpg"
-          autofocus
-        ></label>
-        <label>Description<input
-          v-model="imageAlt"
-          placeholder="Describe the image for someone who cannot see it"
-        ></label>
-        <p
-          v-if="imageError"
-          role="alert"
-        >
-          {{ imageError }}
-        </p>
-        <div class="image-dialog-actions">
-          <button
-            type="button"
-            @click="cancelImage"
-          >
-            Cancel
-          </button><button type="submit">
-            Insert image
-          </button>
-        </div>
-      </form>
-    </dialog>
     <section class="integration-checks">
       <button
         type="button"
@@ -394,12 +325,6 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
 .library-card-footer strong { font-weight: 550; }
 .document-notice { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .75rem; margin-bottom: .75rem; border: 1px solid var(--border); border-radius: .5rem; font-size: .8rem; }
 .document-notice button { text-decoration: underline; }
-.image-dialog { width: min(30rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--card); color: var(--foreground); box-shadow: 0 20px 80px rgb(0 0 0 / .25); }
-.image-dialog::backdrop { background: rgb(0 0 0 / .4); }
-.image-dialog label { display: grid; gap: .5rem; font-size: .8rem; margin: 1.2rem 0; }
-.image-dialog input { width: 100%; border: 1px solid var(--border); border-radius: .4rem; padding: .7rem; background: var(--background); color: var(--foreground); }
-.image-dialog-actions { display: flex; gap: .5rem; justify-content: end; }
-.image-dialog-actions button:last-child { background: var(--foreground); color: var(--background); }
 .integration-checks { border-top: 1px solid var(--border); margin-top: 2rem; }
 .integration-checks > button { width: 100%; justify-content: space-between; color: var(--muted-foreground); padding: 1rem 0; }
 .checks-content { max-width: 50rem; padding-block: 1rem; }

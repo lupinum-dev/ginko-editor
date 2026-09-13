@@ -86,10 +86,11 @@ async function verifyVueConsumer(consumer) {
     join(consumer, 'App.vue'),
     `<script setup lang="ts">
 import { onMounted, ref, shallowRef } from 'vue'
-import { GinkoEditor, type GinkoEditorHandle } from '@lupinum/ginko-editor'
+import { GinkoEditor, type GinkoEditorHandle, type ImageUploadHandler } from '@lupinum/ginko-editor'
 import { createAuthoringKit, type AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
 const source = ref('# Vue consumer\\n')
 const editor = ref<GinkoEditorHandle>()
+const uploadImage: ImageUploadHandler = async (_file, { signal }) => { signal.throwIfAborted(); return { url: '/host-image.png' } }
 const authoringKit = shallowRef<AuthoringKitV1>()
 const error = ref('')
 onMounted(async () => {
@@ -101,7 +102,7 @@ async function flush() {
 }
 </script>
 <template>
-  <GinkoEditor v-if="authoringKit" ref="editor" v-model="source" :authoring-kit="authoringKit" :enable-images="true" :enable-files="false" :enable-video="false" @request-image="request => request.complete(null)">
+  <GinkoEditor v-if="authoringKit" ref="editor" v-model="source" :authoring-kit="authoringKit" :image-upload="uploadImage" :enable-images="true" :enable-files="false" :enable-video="false">
     <template #recipe-preview="{ recipe }"><p>{{ recipe.description ?? recipe.label }}</p></template>
   </GinkoEditor>
   <button @click="flush">Flush changes</button><p>{{ error }}</p>
@@ -120,7 +121,7 @@ async function flush() {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table']) {
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-editor__toolbar-group']) {
     if (!(await containsCss(join(consumer, 'dist'), marker))) throw new Error(`The Vue production build dropped package CSS: ${marker}.`)
   }
 }
@@ -156,7 +157,7 @@ async function verifyNuxtConsumer(consumer) {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table']) {
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-editor__toolbar-group']) {
     if (!(await containsCss(join(consumer, '.output'), marker))) throw new Error(`The Nuxt production build dropped package CSS: ${marker}.`)
   }
 }

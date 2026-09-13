@@ -19,6 +19,7 @@ export type {
   EditorAssetRequest,
   EditorFlushResult,
   GinkoEditorHandle,
+  ImageUploadHandler,
   VideoInfo,
 } from './types'
 export type { ConversionErrorPayload, ConversionRecoveredPayload } from './lib/conversionPipeline'

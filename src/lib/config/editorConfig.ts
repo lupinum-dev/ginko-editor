@@ -1,3 +1,5 @@
+import { ImageUpload } from '../extensions/image-upload'
+import type { ImageUploadHandler, AssetInfo } from '../../types'
 import type { ImageActions } from '../nodeviews/image'
 import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -37,6 +39,10 @@ const TableHeader = TiptapTableHeader.extend({
 })
 
 export interface CreateEditorExtensionsOptions {
+  getImageUpload?: () => ImageUploadHandler | undefined
+  canUploadImage?: () => boolean
+  insertUploadedImage?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
+  onImageUploadPending?: (count: number) => void
   imageActions?: ImageActions
   assetProvider?: AssetProvider
   codeBlockTheme: string
@@ -114,6 +120,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
     CodeBlock.configure({
       theme: codeBlockTheme,
     }),
+    ImageUpload.configure({ upload: options.getImageUpload, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
     Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions }),
     Video,
     File.configure({ resolveSrc: resolveAsset }),

@@ -66,6 +66,25 @@ describe('async authoring validation regressions', () => {
     })
   }
 
+  it('blocks both active flush callers when an image placeholder is added during conversion', async () => {
+    const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: await createAuthoringKit(source()), syncDebounceMs: 10000, imageUpload: async () => ({ url: '/image.png' }) } })
+    let release!: () => void
+    try {
+      await flushPromises()
+      let signalStarted!: () => void
+      const started = new Promise<void>(resolve => { signalStarted = resolve })
+      const blocked = new Promise<void>(resolve => { release = resolve })
+      state.pause = () => { signalStarted(); return blocked }
+      wrapper.vm.editor!.commands.insertContent('Edited ')
+      const first = wrapper.vm.flush()
+      await started
+      const second = wrapper.vm.flush()
+      wrapper.vm.editor!.commands.insertImageUpload()
+      release()
+      for (const result of await Promise.all([first, second])) expect(result).toMatchObject({ ok: false, error: { code: 'image_upload_pending' } })
+    } finally { release?.(); state.pause = undefined; wrapper.unmount() }
+  })
+
   it('emits only the newest local edit when another edit occurs during validation', async () => {
     const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: await createAuthoringKit(source()), syncDebounceMs: 10000 } })
     try {

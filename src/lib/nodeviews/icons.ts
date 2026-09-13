@@ -1,5 +1,7 @@
 /** Small stroke icons share one geometry and inherit the host's text color. */
 const paths = {
+  close: 'm6 6 12 12M6 18 18 6',
+  imageUpload: 'M14 4H4v16h16V10M4 16l5-5 5 5 2-2 4 4M16 5h6M19 2v6M8 7h.01',
   settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM9 3l1-1h4l1 1 .5 2 2 1 2-.5 2 3-1.5 1.5v3L21.5 15l-2 3-2-.5-2 1L15 21h-6l-.5-2.5-2-1-2 .5-2-3L4 13v-3L2.5 8.5l2-3 2 .5 2-1L9 3Z',
   rows: 'M3 4h18v16H3zM3 9h18M3 15h18',
   columns: 'M3 4h18v16H3zM9 4v16M15 4v16',

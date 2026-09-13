@@ -49,7 +49,8 @@ Opening, closing, or changing modes does not rewrite `source`. A real visual edi
 emits normalized MDC. An invalid or unsupported value remains byte-for-byte
 available in the Markdown textarea.
 
-The host owns persistence and asset selection. Listen for `request-image`,
+The host owns persistence and asset selection. Supply `image-upload` for the inline
+upload flow below, or listen for `request-image`,
 `request-file`, or `request-video`, then call the event request's `complete`
 method after the user selects an asset. Pass `null` when selection is cancelled.
 Each request can complete once. Cancellation is permanent. Completion returns
@@ -62,8 +63,8 @@ external replacement, the current external source remains authoritative; hosts
 should not replay older editor emissions as intentional replacements.
 Before closing the editor or replacing its document, await the exposed `flush()`
 method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
-result means conversion failed: keep the editor open so the user can correct
-the document or use Undo. A failed flush blocks switching to Markdown, which
+result means conversion failed or an image upload is unfinished: keep the editor
+open so the user can correct the document, finish the upload, or remove it. A failed flush blocks switching to Markdown, which
 would otherwise replace pending visual edits with older source. `flush()` emits
 the latest converted source but does
 not persist it; the host still owns and must await its save operation.
@@ -88,6 +89,54 @@ document. An unsupported paste leaves the document unchanged and explains why.
 `createAuthoringKit` consumes and freezes its input before asynchronous recipe
 validation. Pass a fresh object if the application must keep an editable draft
 of the configuration.
+
+## Inline image uploads
+
+Provide one callback to enable an upload placeholder for **Add image**, `/image`,
+and **Replace image**. The editor accepts one non-empty image file up to 10 MB
+per placeholder, from the file chooser or drag and drop.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { GinkoEditor, type ImageUploadHandler } from '@lupinum/ginko-editor'
+import '@lupinum/ginko-editor/style.css'
+import { saveImage } from './assets' // Your host's validated storage operation.
+
+const source = ref('')
+const uploadImage: ImageUploadHandler = async (file, { signal }) => {
+  const saved = await saveImage(file, { signal })
+  return { url: saved.url, alt: file.name }
+}
+</script>
+
+<template>
+  <GinkoEditor v-model="source" :image-upload="uploadImage" :enable-files="false" :enable-video="false" />
+</template>
+```
+
+Return a durable URL, or an `id` with an `asset-provider` that resolves it for
+display. The provider's safe display URL takes precedence over the stored image
+source. Match stored references to the consuming Content policy; native image
+URLs support site-relative paths such as `/images/photo.png`. Use
+`image-output="markdown"` for native Markdown; the default MDC output also
+preserves supported image dimensions and crop/focal metadata.
+
+The host validates and persists files. Reject with a user-facing error to keep
+the placeholder available for retry. Respect `signal` to cancel work when the
+placeholder, document, upload handler, or editor lifetime changes. A failed or
+cancelled replacement keeps the original image. Completion follows the original
+insertion point as text changes and does not interrupt typing elsewhere.
+
+Pending placeholders are temporary view state, never Markdown or document nodes.
+`hasPendingChanges()` and `pending-change` include them; `flush()` returns
+`image_upload_pending` until they finish or are removed. Preserve this guard when
+saving, leaving, or changing documents. Without `image-upload`, the existing
+`request-image` host-picker contract applies.
+
+The docs playground stores uploaded files in this browser's IndexedDB. Its local
+image references survive reloads in that browser, but do not publish images or
+make them available on other devices. Applications supply their own storage.
 
 ## Inline component controls
 

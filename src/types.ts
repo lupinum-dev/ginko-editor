@@ -41,6 +41,9 @@ export interface AssetProvider {
   parseUrl: (url: string) => Partial<AssetInfo> | null
 }
 
+/** Host-owned persistence for an inline image upload. Reject to show a retryable error. */
+export type ImageUploadHandler = (file: File, context: { signal: AbortSignal }) => Promise<Partial<AssetInfo>>
+
 export interface EditorAssetRequest<T> {
   /** Complete once. Null cancels permanently; false means nothing was applied. */
   complete: (value: T | null) => boolean
