@@ -3,6 +3,19 @@
 > requirements and their earlier acceptance below. Remove handles, move menus,
 > move shortcuts and the drag dependency. Preserve source, ordinary editing,
 > component duplication/deletion, column sizing and host image uploads.
+> Implemented in `3337fcc`. Verification: `pnpm verify` (260 tests, dependency
+> policy, lint, types, library and documentation builds), clean dependency audit,
+> independent final review, and packed Vue/Nuxt consumers all passed. Focused
+> host checks passed (73 CMS, 7 ChiliSkills tests), and the ChiliSkills build
+> passed with the same archive. Archive SHA-256:
+> `f8dbf2b5a80281f1bd54ef8b62e8f0ccd862652d77bef2bf0bf55946c603d284`.
+> Browser checks confirmed no handle/move actions, no image repositioning on
+> drag, retained duplicate/delete/undo, and a usable 390-pixel canvas. Refreshing
+> the user's playground preserved the 96-word draft, titles and both loaded
+> images. Image blob URLs renewed normally on reload. The local Editor and
+> ChiliSkills previews use the new build; CMS consumes the new local candidate.
+> Authenticated CMS acceptance remains open. No push or publication occurred.
+
 
 > **Playground overhaul — implemented by Astra (2026-09-13).** Matthias requested a full UI/UX overhaul personally by the coordinating Astra agent. This authorizes the playground preview work ahead of the earlier Step 7 pause; authenticated CMS acceptance remains separate and incomplete. Acceptance: a cursor-anchored searchable slash menu, native writing blocks and host recipes, real component previews, coherent light/dark and narrow layouts, keyboard/focus recovery, durable local drafts, and successful Editor verification plus actual browser interaction checks. No publishing or deployment is included. The implementation adds 13 commands, host-owned preview slots, real component examples, image URL validation, and automatic local draft saving. Independent review findings were corrected. Browser checks covered light/dark themes, 390-pixel layout, slash search/insertion, component properties, image validation/rendering, undo, source recovery, reload/navigation persistence, and documentation search. Full Editor verification passes 83 tests plus type/lint/package/docs builds. This acceptance is for the playground overhaul; it does not certify complete Notion feature parity or close the authenticated CMS gate.
 
