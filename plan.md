@@ -2984,3 +2984,10 @@ viewport the 300-pixel panel remained inside the viewport and followed the image
 at an 8-pixel offset after scrolling. Cancel and successful replacement restored
 editor focus. Browser-dispatched file events used the same isolated fixture
 harness as the prior drop pass; native Finder dragging was not automated.
+
+Implementation `f71dd22` passed packed Vue and Nuxt consumer verification.
+Archive SHA-256:
+`827979791253b3ba3b0297babfc5942c769d513d34ada84b075e8b8c2a3a8d23`.
+The production playground was refreshed with the user's 81-word draft and both
+images preserved; it reports saved state and no console errors. The temporary
+browser harness and proxy are closed. No publication or push was performed.
