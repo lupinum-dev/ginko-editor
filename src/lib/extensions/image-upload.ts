@@ -14,7 +14,7 @@ export interface UploadOptions {
   onPendingChange?: (count: number) => void
 }
 export interface UploadStorage { add: () => boolean; clear: () => void }
-interface UploadEntry { committing?: boolean; target?: ProseMirrorNode; id: string; dom: HTMLElement; offer: (file: File) => void; cancel: () => void; refresh: () => void }
+interface UploadEntry { committing?: boolean; target?: ProseMirrorNode; id: string; dom: HTMLElement; offer: (file: File) => void; cancel: (abort?: boolean) => void; refresh: () => void }
 const key = new PluginKey<DecorationSet>('ginkoImageUploads')
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -40,7 +40,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
     const position = (id: string) => decorations().find(undefined, undefined, spec => spec.id === id)[0]?.from
     function remove(id: string, cancel = true) {
       const entry = entries.get(id)
-      if (cancel) entry?.cancel()
+      entry?.cancel(cancel)
       entries.delete(id)
       if (view && !destroyed) view.dispatch(view.state.tr.setMeta(key, { remove: id }))
     }
@@ -57,7 +57,8 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       if (existing) { if (drop) existing.offer(drop.file); else existing.dom.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); return true }
       const id = `image-upload-${++sequence}`
       const dom = document.createElement('div'); dom.className = 'ginko-image-upload'; dom.contentEditable = 'false'
-      dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', 'Image upload')
+      dom.setAttribute('role', target ? 'dialog' : 'group'); dom.setAttribute('aria-label', target ? 'Replace image' : 'Image upload')
+      if (target) dom.dataset.replacement = 'true'
       const area = document.createElement('button'); area.type = 'button'; area.className = 'ginko-image-upload__dropzone'
       area.setAttribute('aria-label', 'Upload image')
       const symbol = document.createElement('span'); symbol.className = 'ginko-image-upload__symbol'; symbol.append(icon('imageUpload'))
@@ -92,12 +93,12 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
         }
         render()
         const focusTarget = offered ? confirm : area
-        focusTarget.focus()
+        focusTarget.focus({ preventScroll: !!target })
         // A host may reveal its writing pane in response to pending-change.
         // Retry after that render only if nothing else has taken focus.
         if (document.activeElement !== focusTarget) {
           const previousFocus = document.activeElement
-          queueMicrotask(() => { if (entries.has(id) && enabled() && document.activeElement === previousFocus) focusTarget.focus() })
+          queueMicrotask(() => { if (entries.has(id) && enabled() && document.activeElement === previousFocus) focusTarget.focus({ preventScroll: !!target }) })
         }
       }
       function render() {
@@ -107,6 +108,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
         area.disabled = busy || !enabled()
         label.textContent = busy ? 'Uploading image…' : !error.hidden ? 'Try another image or retry' : target ? 'Click to replace or drag and drop' : 'Click to upload or drag and drop'
         dom.setAttribute('aria-busy', String(busy)); dom.dataset.uploading = String(busy)
+        positionReplacement()
       }
       async function upload(file: globalThis.File) {
         if (busy || !enabled() || position(id) === undefined) return
@@ -146,11 +148,42 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       dom.addEventListener('drop', event => { event.preventDefault(); event.stopPropagation(); dom.dataset.dragging = 'false'; const files = event.dataTransfer?.files; if (!files?.length) return; if (files.length > 1) { offered = undefined; clearPreview(); error.textContent = 'Choose one image for this placeholder.'; error.hidden = false; render(); area.focus(); return } offer(files[0]) })
       cancel.addEventListener('click', () => { remove(id); editor.view.focus() })
       dom.addEventListener('keydown', event => { if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); remove(id); editor.view.focus() } })
-      entries.set(id, { target, id, dom, offer, cancel: () => { controller?.abort(); clearPreview() }, refresh: render })
+      let anchoredImage: Element | undefined
+      const resize = target && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => positionReplacement()) : undefined
+      function positionReplacement() {
+        if (!target || !view || destroyed || !entries.has(id)) return
+        const current = position(id)
+        const image = current === undefined ? undefined : view.nodeDOM(current)
+        if (!(image instanceof Element)) return
+        if (anchoredImage !== image) {
+          if (anchoredImage) resize?.unobserve(anchoredImage)
+          anchoredImage = image; resize?.observe(image)
+        }
+        const bounds = image.getBoundingClientRect(), gutter = 12
+        const width = Math.min(300, window.innerWidth - gutter * 2)
+        dom.style.width = `${width}px`
+        dom.style.maxHeight = `${window.innerHeight - gutter * 2}px`
+        const height = Math.min(dom.scrollHeight, window.innerHeight - gutter * 2)
+        dom.style.left = `${Math.max(gutter, Math.min(bounds.right - width - 8, window.innerWidth - width - gutter))}px`
+        dom.style.top = `${Math.max(gutter, Math.min(bounds.top + 8, window.innerHeight - height - gutter))}px`
+        dom.style.visibility = bounds.bottom <= 0 || bounds.top >= window.innerHeight ? 'hidden' : ''
+      }
+      if (target) {
+        resize?.observe(dom)
+        window.addEventListener('scroll', positionReplacement, true)
+        window.addEventListener('resize', positionReplacement)
+      }
+      entries.set(id, { target, id, dom, offer, cancel: (abort = true) => {
+        if (abort) controller?.abort()
+        clearPreview(); resize?.disconnect(); if (target) dom.remove()
+        window.removeEventListener('scroll', positionReplacement, true); window.removeEventListener('resize', positionReplacement)
+      }, refresh: render })
       render()
       view.dispatch(closeHistory(view.state.tr).setMeta(key, { add: { id, pos, dom } }))
-      if (drop) offer(drop.file); else area.focus()
-      dom.scrollIntoView?.({ block: 'nearest' })
+      if (target) (view.dom.closest('.ginko-editor') ?? view.dom.parentElement)?.append(dom)
+      render()
+      if (drop) offer(drop.file); else area.focus({ preventScroll: !!target })
+      if (!target) dom.scrollIntoView?.({ block: 'nearest' })
       return true
     }
     let dropRoot: HTMLElement | undefined, highlighted: Element | undefined
@@ -234,7 +267,12 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
           if (change?.remove) next = next.remove(next.find(undefined, undefined, spec => spec.id === change.remove))
           if (change?.add) {
             const { id, pos, dom } = change.add
-            next = next.add(tr.doc, [Decoration.widget(pos, () => dom, { id, key: id, side: entries.get(id)?.target ? 1 : -1, stopEvent: () => true, ignoreSelection: true })])
+            const target = entries.get(id)?.target
+            // Replacement tracks the existing node without adding a DOM sibling.
+            // Even a fixed widget would change :first-child document spacing.
+            next = next.add(tr.doc, [target
+              ? Decoration.node(pos, pos + target.nodeSize, { class: 'ginko-image--replacing' }, { id, key: id })
+              : Decoration.widget(pos, () => dom, { id, key: id, side: -1, stopEvent: () => true, ignoreSelection: true })])
           }
           return next
         },

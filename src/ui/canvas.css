@@ -99,3 +99,11 @@
 .ginko-editor .ginko-image-upload__actions button:focus-visible { outline: 2px solid var(--ginko-text); outline-offset: 3px; }
 .ginko-editor .ginko-image--drop-target { outline: 2px solid var(--ginko-text); outline-offset: 5px; border-radius: .5rem; }
 .ginko-editor .ginko-image-drop-hint { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 100; max-width: calc(100vw - 2rem); border: 1px solid var(--ginko-border); border-radius: .65rem; padding: .8rem 1.2rem; background: var(--ginko-bg); color: var(--ginko-text); box-shadow: 0 4px 20px rgb(0 0 0 / .12); font: 500 .875rem/1.4 system-ui, sans-serif; pointer-events: none; text-align: center; }
+
+/* Replacement belongs to the existing image and must not consume document space. */
+.ginko-editor .ginko-image-upload[data-replacement='true'] { position: fixed; z-index: 200; margin: 0; border: 1px solid var(--ginko-border); border-radius: .7rem; background: var(--ginko-bg); box-shadow: 0 8px 28px rgb(0 0 0 / .13), 0 2px 6px rgb(0 0 0 / .05); overflow: auto; }
+.ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__confirmation { padding: 1.25rem 1rem 1rem; gap: .5rem; }
+.ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__confirmation img { width: 64px; height: 64px; max-height: 64px; }
+.ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__confirmation h3 { font-size: .875rem; line-height: 1.4; letter-spacing: normal; }
+.ginko-editor .ginko-image-upload[data-replacement='true'] .ginko-image-upload__dropzone { min-height: 160px; padding: 1.25rem 1rem; }
+.ginko-editor .ginko-image--replacing { outline: 2px solid var(--ginko-border); outline-offset: 4px; border-radius: .5rem; }

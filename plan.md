@@ -2957,3 +2957,30 @@ harness logged a MutationObserver exception around its reload; this was not
 reproduced in the production tab, and the drop assertions completed. The temporary
 harness tab and proxy server were closed. Other repository worktrees remain clean;
 no packages were published or pushed.
+
+## Image-attached replacement — 2026-09-13
+
+Replacement now uses a compact non-modal popover over the original image, using
+the image-settings visual treatment. Its thumbnail is 64 pixels; Add image keeps
+its existing inline confirmation. Replacement stays attached on scroll, resize,
+and document edits, stays inside the viewport, and hides when its image leaves
+the viewport. Cancel and Escape keep the original; upload and retry use the same
+anchored panel. Opening replacement does not scroll the page.
+
+A node decoration tracks the replacement image, while the temporary panel lives
+outside ProseMirror content. This preserves document spacing and first-child
+selectors; a fixed widget alone still caused a measured 15-pixel layout shift.
+The panel, observers, listeners, preview URL, and image highlight are cleaned up
+on success, cancellation, target invalidation, and editor teardown. A guarded
+position update also prevents an aborted upload from reattaching to a changed
+block. Focused regressions cover anchoring, scroll, no extra document children,
+cancellation cleanup, and abort-aware target replacement.
+
+Final `pnpm verify` passed with 193 tests, dependency policy, lint, types, library
+and declaration output, and production docs build. Independent final review
+passed. Browser measurements confirmed identical image top, following-paragraph
+top, and scroll position before/after opening replacement. On a 336-pixel iframe
+viewport the 300-pixel panel remained inside the viewport and followed the image
+at an 8-pixel offset after scrolling. Cancel and successful replacement restored
+editor focus. Browser-dispatched file events used the same isolated fixture
+harness as the prior drop pass; native Finder dragging was not automated.

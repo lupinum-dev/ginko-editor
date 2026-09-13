@@ -214,6 +214,39 @@ describe('inline image uploads', () => {
     await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
     await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
     expect(editor.state.doc.child(1).attrs.props.src).toBe('/dropped.png')
+    expect(wrapper.find('.ginko-image--replacing').exists()).toBe(false)
+  })
+
+  it('anchors replacement to the image through scrolling and removes its decoration on cancellation', async () => {
+    const upload = vi.fn<ImageUploadHandler>()
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
+    const image = wrapper.get('.ginko-image').element
+    let top = 100
+    const bounds = vi.spyOn(image, 'getBoundingClientRect').mockImplementation(() => new DOMRect(200, top, 600, 400))
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    const panel = wrapper.get<HTMLDivElement>('[role="dialog"][aria-label="Replace image"]')
+    expect(panel.attributes('data-replacement')).toBe('true')
+    expect(editor.view.dom.contains(panel.element)).toBe(false)
+    expect(editor.view.dom.children).toHaveLength(3)
+    expect(panel.element.style.top).toBe('108px')
+    expect(panel.element.style.left).toBe('492px')
+    expect(image.classList.contains('ginko-image--replacing')).toBe(true)
+    top = 40; window.dispatchEvent(new Event('scroll'))
+    expect(panel.element.style.top).toBe('48px')
+    editor.commands.insertContentAt(1, 'More ')
+    expect(panel.element.style.top).toBe('48px')
+    top = -500; window.dispatchEvent(new Event('scroll'))
+    expect(panel.element.style.visibility).toBe('hidden')
+    top = 100; window.dispatchEvent(new Event('scroll'))
+    expect(panel.element.style.visibility).toBe('')
+    await panel.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('[data-replacement]').exists()).toBe(false)
+    expect(image.classList.contains('ginko-image--replacing')).toBe(false)
+    expect(upload).not.toHaveBeenCalled()
+    bounds.mockClear(); window.dispatchEvent(new Event('scroll'))
+    expect(bounds).not.toHaveBeenCalled()
+    bounds.mockRestore()
   })
 
   it('maps a confirmed drop across typing and prevents confirmation after target removal', async () => {
@@ -229,6 +262,20 @@ describe('inline image uploads', () => {
     await flushPromises()
     expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
     expect(upload).toHaveBeenCalledOnce()
+  })
+
+  it('does not reattach a replacement panel after an aborted target change', async () => {
+    const wrapper = await mountEditor((_file, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('Aborted')))
+    })), editor = wrapper.vm.editor!
+    editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click')
+    editor.commands.insertContentAt({ from: 7, to: 8 }, { type: 'paragraph', content: [{ type: 'text', text: 'Changed block' }] })
+    await flushPromises()
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(wrapper.find('.ginko-image--replacing').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Changed block')
   })
 
   it('supports an outer workspace drop target without intercepting another editor', async () => {

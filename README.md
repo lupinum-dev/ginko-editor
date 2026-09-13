@@ -96,7 +96,8 @@ Provide one callback to enable an upload placeholder for **Add image**, `/image`
 and **Replace image**. The editor accepts one non-empty image file up to 10 MB
 per placeholder, from the file chooser or drag and drop. Drop a file directly
 onto the editor to see its preview and confirm **Add image**. Drop onto an
-existing editor image to confirm **Replace image**. Cancel preserves the original;
+existing editor image to confirm **Replace image** in a compact popover attached
+to that image, without moving the document. Cancel preserves the original;
 no upload starts before confirmation. Dropping inside text chooses the nearby
 block boundary, independently of the current caret.
 
