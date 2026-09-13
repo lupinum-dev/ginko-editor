@@ -2899,3 +2899,17 @@ concurrency, cancellation, and history are covered by focused component tests.
 This pass changes Editor and its docs host only. Docs `d6a6910`, Content
 `2789113`, CMS `4da0a230`, and ChiliSkills `ce2de51` remain clean. The previously
 recorded authenticated CMS acceptance and public release gates remain separate.
+
+The final archive from implementation commit `3014d61` passed installed Vue and
+Nuxt consumer verification, including the public `ImageUploadHandler` callback
+and retained toolbar/upload CSS. Archive SHA-256:
+`e809b7c7c8115d6dc013fd52ef6aa6f0273bece89e8e5b03e7d94191dbf80679`.
+The accepted Content archive remains
+`f25e43f24d88c820612421011cd8a475155b92398698ffc778de25236eb7bc07`.
+
+The rebuilt production playground is running at
+`http://127.0.0.1:4317/playground`. The existing 79-word reviewer draft was
+preserved. The production Add action opened and removed its placeholder without
+changing source; no browser console errors were reported. The updated Getting
+started page renders the upload and cancellation contract. The isolated test
+server was stopped and test tabs closed. No packages were published or pushed.
