@@ -63,6 +63,18 @@ certification. Public package release, production migration and deployment remai
 outside this task's authorization. Complex grouped Docs components still require
 separate editing contracts, as documented in component coverage.
 
+
+Final local commits: Editor `a66ceea`, CMS `5aa12170`, ChiliSkills `a8e0718`.
+Content `961ba5f` and Docs `d6a6910` remain clean. The committed Editor archive
+SHA-256 is `cf1ed6506999357cecd997aa0e35648025b6465f7a9b7583d41e54f33b1a2065`.
+Fresh Vue/Nuxt consumers passed on that exact archive; CMS's 72 relevant runtime
+tests and ChiliSkills' seven editor/asset tests passed after installing it.
+Content archive SHA-256: `d26f734a1c4b0cad7b5122d54af3d57b90756d79919acc3f1fb822f056c56080`.
+Docs archive SHA-256: `371dab5be201d02bef129aa9aa34b20a0743e361bd09d10f252017205015efa0`.
+The mobile ChiliSkills header correction was rechecked at 390 × 844: no horizontal
+overflow, and the restored script and image remained readable. Independent
+reviewers report no remaining actionable findings in the implementation.
+
 ---
 
 ## Historical implementation plan
