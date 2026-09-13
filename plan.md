@@ -2795,3 +2795,52 @@ API, conversion and playground changes. Authenticated CMS editing/save/reload
 remains the explicit unverified acceptance gate; local package and component
 checks do not establish that backend workflow. No push, publication or deployment
 was performed.
+
+
+### Inline editing and Markdown clipboard — 2026-09-13
+
+The writing canvas now owns contextual editing controls. The selected-block
+inspector and image action bar below the document have been removed. Callout
+and image cogs open local settings; callout titles, aside labels, and excerpt
+labels are editable directly. Callouts can change type without losing their
+properties or body. The candidate must validate against Content before it applies.
+Latest-choice and document ownership guards reject stale asynchronous changes.
+
+The public optional `canvas` metadata refers to existing component properties.
+Docs owns the six callout variants and the three paired column presets. The
+Editor has no Docs tag dependency. A paired layout exposes a divider and width
+labels, with pointer capture, three snap positions, keyboard adjustment,
+cancellation, and one-step undo. Existing custom layouts remain untouched on
+load. Component isolation prevents ordinary joins from discarding block metadata.
+
+Tables have contextual row, column, and alignment icon menus. The first row is
+the Markdown header; another row can be promoted without discarding the old
+header. Code language and filename controls use the existing source properties.
+Image controls preserve stable asset references and refresh resolved URLs
+without replacing the image element or rewriting document source.
+
+Copy/Cut use Content's canonical serializer for both Markdown and component
+source. Warm selections write synchronously; immediate selections use the native
+async clipboard while retaining user activation. Failed copies are visible,
+and a pending cut never deletes a subsequently changed selection. Ordinary
+input-field copying remains native. No second Markdown serializer was introduced.
+
+Validation: Editor `pnpm verify` passed with 160 tests, lint, types, dependency
+checks, library build, and production Docs build. Docs `pnpm check` and all 226
+tests passed; its earlier complete verification and component-only consumer
+review were extended with the newly observed image-wrapper correction. Independent
+review fixes cover component boundaries, variant races, hot kit changes, numeric
+drafts, keyboard history, and image-provider refresh.
+
+Real browser checks passed at desktop and 390×844: direct title editing and
+callout switching, three-position drag and keyboard resize, slash table insertion,
+row/column menus, inline image controls, and reload persistence. The production
+specimen containing a callout, paired columns, table, named code block, image,
+aside, and excerpt produced byte-identical canonical Markdown after Copy → new
+page → Paste → Copy. The reader image's zero-width wrapper was fixed in Docs.
+
+Docs revision `d6a6910` supplies ten authored component tags and component-only
+styles. This is the certified simple-component surface; complex grouped Docs
+components (such as tabs, quizzes, and timelines) still need their own editing
+contracts. The existing authenticated CMS save/reload gate remains unverified.
+This pass does not publish packages, deploy applications, or change host storage.

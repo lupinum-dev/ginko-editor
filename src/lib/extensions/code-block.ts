@@ -1,3 +1,4 @@
+import { codeView } from '../nodeviews/code'
 import TiptapCodeBlock from '@tiptap/extension-code-block'
 
 export interface CodeBlockOptions {
@@ -14,6 +15,8 @@ declare module '@tiptap/core' {
 }
 
 export const CodeBlock = TiptapCodeBlock.extend<CodeBlockOptions>({
+  addNodeView() { return codeView },
+
   addAttributes() {
     return {
       filename: {

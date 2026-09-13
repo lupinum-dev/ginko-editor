@@ -183,9 +183,9 @@ describe('deep review regressions', () => {
     const wrapper = await setup({ modelValue: '<note>\nText\n</note>', authoringKit: kit })
     wrapper.vm.editor!.commands.setTextSelection(2)
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(true)
+    expect(wrapper.get('.ginko-settings').attributes('hidden')).toBeUndefined()
     await wrapper.setProps({ disabled: true })
-    expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(false)
+    expect(wrapper.get('.ginko-settings').attributes('hidden')).toBeDefined()
   })
 
   it('freezes nested data before asynchronous recipe validation even with a shallow-frozen source', async () => {

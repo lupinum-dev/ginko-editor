@@ -236,11 +236,11 @@ describe('GinkoEditor browser journey', () => {
     wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('[aria-label="Selected image actions"]').text()).toContain('diagram.png')
-    await clickButton(wrapper, 'Metadata')
+    expect(wrapper.get('.ginko-image img').attributes('data-filename')).toBe('diagram.png')
+    await clickButton(wrapper, 'Image metadata')
     expect(wrapper.emitted('request-image-metadata')).toEqual([['asset_123456789012345']])
 
-    await clickButton(wrapper, 'Replace')
+    await clickButton(wrapper, 'Replace image')
     const request = wrapper.emitted('request-image')?.at(-1)?.[0] as EditorAssetRequest<Partial<AssetInfo>>
     expect(request.complete({ alt: 'Replacement', id: 'asset_456', url: '/replacement.png' })).toBe(true)
     await wrapper.vm.flush()
@@ -257,7 +257,7 @@ describe('GinkoEditor browser journey', () => {
     })
     wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('button').some((button) => button.text() === 'Metadata')).toBe(false)
+    expect(wrapper.get('button[aria-label="Image metadata"]').attributes('hidden')).toBeDefined()
   })
 
   it('keeps block separation when a markdown file is inserted before a heading', async () => {

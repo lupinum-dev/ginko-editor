@@ -1,3 +1,4 @@
+import { imageView, type ImageActions } from '../nodeviews/image'
 import type { CommandProps } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 
@@ -5,6 +6,7 @@ import type { JsonRecord } from '../../types'
 import { readStoredMediaProps, sanitizeImageUrl, sanitizeResolvedImageUrl } from '../props'
 
 export interface ImageOptions {
+  actions?: ImageActions
   allowBase64: boolean
   HTMLAttributes: JsonRecord
   inline: boolean
@@ -100,6 +102,10 @@ export const Image = Node.create<ImageOptions>({
         tag: this.options.allowBase64 ? 'img[src]' : 'img[src]:not([src^="data:"])',
       },
     ]
+  },
+
+  addNodeView() {
+    return props => imageView(props, this.options.actions)
   },
 
   renderHTML({ node }) {

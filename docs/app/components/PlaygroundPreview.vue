@@ -2,7 +2,7 @@
 import ContentBodyRenderer from '@lupinum/ginko-content/body-renderer'
 import { parseMdcBody, validatePublicMarkdownAst, type ParseMdcBodyResult } from '@lupinum/ginko-content/cms-contract'
 import type { AuthoringKitV1 } from '@lupinum/ginko-editor/authoring'
-import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import LearningObjective from './LearningObjective.vue'
 import HostNote from './HostNote.vue'
 
@@ -11,7 +11,7 @@ const body = shallowRef<ParseMdcBodyResult['body'] | null>(null)
 const error = ref('')
 const parsing = ref(false)
 const renderKey = ref(0)
-const components = { column: 'MdcColumn', info: 'MdcInfo', layout: 'MdcLayout', 'learning-objective': LearningObjective, 'host-note': HostNote }
+const components = computed(() => ({ ...Object.fromEntries(Object.entries(props.kit.implementation).map(([tag, implementation]) => [tag, implementation.componentName])), 'learning-objective': LearningObjective, 'host-note': HostNote }))
 let revision = 0
 let timer: ReturnType<typeof globalThis.setTimeout>
 watch(() => [props.source, props.kit] as const, ([source, kit]) => {
@@ -76,13 +76,13 @@ onBeforeUnmount(() => { revision++; globalThis.clearTimeout(timer) })
 
 <style scoped>
 .document-preview { font-size: 15px; line-height: 1.75; overflow-wrap: anywhere; }
-.document-preview :deep(h1) { font-size: clamp(1.8rem, 3vw, 2.5rem); line-height: 1.15; letter-spacing: -.035em; margin: 0 0 1.2rem; }
+.document-preview :deep(h1) { font-size: 2rem; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 1.2rem; }
 .document-preview :deep(h2) { font-size: 1.45rem; line-height: 1.3; margin-top: 1.8rem; }
 .document-preview :deep(h3) { font-size: 1.15rem; }
 .document-preview :deep(p) { margin: .75rem 0; }
 .document-preview :deep(ul) { list-style: disc; padding-inline-start: 1.4rem; }
 .document-preview :deep(ol) { list-style: decimal; padding-inline-start: 1.4rem; }
-.document-preview :deep(blockquote) { border-inline-start: 3px solid var(--foreground); padding-inline-start: 1rem; }
+.document-preview :deep(blockquote:not(.content-excerpt-body)) { border-inline-start: 3px solid var(--foreground); padding-inline-start: 1rem; }
 .document-preview :deep(pre) { overflow-x: auto; padding: 1rem; border-radius: .5rem; background: var(--muted); }
 .document-preview :deep(table) { width: 100%; border-collapse: collapse; }
 .document-preview :deep(td), .document-preview :deep(th) { border: 1px solid var(--border); padding: .5rem; text-align: start; }

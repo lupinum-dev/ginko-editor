@@ -120,8 +120,8 @@ async function flush() {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  if (!(await containsCss(join(consumer, 'dist'), '.ginko-editor'))) {
-    throw new Error('The Vue production build dropped the package CSS.')
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table']) {
+    if (!(await containsCss(join(consumer, 'dist'), marker))) throw new Error(`The Vue production build dropped package CSS: ${marker}.`)
   }
 }
 
@@ -156,8 +156,8 @@ async function verifyNuxtConsumer(consumer) {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  if (!(await containsCss(join(consumer, '.output'), '.ginko-editor'))) {
-    throw new Error('The Nuxt production build dropped the package CSS.')
+  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table']) {
+    if (!(await containsCss(join(consumer, '.output'), marker))) throw new Error(`The Nuxt production build dropped package CSS: ${marker}.`)
   }
 }
 

@@ -79,12 +79,66 @@ The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its sourc
 with Ginko Content and their own components. The menu handles selection, focus,
 viewport placement, and insertion. The package does not depend on host renderers.
 
-Copy uses the editor's native rich text and plain text clipboard formats.
+Copy and Cut put canonical Markdown and component source on the clipboard, so
+selections can be shared with AI tools or pasted back into the editor. Titles
+and settings are serialized as component properties; editing controls are never
+copied. Text selected inside a title or settings input copies normally.
 Markdown paste uses Content's parser and the same fidelity checks as opening a
 document. An unsupported paste leaves the document unchanged and explains why.
 `createAuthoringKit` consumes and freezes its input before asynchronous recipe
 validation. Pass a fresh object if the application must keep an editable draft
 of the configuration.
+
+## Inline component controls
+
+The kit describes editing controls without depending on Vue render components:
+
+```ts
+// Authoring metadata alongside an existing Content policy and implementation.
+authoring: {
+  note: {
+    label: 'Note',
+    props: { title: { label: 'Title', control: 'text' } },
+    canvas: { titleProp: 'title', switchGroup: 'callout', tone: 'neutral' },
+  },
+  warning: {
+    label: 'Warning',
+    props: { title: { label: 'Title', control: 'text' } },
+    canvas: { titleProp: 'title', switchGroup: 'callout', tone: 'warning' },
+  },
+  layout: {
+    label: 'Columns',
+    canvas: {
+      columns: {
+        childTag: 'column', sizeProp: 'size',
+        presets: [
+          { label: 'Small / Large', values: ['sm', 'lg'], ratio: 1 / 3 },
+          { label: 'Medium / Medium', values: ['md', 'md'], ratio: 1 / 2 },
+          { label: 'Large / Small', values: ['lg', 'sm'], ratio: 2 / 3 },
+        ],
+      },
+    },
+  },
+}
+```
+
+`titleProp` edits the declared text property directly. A populated title slot
+keeps its existing rich content. Other declared fields and block actions live in
+the block's cog menu. `switchGroup` offers compatible variants; the complete
+candidate document must pass the active Content policy before a switch applies.
+It never drops properties to make a switch succeed.
+
+`columns` references existing child props and allowed values. For exactly two
+columns, the divider changes both sizes in one undoable operation, using pointer
+drag or arrow keys. Imported custom pairs and layouts with other column counts
+remain unchanged until explicitly edited. Presets require unique pairs and
+increasing finite ratios between zero and one.
+
+Tables expose row, column, and alignment menus beside the active table. The first
+row is the Markdown header; another row can be promoted to that position.
+Merged cells and arbitrary header placement are outside the Markdown table
+contract. Code blocks expose their language and file name above the code. Images have a
+cog for their description, replacement, host metadata, and removal.
 
 ## Documentation
 

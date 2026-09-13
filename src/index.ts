@@ -1,3 +1,5 @@
+import './ui/canvas.css'
+
 export { default as GinkoEditor } from './GinkoEditor.vue'
 export { composeAuthoringKits, createAuthoringKit, parseAuthoringSource } from './authoring'
 export type {

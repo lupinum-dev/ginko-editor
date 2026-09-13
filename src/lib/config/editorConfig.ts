@@ -1,3 +1,4 @@
+import type { ImageActions } from '../nodeviews/image'
 import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Table as TiptapTable } from '@tiptap/extension-table'
@@ -6,6 +7,7 @@ import { TableHeader as TiptapTableHeader } from '@tiptap/extension-table-header
 import { TableRow } from '@tiptap/extension-table-row'
 import StarterKit from '@tiptap/starter-kit'
 import { ref } from 'vue'
+import { tableView } from '../nodeviews/table'
 
 import type { AssetProvider, JsonRecord } from '../../types'
 import type { AuthoringKitV1 } from '../../authoring'
@@ -35,6 +37,7 @@ const TableHeader = TiptapTableHeader.extend({
 })
 
 export interface CreateEditorExtensionsOptions {
+  imageActions?: ImageActions
   assetProvider?: AssetProvider
   codeBlockTheme: string
   enableDebug: boolean
@@ -45,6 +48,7 @@ export interface CreateEditorExtensionsOptions {
   getAuthoringKit?: () => AuthoringKitV1 | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   canPaste?: () => boolean
+  onCopyError?: (message: string | undefined) => void
   onPasteError?: (message: string | undefined) => void
   placeholder?: string
   showMarkdownMarkers: boolean
@@ -80,7 +84,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       levels: [1, 2, 3, 4, 5, 6],
       showMarkers: showMarkdownMarkers,
     }),
-    TiptapTable.configure({
+    TiptapTable.extend({ addNodeView() { return tableView } }).configure({
       renderWrapper: true,
       resizable: false,
     }),
@@ -99,17 +103,18 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       getOutputOptions: options.getOutputOptions,
       canPaste: options.canPaste,
       onPasteError: options.onPasteError,
+      onCopyError: options.onCopyError,
       imageOutput: options.imageOutput,
       videoOutput: options.videoOutput,
     }),
     ...(enableDebug ? [EditorDebug] : []),
-    Element.configure({ getAuthoringKit: options.getAuthoringKit }),
-    Slot,
+    Element.configure({ getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions }),
+    Slot.configure({ getAuthoringKit: options.getAuthoringKit }),
     InlineElement,
     CodeBlock.configure({
       theme: codeBlockTheme,
     }),
-    Image.configure({ resolveSrc: resolveAsset }),
+    Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions }),
     Video,
     File.configure({ resolveSrc: resolveAsset }),
     Binding,

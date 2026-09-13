@@ -31,6 +31,7 @@ export const learningObjectiveSource = {
   authoring: {
     'learning-objective': {
       label: 'Learning objective',
+      canvas: { titleProp: 'title' },
       description: 'A host-owned objective with an optional teaching tip.',
       props: {
         assessed: { control: 'toggle', label: 'Assessed' },

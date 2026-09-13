@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import { closeHistory } from '@tiptap/pm/history'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 
@@ -16,9 +14,10 @@ import type {
   AssetProvider,
   EditorAssetRequest,
   EditorFlushResult,
-  JsonValue,
   VideoInfo,
 } from './types'
+import { parentColumnConfig } from './lib/nodeviews/columns'
+import { actOnBlock } from './lib/nodeviews/block-actions'
 import GinkoToolbar from './ui/GinkoToolbar.vue'
 import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
 
@@ -92,7 +91,6 @@ const insertError = ref<string | null>(null)
 const insertBusy = ref(false)
 type BrowserInputElement = InstanceType<typeof globalThis.HTMLInputElement>
 type BrowserKeyboardEvent = InstanceType<typeof globalThis.KeyboardEvent>
-type BrowserEvent = InstanceType<typeof globalThis.Event>
 
 const insertSearch = ref<BrowserInputElement>()
 const insertMenuId = useId()
@@ -104,9 +102,6 @@ watch(insertMenu, (element) => {
   if (element) menuResizeObserver?.observe(element)
 })
 const insertPosition = ref({ left: '8px', top: '48px', maxHeight: '420px' })
-const componentSettingsId = useId()
-const propertyDrafts = ref<Record<string, string>>({})
-const propertyErrors = ref<Record<string, string>>({})
 let insertSelection: { from: number; to: number } | undefined
 
 const outputOptions = computed(() => ({
@@ -138,6 +133,15 @@ const editor = useEditor({
     getOutputOptions: () => outputOptions.value,
     canPaste: () => canMutateVisualContent(),
     onPasteError: message => { clipboardError.value = message },
+    onCopyError: message => { clipboardError.value = message },
+    imageActions: imageProps => {
+      const source = typeof imageProps.src === 'string' ? imageProps.src : ''
+      const id = typeof imageProps.id === 'string' && imageProps.id ? imageProps.id : resolvedAssetProvider.value.parseUrl(source)?.id
+      return {
+        replace: props.enableImages ? requestImage : undefined,
+        metadata: props.enableImageMetadata && id ? () => { if (canMutateVisualContent()) emit('request-image-metadata', id) } : undefined,
+      }
+    },
     imageOutput: props.imageOutput,
     placeholder: props.placeholder,
     showMarkdownMarkers: props.showMarkdownMarkers,
@@ -145,7 +149,6 @@ const editor = useEditor({
   }),
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
-    if (transaction.docChanged) clearPropertyDrafts()
     if (!isCurrentlyNormalizingTable() && normalizeTableCells(instance)) return
     if (!applyingDocument && transaction.docChanged) scheduleVisualUpdate(instance)
   },
@@ -200,122 +203,10 @@ const selectedComponent = computed(() => {
     ...selected,
     definition,
     description: metadata.description,
-    fields: Object.entries(metadata.props ?? {}).flatMap(([name, field]) => {
-      if (!field) return []
-      const policy = definition.props[name]
-      if (!policy) return []
-      return [{ field, name, options: policy.allowedValues ?? [] }]
-    }),
     label: metadata.label,
     tag,
   }
 })
-
-const selectedImage = computed(() => {
-  const instance = editor.value
-  if (!instance || selectionRevision.value < 0) return undefined
-  const selection = instance.state.selection as (TiptapEditor['state']['selection'] & {
-    node?: ProseMirrorNode
-  })
-  if (!selection?.node || selection.node.type.name !== 'image') return undefined
-  const properties = selection.node.attrs.props as Record<string, unknown> | undefined
-  const source = typeof properties?.src === 'string' ? properties.src : ''
-  const parsed = source ? resolvedAssetProvider.value.parseUrl(source) : null
-  return {
-    assetId:
-      typeof properties?.id === 'string' && properties.id
-        ? properties.id
-        : typeof parsed?.id === 'string' && parsed.id
-          ? parsed.id
-          : '',
-    filename: typeof properties?.filename === 'string' ? properties.filename : '',
-  }
-})
-
-function clearPropertyDrafts() {
-  propertyDrafts.value = {}
-  propertyErrors.value = {}
-}
-
-watch(
-  () => {
-    const selected = selectedComponent.value
-    return selected ? `${selected.pos}:${selected.tag}` : undefined
-  },
-  clearPropertyDrafts,
-)
-
-function selectedPropValue(name: string): JsonValue | undefined {
-  return selectedComponent.value?.node.attrs.props?.[name] as JsonValue | undefined
-}
-
-function effectivePropValue(name: string): JsonValue | undefined {
-  const selected = selectedComponent.value
-  return selectedPropValue(name) ?? (selected ? props.authoringKit?.implementation[selected.tag]?.props[name]?.default : undefined)
-}
-
-function updateSelectedProp(name: string, value: JsonValue | undefined) {
-  const instance = editor.value
-  const selected = selectedComponent.value
-  if (!instance || !selected || props.disabled) return
-  const current = (selected.node.attrs.props ?? {}) as Record<string, JsonValue>
-  const next = { ...current }
-  if (value === undefined) delete next[name]
-  else next[name] = value
-  instance.view.dispatch(
-    instance.state.tr.setNodeMarkup(selected.pos, undefined, {
-      ...selected.node.attrs,
-      props: next,
-    }),
-  )
-}
-
-function propertyDraftKey(name: string) {
-  const selected = selectedComponent.value
-  return selected ? `${selected.pos}:${selected.tag}:${name}` : name
-}
-
-function propertyInputValue(name: string) {
-  const draft = propertyDrafts.value[propertyDraftKey(name)]
-  return draft ?? String(selectedPropValue(name) ?? '')
-}
-
-function updateNumberProp(name: string, event: BrowserEvent) {
-  const target = event.target as BrowserInputElement
-  const key = propertyDraftKey(name)
-  const raw = target.value
-  propertyDrafts.value[key] = raw
-  if (!raw.trim()) {
-    delete propertyDrafts.value[key]
-    delete propertyErrors.value[key]
-    updateSelectedProp(name, undefined)
-    return
-  }
-  const trimmed = raw.trim()
-  const completeNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)
-  if (!completeNumber) {
-    const incompleteNumber = /^[+-]?(?:(?:\d+\.?|\.\d*)?(?:[eE][+-]?)?)?$/.test(trimmed)
-    if (incompleteNumber) delete propertyErrors.value[key]
-    else propertyErrors.value[key] = 'Enter a valid number.'
-    return
-  }
-  const value = Number(trimmed)
-  if (!Number.isFinite(value)) {
-    propertyErrors.value[key] = 'Enter a valid number.'
-    return
-  }
-  delete propertyDrafts.value[key]
-  delete propertyErrors.value[key]
-  updateSelectedProp(name, value)
-}
-
-function propertyError(name: string) {
-  return propertyErrors.value[propertyDraftKey(name)]
-}
-
-function valueFromOption(options: readonly JsonValue[], value: string): JsonValue | undefined {
-  return options.find((option) => JSON.stringify(option) === value)
-}
 
 const activeRecipe = computed(() => filteredRecipes.value[insertIndex.value])
 watch([insertQuery, activeRecipe], () => { void nextTick(positionInsertMenu) })
@@ -423,53 +314,13 @@ function placementError(instance: TiptapEditor, document: JSONContent): string |
   return undefined
 }
 
-function selectedSibling(offset: -1 | 1) {
-  const instance = editor.value
-  const selected = selectedComponent.value
-  if (!instance || !selected) return undefined
-  const resolved = instance.state.doc.resolve(selected.pos)
-  const index = resolved.index()
-  const siblingIndex = index + offset
-  if (siblingIndex < 0 || siblingIndex >= resolved.parent.childCount) return undefined
-  return resolved.parent.child(siblingIndex)
-}
-
 function moveSelectedComponent(offset: -1 | 1) {
-  const instance = editor.value
-  const selected = selectedComponent.value
-  const sibling = selectedSibling(offset)
-  if (!instance || !selected || !sibling || props.disabled) return
-  const target = offset < 0
-    ? selected.pos - sibling.nodeSize
-    : selected.pos + sibling.nodeSize
-  const tr = instance.state.tr.delete(
-    selected.pos,
-    selected.pos + selected.node.nodeSize,
-  )
-  tr.insert(target, selected.node)
-  tr.setSelection(NodeSelection.create(tr.doc, target))
-  instance.view.dispatch(closeHistory(tr))
-  instance.commands.focus()
+  const instance = editor.value, selected = selectedComponent.value
+  if (instance && selected && !props.disabled) actOnBlock(instance, selected.node, selected.pos, offset < 0 ? 'up' : 'down')
 }
-
 function duplicateSelectedComponent() {
-  const instance = editor.value
-  const selected = selectedComponent.value
-  if (!instance || !selected || props.disabled) return
-  const target = selected.pos + selected.node.nodeSize
-  const tr = instance.state.tr.insert(target, selected.node.copy(selected.node.content))
-  tr.setSelection(NodeSelection.create(tr.doc, target))
-  instance.view.dispatch(closeHistory(tr))
-  instance.commands.focus()
-}
-
-function deleteSelectedComponent() {
-  const instance = editor.value
-  const selected = selectedComponent.value
-  if (!instance || !selected || props.disabled) return
-  const tr = instance.state.tr.delete(selected.pos, selected.pos + selected.node.nodeSize)
-  instance.view.dispatch(closeHistory(tr))
-  instance.commands.focus()
+  const instance = editor.value, selected = selectedComponent.value
+  if (instance && selected && !props.disabled && !parentColumnConfig(instance.state.doc, selected.pos, props.authoringKit)) actOnBlock(instance, selected.node, selected.pos, 'duplicate')
 }
 
 function handleComponentShortcut(event: BrowserKeyboardEvent) {
@@ -852,12 +703,6 @@ function requestImage() {
   emit('request-image', createAssetRequest(insertImageAsset))
 }
 
-function requestSelectedImageMetadata() {
-  const assetId = selectedImage.value?.assetId
-  if (!assetId || !canMutateVisualContent()) return
-  emit('request-image-metadata', assetId)
-}
-
 function requestFile() {
   if (!canMutateVisualContent(props.enableFiles)) return
   emit('request-file', createAssetRequest(insertFileAsset))
@@ -871,7 +716,6 @@ function requestVideo() {
 watch(() => props.modelValue, (value, previous) => {
   if (value === previous) return
   if (consumeEcho(value)) return
-  clearPropertyDrafts()
   void loadSource(value)
 })
 watch(hasPendingVisualChanges, (pending) => emit('pending-change', pending), {
@@ -881,12 +725,15 @@ let assetContextRevision = 0
 watch([viewMode, () => props.disabled, () => props.enableImages, () => props.enableFiles, () => props.enableVideo, () => props.assetProvider], () => {
   assetContextRevision += 1
 }, { flush: 'sync' })
+watch([() => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages], () => {
+  const instance = editor.value
+  if (instance && !instance.isDestroyed) instance.view.dispatch(instance.state.tr)
+})
 watch(() => props.disabled, (disabled) => {
   editor.value?.setEditable(!disabled)
   if (disabled) closeInsertMenu(false)
 }, { flush: 'sync' })
 watch(() => props.authoringKit, () => {
-  clearPropertyDrafts()
   void (async () => {
     const result = await flush()
     if (!result.ok) return
@@ -1089,134 +936,6 @@ defineExpose({
           :editor="editor"
         />
       </div>
-      <section
-        v-if="selectedImage && !disabled"
-        class="ginko-editor__media-actions"
-        aria-label="Selected image actions"
-      >
-        <span>{{ selectedImage.filename || 'Selected image' }}</span>
-        <button
-          v-if="enableImages"
-          type="button"
-          @click="requestImage"
-        >
-          Replace
-        </button>
-        <button
-          v-if="enableImageMetadata && selectedImage.assetId"
-          type="button"
-          @click="requestSelectedImageMetadata"
-        >
-          Metadata
-        </button>
-        <button
-          type="button"
-          class="ginko-editor__delete"
-          @click="removeSelectedMedia"
-        >
-          Remove
-        </button>
-      </section>
-      <section
-        v-if="selectedComponent && !disabled"
-        class="ginko-editor__inspector"
-        :aria-labelledby="componentSettingsId"
-      >
-        <div>
-          <p class="ginko-editor__inspector-kicker">
-            Selected block
-          </p>
-          <h3 :id="componentSettingsId">
-            {{ selectedComponent.label }}
-          </h3>
-          <p v-if="selectedComponent.description">
-            {{ selectedComponent.description }}
-          </p>
-        </div>
-        <div
-          v-if="selectedComponent.fields.length"
-          class="ginko-editor__fields"
-        >
-          <label
-            v-for="item in selectedComponent.fields"
-            :key="item.name"
-          >
-            <span>{{ item.field.label }}</span>
-            <input
-              v-if="item.field.control === 'toggle'"
-              type="checkbox"
-              :checked="effectivePropValue(item.name) === true"
-              @change="updateSelectedProp(item.name, ($event.target as HTMLInputElement).checked)"
-            >
-            <select
-              v-else-if="item.field.control === 'select'"
-              :value="JSON.stringify(selectedPropValue(item.name)) ?? ''"
-              @change="updateSelectedProp(item.name, valueFromOption(item.options, ($event.target as HTMLSelectElement).value))"
-            >
-              <option value="">Default</option>
-              <option
-                v-for="option in item.options"
-                :key="JSON.stringify(option)"
-                :value="JSON.stringify(option)"
-              >
-                {{ typeof option === 'string' ? (option || 'Empty text') : JSON.stringify(option) }}
-              </option>
-            </select>
-            <input
-              v-else
-              type="text"
-              :inputmode="item.field.control === 'number' ? 'decimal' : undefined"
-              :value="item.field.control === 'number' ? propertyInputValue(item.name) : String(selectedPropValue(item.name) ?? '')"
-              @input="item.field.control === 'number' ? updateNumberProp(item.name, $event) : undefined"
-              @change="item.field.control === 'number' ? undefined : updateSelectedProp(item.name, ($event.target as HTMLInputElement).value)"
-            >
-            <small v-if="item.field.help">{{ item.field.help }}</small>
-            <small
-              v-if="propertyError(item.name)"
-              class="ginko-editor__field-error"
-              role="alert"
-            >
-              {{ propertyError(item.name) }}
-            </small>
-          </label>
-        </div>
-        <div
-          class="ginko-editor__block-actions"
-          role="group"
-          aria-label="Selected block actions"
-        >
-          <button
-            type="button"
-            aria-keyshortcuts="Alt+ArrowUp"
-            :disabled="!selectedSibling(-1)"
-            @click="moveSelectedComponent(-1)"
-          >
-            Move up
-          </button>
-          <button
-            type="button"
-            aria-keyshortcuts="Alt+ArrowDown"
-            :disabled="!selectedSibling(1)"
-            @click="moveSelectedComponent(1)"
-          >
-            Move down
-          </button>
-          <button
-            type="button"
-            aria-keyshortcuts="Alt+Shift+D"
-            @click="duplicateSelectedComponent"
-          >
-            Duplicate
-          </button>
-          <button
-            type="button"
-            class="ginko-editor__delete"
-            @click="deleteSelectedComponent"
-          >
-            Delete
-          </button>
-        </div>
-      </section>
     </template>
     <textarea
       v-else
@@ -1278,32 +997,11 @@ defineExpose({
 .ginko-editor__surface :deep(.ProseMirror > :first-child) { margin-top: 0; }
 .ginko-editor__surface :deep(.ProseMirror > * + *) { margin-block-start: 1em; }
 .ginko-editor__surface :deep(.ProseMirror h1), .ginko-editor__surface :deep(.ProseMirror h2), .ginko-editor__surface :deep(.ProseMirror h3) { line-height: 1.2; letter-spacing: -.02em; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='element']) { position: relative; min-width: 0; border: 1px solid var(--ginko-border); border-radius: .7rem; background: color-mix(in srgb, var(--ginko-bg) 96%, var(--ginko-text)); padding: 2.15rem .9rem .9rem; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='element']::before) { position: absolute; inset-block-start: .55rem; inset-inline-start: .75rem; content: attr(data-label); color: var(--ginko-muted-text); font: 650 .68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-transform: uppercase; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='element'][data-title]::before) { content: attr(data-title); font-family: inherit; font-size: .83rem; text-transform: none; letter-spacing: normal; color: var(--ginko-text); }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']) { position: relative; min-height: 3.5rem; border: 1px dashed var(--ginko-border); border-radius: .5rem; padding: 1.8rem .7rem .5rem; }
 .ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']::before) { position: absolute; inset-block-start: .45rem; inset-inline-start: .6rem; content: attr(name); color: var(--ginko-muted-text); font-size: .68rem; font-weight: 650; text-transform: uppercase; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='element'].ProseMirror-selectednode) { outline: 2px solid var(--ginko-text); outline-offset: 2px; }
 .ginko-editor__surface :deep(.ProseMirror img) { display: block; max-width: 100%; height: auto; }
 .ginko-editor__surface :deep(table) { width: 100%; border-collapse: collapse; }
 .ginko-editor__surface :deep(td), .ginko-editor__surface :deep(th) { border: 1px solid var(--ginko-border); padding: .5rem; }
-.ginko-editor__inspector { display: grid; grid-template-columns: minmax(10rem, .75fr) minmax(0, 1.25fr); gap: 1rem; border-top: 1px solid var(--ginko-border); background: var(--ginko-muted); padding: .9rem 1rem 1rem; }
-.ginko-editor__media-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; border-top: 1px solid var(--ginko-border); background: var(--ginko-muted); padding: .5rem .75rem; }
-.ginko-editor__media-actions > span { margin-inline-end: auto; overflow: hidden; color: var(--ginko-muted-text); text-overflow: ellipsis; white-space: nowrap; }
-.ginko-editor__inspector h3, .ginko-editor__inspector p { margin: 0; }
-.ginko-editor__inspector h3 { font-size: 1rem; line-height: 1.3; }
-.ginko-editor__inspector > div > p:last-child { margin-block-start: .2rem; color: var(--ginko-muted-text); font-size: .8rem; }
-.ginko-editor__inspector-kicker { color: var(--ginko-muted-text); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.ginko-editor__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
-.ginko-editor__fields label { display: grid; align-content: start; gap: .25rem; color: var(--ginko-muted-text); font-size: .75rem; font-weight: 650; }
-.ginko-editor__fields input:not([type='checkbox']), .ginko-editor__fields select { box-sizing: border-box; width: 100%; min-height: 2.5rem; border: 1px solid var(--ginko-border); border-radius: .45rem; background: var(--ginko-bg); color: var(--ginko-text); padding: .45rem .6rem; font: inherit; font-size: .875rem; font-weight: 400; }
-.ginko-editor__fields input[type='checkbox'] { width: 1.25rem; height: 1.25rem; margin: .35rem 0; }
-.ginko-editor__fields small { font-weight: 400; }
-.ginko-editor__field-error { color: #8a2e1b; }
-.ginko-editor__block-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem; border-top: 1px solid var(--ginko-border); padding-top: .75rem; }
-.ginko-editor__block-actions button { border: 1px solid var(--ginko-border); background: var(--ginko-bg); }
-.ginko-editor__block-actions button:disabled { cursor: not-allowed; opacity: .45; }
-.ginko-editor__block-actions .ginko-editor__delete { margin-inline-start: auto; color: #8a2e1b; }
 .ginko-editor__source { box-sizing: border-box; display: block; width: 100%; min-height: 280px; resize: vertical; border: 0; background: var(--ginko-bg); color: var(--ginko-text); padding: 1rem; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline: none; }
 @media (max-width: 34rem) {
   .ginko-editor button { min-height: 2.75rem; }
@@ -1311,6 +1009,5 @@ defineExpose({
   .ginko-editor__status { grid-column: 1 / -1; grid-row: 2; padding-inline: .65rem; }
   .ginko-editor__surface { padding: 1rem; }
   .ginko-editor__surface :deep(.ProseMirror) { min-height: 18rem; }
-  .ginko-editor__inspector { grid-template-columns: 1fr; }
 }
 </style>

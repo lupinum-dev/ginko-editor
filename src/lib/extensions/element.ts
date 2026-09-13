@@ -1,10 +1,13 @@
+import { componentView } from '../nodeviews/component'
 import type { Content } from '@tiptap/core'
 import { InputRule, mergeAttributes, Node } from '@tiptap/core'
 
+import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import type { AuthoringKitV1 } from '../../authoring'
 import type { JsonRecord } from '../../types'
 
 export interface ElementOptions {
+  getOutputOptions?: () => TiptapToMDCOptions
   getAuthoringKit?: () => AuthoringKitV1 | undefined
   HTMLAttributes: JsonRecord
 }
@@ -24,6 +27,9 @@ export const Element = Node.create<ElementOptions>({
   group: 'block',
   content: 'block*',
   inline: false,
+  // Generic component nodes carry distinct tags and properties. Joining them
+  // at a text boundary would silently discard one component’s metadata.
+  isolating: true,
   selectable: true,
   priority: 1000,
 
@@ -102,6 +108,10 @@ export const Element = Node.create<ElementOptions>({
 
   parseHTML() {
     return [{ tag: 'div[data-type="element"]' }]
+  },
+
+  addNodeView() {
+    return props => componentView(props, () => this.options.getAuthoringKit?.(), () => this.options.getOutputOptions?.() ?? {})
   },
 
   renderHTML({ HTMLAttributes }) {

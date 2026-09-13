@@ -165,7 +165,7 @@ describe('editor-specific authoring kits', () => {
       ;(icon.element as HTMLInputElement).focus()
       await icon.setValue('info')
       expect(document.activeElement).toBe(icon.element)
-      expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(true)
+      expect(wrapper.find('.ginko-settings').exists()).toBe(true)
 
       const appearance = wrapper.get('select')
       ;(appearance.element as HTMLSelectElement).focus()
@@ -176,7 +176,7 @@ describe('editor-specific authoring kits', () => {
       ;(visible.element as HTMLInputElement).focus()
       await visible.setValue(false)
       expect(document.activeElement).toBe(visible.element)
-      expect(wrapper.find('.ginko-editor__inspector').exists()).toBe(true)
+      expect(wrapper.find('.ginko-settings').exists()).toBe(true)
     } finally {
       wrapper.unmount()
     }
@@ -265,19 +265,19 @@ describe('editor-specific authoring kits', () => {
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
-      const actions = wrapper.get('.ginko-editor__block-actions')
+      const actions = () => wrapper.get('.ginko-editor__block-actions')
 
-      await actions.get('button[aria-keyshortcuts="Alt+ArrowDown"]').trigger('click')
+      await actions().get('button[data-action="down"]').trigger('click')
       await wrapper.vm.flush()
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/Second[\s\S]*First/)
       wrapper.vm.editor!.commands.undo()
       await wrapper.vm.flush()
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/First[\s\S]*Second/)
 
-      await actions.get('button[aria-keyshortcuts="Alt+Shift+D"]').trigger('click')
+      await actions().get('button[data-action="duplicate"]').trigger('click')
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(2)
-      await actions.get('.ginko-editor__delete').trigger('click')
+      await actions().get('button[data-action="delete"]').trigger('click')
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(1)
       wrapper.vm.editor!.commands.undo()
@@ -514,7 +514,7 @@ describe('editor-specific authoring kits', () => {
 
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
-      await wrapper.get('.ginko-editor__delete').trigger('click')
+      await wrapper.get('button[data-action="delete"]').trigger('click')
       expect(columnPositions()).toHaveLength(0)
       wrapper.vm.editor!.commands.undo()
       expect(columnPositions()).toHaveLength(2)

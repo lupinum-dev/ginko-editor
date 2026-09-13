@@ -255,7 +255,7 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
       <span role="status"><span class="save-dot" />{{ pending ? 'Updating document…' : draftStatus }}</span><span>{{ wordCount }} source words <span aria-hidden="true">·</span> Markdown + components</span>
     </footer>
     <div class="workspace-help">
-      <span><kbd>/</kbd> insert blocks <span aria-hidden="true">·</span> <kbd>Ctrl/⌘</kbd><kbd>Z</kbd> undo <span aria-hidden="true">·</span> Select a block to edit its properties</span><button
+      <span><kbd>/</kbd> insert blocks <span aria-hidden="true">·</span> <kbd>Ctrl/⌘</kbd><kbd>Z</kbd> undo <span aria-hidden="true">·</span> Use the cog to change a block</span><button
         type="button"
         @click="replaceDocument(example)"
       >
@@ -378,9 +378,6 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
 .document-panel :deep(.ginko-editor__surface) { padding: clamp(1.5rem, 3.5vw, 3rem); }
 .document-panel :deep(.ProseMirror) { min-height: 510px; font-size: 15px; line-height: 1.75; }
 .document-panel :deep(.ginko-editor__source) { min-height: 660px; padding: 2rem; line-height: 1.9; }
-.document-panel :deep(.ProseMirror div[data-type='element'][tag='info']) { background: color-mix(in srgb, #79a284 10%, var(--card)); border-color: color-mix(in srgb, #79a284 25%, var(--border)); }
-.document-panel :deep(.ProseMirror div[data-type='element'][tag='layout']) { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; background: transparent; }
-.document-panel :deep(.ProseMirror div[data-type='element'][tag='column']) { padding: 1.8rem .75rem .75rem; background: transparent; }
 .document-panel :deep(.ProseMirror div[data-type='element'] p) { margin: .35rem 0; }
 .workspace-footer { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem .2rem; color: var(--muted-foreground); font-size: .7rem; }
 .workspace-footer > span:first-child { display: flex; align-items: center; gap: .4rem; }
@@ -409,5 +406,5 @@ onBeforeUnmount(() => { globalThis.clearTimeout(saveTimer); saveOnExit(); global
 .checks-content h2 { font-size: 1.1rem; }
 .checks-content > p { font-size: .85rem; margin-bottom: 1rem; color: var(--muted-foreground); }
 @media (max-width: 850px) { .workspace-subheading { align-items: start; flex-direction: column; } .document-workspace { grid-template-columns: 1fr; } .document-panel--preview { border-left: 0; border-top: 1px solid var(--border); } .reader-page { min-height: 320px; } .library-grid { grid-template-columns: 1fr; } .library-card-preview { min-height: 100px; } .workspace-help { align-items: start; flex-direction: column; gap: .4rem; } }
-@media (max-width: 500px) { .workspace-heading { align-items: start; flex-direction: column; gap: .7rem; } .workspace-actions { width: 100%; justify-content: space-between; } .panel-hint { display: none; } .workspace-footer { flex-direction: column; gap: .4rem; } .writing-workspace button { min-height: 40px; } .document-panel :deep(.ginko-editor__surface) { padding: 1.2rem; } .document-panel :deep(.ProseMirror div[data-type='element'][tag='layout']) { grid-template-columns: 1fr; } }
+@media (max-width: 500px) { .workspace-heading { align-items: start; flex-direction: column; gap: .7rem; } .workspace-actions { width: 100%; justify-content: space-between; } .panel-hint { display: none; } .workspace-footer { flex-direction: column; gap: .4rem; } .writing-workspace button { min-height: 40px; } .document-panel :deep(.ginko-editor__surface) { padding: 1.2rem; } }
 </style>
