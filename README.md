@@ -94,7 +94,17 @@ of the configuration.
 
 Provide one callback to enable an upload placeholder for **Add image**, `/image`,
 and **Replace image**. The editor accepts one non-empty image file up to 10 MB
-per placeholder, from the file chooser or drag and drop.
+per placeholder, from the file chooser or drag and drop. Drop a file directly
+onto the editor to see its preview and confirm **Add image**. Drop onto an
+existing editor image to confirm **Replace image**. Cancel preserves the original;
+no upload starts before confirmation. Dropping inside text chooses the nearby
+block boundary, independently of the current caret.
+
+By default, the editor owns file drops within its own surface. To include an
+outer writing workspace, pass its element as `image-drop-target`. Drops outside
+the editor append to the document; nested independent editors keep their own
+drop handling. The playground uses this option for its whole workspace, including
+the reader pane. Existing editor block drags retain their normal move behavior.
 
 ```vue
 <script setup lang="ts">

@@ -14,6 +14,7 @@ const source = ref(example)
 const assets = createPlaygroundAssets()
 provide(playgroundImageSource, assets.resolve)
 const editor = ref<GinkoEditorHandle>()
+const workspace = ref<globalThis.HTMLElement>()
 const view = ref<'write' | 'split' | 'preview'>('split')
 const showLibrary = ref(false)
 const showChecks = ref(false)
@@ -82,6 +83,7 @@ onBeforeUnmount(() => { assets.dispose(); globalThis.clearTimeout(saveTimer); sa
 
 <template>
   <div
+    ref="workspace"
     class="writing-workspace"
   >
     <header class="workspace-heading">
@@ -199,12 +201,13 @@ onBeforeUnmount(() => { assets.dispose(); globalThis.clearTimeout(saveTimer); sa
           :authoring-kit="playgroundAuthoringKit"
           :asset-provider="assets.provider"
           :image-upload="assets.upload"
+          :image-drop-target="workspace"
           :enable-files="false"
           :enable-video="false"
           image-output="markdown"
           aria-label="Main playground editor"
           placeholder="Write something, or type / for blocks…"
-          @pending-change="pending = $event"
+          @pending-change="pending = $event; if ($event && view === 'preview') view = 'split'"
         >
           <template #recipe-preview="{ recipe }">
             <PlaygroundPreview

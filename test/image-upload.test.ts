@@ -95,7 +95,7 @@ describe('inline image uploads', () => {
     expect(wrapper.text()).toContain('Choose a non-empty image file')
     await choose(wrapper, new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' }))
     expect(wrapper.text()).toContain('smaller than 10 MB'); expect(upload).not.toHaveBeenCalled()
-    await area.trigger('drop', { dataTransfer: { files: [file()] } }); await flushPromises()
+    await area.trigger('drop', { dataTransfer: { files: [file()] } }); await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
     expect(wrapper.text()).toContain('Storage is full.')
     await choose(wrapper)
     expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
@@ -181,6 +181,103 @@ describe('inline image uploads', () => {
     expect(await wrapper.vm.flush()).toMatchObject({ ok: true })
     expect(wrapper.vm.editor!.state.doc.child(1).attrs.props).toMatchObject({ fit: 'cover', focalX: 0.25, focalY: 0.75, cropWidth: 300, cropHeight: 200 })
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('focalX')
+  })
+
+  it('asks before adding a file dropped into an empty editor', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
+    const wrapper = await mountEditor(upload)
+    await wrapper.setProps({ modelValue: '' })
+    await wrapper.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    expect(wrapper.text()).toContain('Add this image?')
+    expect(upload).not.toHaveBeenCalled()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(await wrapper.vm.flush()).toMatchObject({ ok: false })
+    await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
+    expect(upload).toHaveBeenCalledOnce()
+    expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/dropped.png')
+  })
+
+  it('asks before replacing the image under the drop, independently of the text selection', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
+    editor.commands.setTextSelection(1)
+    await wrapper.get('.ginko-image img').trigger('dragover', { dataTransfer: { types: ['Files'] } })
+    expect(wrapper.get('.ginko-image').classes()).toContain('ginko-image--drop-target')
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    expect(wrapper.text()).toContain('Replace this image?')
+    expect(upload).not.toHaveBeenCalled()
+    expect(editor.state.doc.child(1).attrs.props.src).toBe('/original.png')
+    await wrapper.get('.ginko-image-upload__actions button:first-child').trigger('click')
+    expect(editor.state.doc.child(1).attrs.props.src).toBe('/original.png')
+    expect(upload).not.toHaveBeenCalled()
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
+    expect(editor.state.doc.child(1).attrs.props.src).toBe('/dropped.png')
+  })
+
+  it('maps a confirmed drop across typing and prevents confirmation after target removal', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    await wrapper.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    editor.commands.insertContent('Changed ')
+    await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
+    expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/dropped.png')
+    await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    const imagePos = editor.view.posAtDOM(wrapper.get('.ginko-image').element, 0)
+    editor.commands.deleteRange({ from: imagePos, to: imagePos + 1 })
+    await flushPromises()
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(upload).toHaveBeenCalledOnce()
+  })
+
+  it('supports an outer workspace drop target without intercepting another editor', async () => {
+    const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
+    const wrapper = await mountEditor(upload), other = await mountEditor()
+    await wrapper.setProps({ imageDropTarget: document.body })
+    await other.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(other.text()).toContain('Add this image?')
+    document.body.dispatchEvent(Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer: { types: ['Files'], files: [file()] } }))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Add this image?')
+    expect(upload).not.toHaveBeenCalled()
+  })
+
+  it('accepts a new file over confirmation, revokes previews, and restores focus after approval', async () => {
+    const create = vi.fn().mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:second'), revoke = vi.fn()
+    const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL
+    URL.createObjectURL = create; URL.revokeObjectURL = revoke
+    try {
+      const task = deferred(), wrapper = await mountEditor(() => task.promise)
+      await wrapper.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+      const preview = wrapper.get('.ginko-image-upload__confirmation img')
+      const drag = new Event('dragover', { bubbles: true, cancelable: true })
+      Object.defineProperty(drag, 'dataTransfer', { value: { types: ['Files'] } })
+      preview.element.dispatchEvent(drag)
+      expect(drag.defaultPrevented).toBe(true)
+      await preview.trigger('drop', { dataTransfer: { types: ['Files'], files: [new File(['second'], 'second.png', { type: 'image/png' })] } })
+      expect(wrapper.text()).toContain('second.png')
+      expect(revoke).toHaveBeenCalledWith('blob:first')
+      await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click')
+      expect(document.activeElement).toBe(wrapper.get('[aria-label="Remove image placeholder"]').element)
+      task.resolve({ url: '/confirmed.png' }); await flushPromises()
+      expect(document.activeElement).toBe(wrapper.vm.editor!.view.dom)
+      expect(revoke).toHaveBeenCalledWith('blob:second')
+    } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke }
+  })
+
+  it('does not intercept ordinary drags or accept files in a disabled editor', async () => {
+    const upload = vi.fn<ImageUploadHandler>()
+    const wrapper = await mountEditor(upload)
+    const textDrop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(textDrop, 'dataTransfer', { value: { types: ['text/html'], files: [] } })
+    wrapper.element.dispatchEvent(textDrop)
+    expect(textDrop.defaultPrevented).toBe(false)
+    await wrapper.setProps({ disabled: true })
+    await wrapper.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(upload).not.toHaveBeenCalled()
   })
 
   it('resolves concurrent placeholders independently', async () => {

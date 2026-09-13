@@ -39,6 +39,7 @@ const TableHeader = TiptapTableHeader.extend({
 })
 
 export interface CreateEditorExtensionsOptions {
+  getImageDropTarget?: () => HTMLElement | undefined
   getImageUpload?: () => ImageUploadHandler | undefined
   canUploadImage?: () => boolean
   insertUploadedImage?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
@@ -120,7 +121,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
     CodeBlock.configure({
       theme: codeBlockTheme,
     }),
-    ImageUpload.configure({ upload: options.getImageUpload, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
+    ImageUpload.configure({ dropTarget: options.getImageDropTarget, upload: options.getImageUpload, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
     Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions }),
     Video,
     File.configure({ resolveSrc: resolveAsset }),

@@ -2913,3 +2913,37 @@ preserved. The production Add action opened and removed its placeholder without
 changing source; no browser console errors were reported. The updated Getting
 started page renders the upload and cancellation contract. The isolated test
 server was stopped and test tabs closed. No packages were published or pushed.
+
+## Direct image drops — 2026-09-13
+
+Dropping a file onto the editor now offers an inline thumbnail, filename, and
+Add image confirmation. Dropping onto an existing editor image instead asks to
+Replace image. Neither action starts persistence before confirmation; Cancel or
+Escape preserves the document and original image. Drops onto an open placeholder
+use the same confirmation. Ordinary internal text/block drags retain their normal
+behavior. The existing file chooser remains the keyboard alternative.
+
+The optional `imageDropTarget` element extends the drop region to a host workspace.
+The playground uses its whole writing workspace, including the reader pane.
+Drops outside the editor append to the document; drops inside it choose the
+nearest top-level block boundary. Preview-only mode reveals the writing pane
+and focuses confirmation. Independent nested editors retain their own drops.
+The existing upload callback, mapped pending decorations, cancellation, history,
+and flush contracts remain the single implementation path.
+
+Validation: 191 tests cover confirmation before upload, actual target replacement
+independent of selection, cancellation, mapped anchors, removed targets, nested
+editor isolation, confirmation-surface dragging, focus recovery, disabled state,
+and ordinary text drag behavior. Independent review verified the fixes for
+confirmation drag handling, completion focus, and Preview-only visibility.
+Browser-dispatched file drag events against the production build verified empty
+workspace Add, replacement approval, cancellation preserving the original source,
+one-image replacement, and Preview-only reveal with focused confirmation. A real
+file chooser supplied the image fixture. Native Finder drag automation is not
+supported by the browser driver, so OS-level dragging was not automated.
+Visual inspection also caught and corrected an inherited style enlarging the
+confirmation thumbnail; its dimensions are now bounded to 120 pixels.
+
+The final `pnpm verify` run passed dependency policy, lint, types, all 191 tests,
+library/declaration generation, and production docs build. The rebuilt browser
+confirmed a 120 × 120 pixel thumbnail with the replacement prompt visible.

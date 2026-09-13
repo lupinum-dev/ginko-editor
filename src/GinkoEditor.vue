@@ -26,6 +26,7 @@ import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes
 defineOptions({ name: 'GinkoEditor' })
 
 const props = withDefaults(defineProps<{
+  imageDropTarget?: globalThis.HTMLElement
   imageUpload?: ImageUploadHandler
   ariaLabel?: string
   assetProvider?: AssetProvider
@@ -49,6 +50,7 @@ const props = withDefaults(defineProps<{
   ariaLabel: undefined,
   assetProvider: undefined,
   imageUpload: undefined,
+  imageDropTarget: undefined,
   authoringKit: undefined,
   disabled: false,
   enableDebug: false,
@@ -141,6 +143,7 @@ const editor = useEditor({
     canPaste: () => canMutateVisualContent(),
     onPasteError: message => { clipboardError.value = message },
     onCopyError: message => { clipboardError.value = message },
+    getImageDropTarget: () => props.imageDropTarget,
     getImageUpload: () => props.imageUpload,
     canUploadImage: () => canMutateVisualContent(props.enableImages),
     insertUploadedImage: insertUploadedImageAt,
@@ -756,7 +759,7 @@ let assetContextRevision = 0
 watch([viewMode, () => props.disabled, () => props.enableImages, () => props.enableFiles, () => props.enableVideo, () => props.assetProvider], () => {
   assetContextRevision += 1
 }, { flush: 'sync' })
-watch([() => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages], () => {
+watch([() => props.imageDropTarget, () => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages], () => {
   const instance = editor.value
   if (instance && !instance.isDestroyed) instance.view.dispatch(instance.state.tr)
 })

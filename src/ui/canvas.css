@@ -88,3 +88,14 @@
 .ginko-editor .ginko-image-upload__dropzone:disabled { cursor: progress; }
 .ginko-editor .ginko-image-upload__error { margin: 0; padding: 0 1rem 1rem; color: #b34c3b; font-size: .8rem; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .ginko-editor .ginko-image-upload { transition: none; } }
+
+.ginko-editor .ginko-image-upload__confirmation { display: grid; justify-items: center; gap: .65rem; padding: 1.5rem; text-align: center; }
+.ginko-editor .ginko-image-upload__confirmation img { max-width: 100%; max-height: 120px; width: 120px; height: 120px; object-fit: contain; border-radius: .4rem; }
+.ginko-editor .ginko-image-upload__confirmation h3 { font: inherit; font-size: 1rem; font-weight: 600; margin: 0; }
+.ginko-editor .ginko-image-upload__confirmation p { max-width: 100%; overflow-wrap: anywhere; font-size: .8rem; color: var(--ginko-muted-text); margin: 0; }
+.ginko-editor .ginko-image-upload__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: .3rem; }
+.ginko-editor .ginko-image-upload__actions button { min-height: 40px; border: 1px solid var(--ginko-border); border-radius: .4rem; padding: .5rem .9rem; background: var(--ginko-bg); color: var(--ginko-text); font: inherit; font-size: .85rem; cursor: pointer; }
+.ginko-editor .ginko-image-upload__actions button:last-child { background: var(--ginko-text); color: var(--ginko-bg); border-color: var(--ginko-text); }
+.ginko-editor .ginko-image-upload__actions button:focus-visible { outline: 2px solid var(--ginko-text); outline-offset: 3px; }
+.ginko-editor .ginko-image--drop-target { outline: 2px solid var(--ginko-text); outline-offset: 5px; border-radius: .5rem; }
+.ginko-editor .ginko-image-drop-hint { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 100; max-width: calc(100vw - 2rem); border: 1px solid var(--ginko-border); border-radius: .65rem; padding: .8rem 1.2rem; background: var(--ginko-bg); color: var(--ginko-text); box-shadow: 0 4px 20px rgb(0 0 0 / .12); font: 500 .875rem/1.4 system-ui, sans-serif; pointer-events: none; text-align: center; }
