@@ -2840,7 +2840,23 @@ aside, and excerpt produced byte-identical canonical Markdown after Copy → new
 page → Paste → Copy. The reader image's zero-width wrapper was fixed in Docs.
 
 Docs revision `d6a6910` supplies ten authored component tags and component-only
-styles. This is the certified simple-component surface; complex grouped Docs
+styles. This is the supported simple-component surface; complex grouped Docs
 components (such as tabs, quizzes, and timelines) still need their own editing
 contracts. The existing authenticated CMS save/reload gate remains unverified.
 This pass does not publish packages, deploy applications, or change host storage.
+
+
+Packed verification also passed after implementation commit `35d607d`: fresh
+Vue and Nuxt consumers include the public declarations and all canvas/popover/
+table CSS. The Editor archive SHA-256 is
+`70b4564c056eff238801f162cab22c6526559fb26e8793ba6982df137fa21126`.
+Docs `d6a6910` produced reproducible archive SHA-256
+`371dab5be201d02bef129aa9aa34b20a0743e361bd09d10f252017205015efa0`;
+its installed component-only consumer also passed. Content remains the accepted
+`2789113` archive recorded above. CMS and ChiliSkills worktrees remain clean at
+`4da0a230` and `ce2de51`; this additive editor pass required no host API changes.
+
+The final production playground is running at
+`http://127.0.0.1:4317/playground`. Its existing saved draft was preserved and
+opened with the new controls; the final browser reported no console errors.
+The isolated `localhost:4318` test preview was cleaned up after verification.
