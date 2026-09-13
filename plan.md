@@ -2947,3 +2947,13 @@ confirmation thumbnail; its dimensions are now bounded to 120 pixels.
 The final `pnpm verify` run passed dependency policy, lint, types, all 191 tests,
 library/declaration generation, and production docs build. The rebuilt browser
 confirmed a 120 × 120 pixel thumbnail with the replacement prompt visible.
+
+Implementation commit `c2492b6` also passed the packed Vue and Nuxt consumer checks.
+The archive SHA-256 is
+`da22bfd6b99ff3933e04cec42c43165538cc84d9bc2d5fd514bebadcb65b0fe7`.
+The production playground remains at `http://127.0.0.1:4317/playground` with the
+user's saved draft intact and no reported console errors. The isolated browser
+harness logged a MutationObserver exception around its reload; this was not
+reproduced in the production tab, and the drop assertions completed. The temporary
+harness tab and proxy server were closed. Other repository worktrees remain clean;
+no packages were published or pushed.
