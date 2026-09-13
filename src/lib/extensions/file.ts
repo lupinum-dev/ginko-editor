@@ -30,7 +30,7 @@ declare module '@tiptap/core' {
 
 export const File = Node.create<FileOptions>({
   name: 'file',
-  draggable: true,
+  draggable: false,
 
   addAttributes() {
     return {

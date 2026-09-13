@@ -2,16 +2,18 @@
 
 ## Unreleased
 
-- Unify toolbar, slash recipes, table actions and block movement behind guarded
+- Remove block drag handles, content dragging, and block-reordering menus and
+  shortcuts. Keep component duplication, deletion, column sizing and image uploads.
+
+- Unify toolbar, slash recipes, table actions and component operations behind guarded
   commands with Reka controls, Lucide icons and scoped shadcn-style tokens.
-- Add nested block handles, keyboard and menu movement, inline component editing,
-  selection formatting, and coordinated editor-local overlays.
+- Add inline component editing, selection formatting, and coordinated editor-local
+  overlays.
 - Add controlled image-library selection alongside uploads, preserving stable
   host asset references and cancellation, flush and undo behavior.
 - Export `GinkoToolbar` and `GinkoImagePicker`, toolbar/actions slots, toolbar item
   selection, messages, shortcut overrides and an optional overlay container.
-- Preserve empty list/quote source on reload; reject obsolete selections and
-  route native block dragging through the same guarded movement operation.
+- Preserve empty list/quote source on reload and reject obsolete selections.
 
 - Preserve visual edits on failed flushes and reject stale asset or paste requests.
 - Keep component values, media metadata, list paragraphs, table alignment, and

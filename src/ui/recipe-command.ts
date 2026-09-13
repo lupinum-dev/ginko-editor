@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Transaction } from '@tiptap/pm/state'
 import type { AuthoringRecipeV1 } from '../authoring'
-import { commitEditorTransaction, trackEditorOperation, type BlockMovementContext, type BlockOperationResult } from '../lib/block-movement'
+import { commitEditorTransaction, trackEditorOperation, type EditorOperationContext, type BlockOperationResult } from '../lib/editor-operations'
 import { prepareMarkdownForVisualEditing } from '../lib/conversionPipeline'
 import { buildEditorCommandTransaction, type EditorCommand } from './commands'
 import { writingRecipes } from './writingRecipes'
@@ -19,7 +19,7 @@ const nativeCommands: Record<string, EditorCommand> = {
 }
 
 /** Slash insertion shares toolbar commands and Content's final-document gate. */
-export function runRecipeCommand(editor: Editor, recipe: AuthoringRecipeV1, context: BlockMovementContext): Promise<BlockOperationResult> {
+export function runRecipeCommand(editor: Editor, recipe: AuthoringRecipeV1, context: EditorOperationContext): Promise<BlockOperationResult> {
   return trackEditorOperation(editor, async () => {
     if (editor.isDestroyed || !editor.isEditable || context.canMutate?.() === false) return { ok: false, reason: 'unavailable' }
     const before = editor.state, kit = context.getAuthoringKit?.(), output = context.getOutputOptions?.() ?? {}, outputKey = JSON.stringify(output)

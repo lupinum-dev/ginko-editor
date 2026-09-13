@@ -64,8 +64,8 @@ export function blockSettings(editor: Editor, getNode: () => Node, getPos: () =>
       if (current()) { report(text('variantFailed')); render() }
     }
   }
-  const actionLabels: { label: Text; key: 'moveUp' | 'moveDown' | 'duplicate' | 'delete' }[] = []
-  for (const [action, key, symbol] of [['up', 'moveUp', 'up'], ['down', 'moveDown', 'down'], ['duplicate', 'duplicate', 'copy'], ['delete', 'delete', 'trash']] as const) {
+  const actionLabels: { label: Text; key: 'duplicate' | 'delete' }[] = []
+  for (const [action, key, symbol] of [['duplicate', 'duplicate', 'copy'], ['delete', 'delete', 'trash']] as const) {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.action = action
     const label = document.createTextNode(text(key)); actionLabels.push({ label, key }); button.append(icon(symbol), label)
     if (action === 'delete') button.className = 'ginko-danger'

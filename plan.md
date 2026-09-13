@@ -1,3 +1,9 @@
+> **Scope change — 2026-09-13.** Matthias requested removal of block dragging and
+> block-order controls after trying the playground. This supersedes the movement
+> requirements and their earlier acceptance below. Remove handles, move menus,
+> move shortcuts and the drag dependency. Preserve source, ordinary editing,
+> component duplication/deletion, column sizing and host image uploads.
+
 > **Playground overhaul — implemented by Astra (2026-09-13).** Matthias requested a full UI/UX overhaul personally by the coordinating Astra agent. This authorizes the playground preview work ahead of the earlier Step 7 pause; authenticated CMS acceptance remains separate and incomplete. Acceptance: a cursor-anchored searchable slash menu, native writing blocks and host recipes, real component previews, coherent light/dark and narrow layouts, keyboard/focus recovery, durable local drafts, and successful Editor verification plus actual browser interaction checks. No publishing or deployment is included. The implementation adds 13 commands, host-owned preview slots, real component examples, image URL validation, and automatic local draft saving. Independent review findings were corrected. Browser checks covered light/dark themes, 390-pixel layout, slash search/insertion, component properties, image validation/rendering, undo, source recovery, reload/navigation persistence, and documentation search. Full Editor verification passes 83 tests plus type/lint/package/docs builds. This acceptance is for the playground overhaul; it does not certify complete Notion feature parity or close the authenticated CMS gate.
 
 # Ginko Editor implementation and rollout plan

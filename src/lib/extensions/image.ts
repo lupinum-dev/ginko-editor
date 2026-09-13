@@ -45,7 +45,7 @@ declare module '@tiptap/core' {
 
 export const Image = Node.create<ImageOptions>({
   name: 'image',
-  draggable: true,
+  draggable: false,
 
   addAttributes() {
     return {

@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
 import GinkoToolbar from '../src/ui/GinkoToolbar.vue'
 import * as conversion from '../src/lib/conversionPipeline'
-import { captureBlock, performBlockAction } from '../src/lib/block-movement'
+import { captureBlock, performBlockAction } from '../src/lib/editor-operations'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
@@ -103,22 +103,6 @@ describe('writing toolbar', () => {
     expect(editor.getJSON().content?.[0].content?.[0].marks).toEqual([{ type: 'bold' }])
   })
 
-  it('prioritizes explicit movement and text bindings over the other group defaults', async () => {
-    const { wrapper, editor } = await setup('First\n\nSecond')
-    editor.commands.setNodeSelection(editor.state.doc.firstChild!.nodeSize)
-    await wrapper.setProps({ shortcuts: { moveUp: 'Mod-b' } })
-    editor.view.dom.dispatchEvent(modKey('b'))
-    await wrapper.vm.flush()
-    expect(editor.state.doc.content.content.map(node => node.textContent)).toEqual(['Second', 'First'])
-    expect(editor.getJSON().content?.[0].content?.[0].marks).toBeUndefined()
-    await wrapper.setProps({ shortcuts: { bold: 'Alt-ArrowDown' } })
-    editor.commands.setTextSelection({ from: 1, to: 7 })
-    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true, cancelable: true }))
-    await wrapper.vm.flush()
-    expect(editor.state.doc.content.content.map(node => node.textContent)).toEqual(['Second', 'First'])
-    expect(editor.getJSON().content?.[0].content?.[0].marks).toEqual([{ type: 'bold' }])
-  })
-
   it('honors disabled and remapped history shortcuts including native aliases', async () => {
     const { wrapper, editor } = await setup()
     editor.commands.insertContent('Changed')
@@ -170,24 +154,24 @@ describe('writing toolbar', () => {
     const { wrapper, editor } = await setup('First\n\nSecond')
     editor.commands.insertContent('Edited ')
     const convert = conversion.convertTiptapDocToMarkdown
-    let releaseSource!: () => void, releaseMove!: () => void
+    let releaseSource!: () => void, releaseDuplicate!: () => void
     const sourceGate = new Promise<void>(resolve => { releaseSource = resolve })
-    const moveGate = new Promise<void>(resolve => { releaseMove = resolve })
+    const duplicateGate = new Promise<void>(resolve => { releaseDuplicate = resolve })
     vi.spyOn(conversion, 'convertTiptapDocToMarkdown')
       .mockImplementationOnce(async (...args) => { await sourceGate; return convert(...args) })
-      .mockImplementationOnce(async (...args) => { await moveGate; return convert(...args) })
+      .mockImplementationOnce(async (...args) => { await duplicateGate; return convert(...args) })
     let finished = false
     const saving = wrapper.vm.flush().then(result => { finished = true; return result })
     await flushPromises()
     // Node views invoke the same operation without a root-specific callback.
-    const moving = performBlockAction(editor, captureBlock(editor, 0)!, 'down')
+    const duplicating = performBlockAction(editor, captureBlock(editor, 0)!, 'duplicate')
     releaseSource(); await flushPromises()
     expect(finished).toBe(false)
     expect(wrapper.vm.hasPendingChanges()).toBe(true)
-    releaseMove()
-    expect(await moving).toEqual({ ok: true })
+    releaseDuplicate()
+    expect(await duplicating).toEqual({ ok: true })
     expect((await saving).ok).toBe(true)
-    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toBe('Second\n\nEdited First\n')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toBe('Edited First\n\nEdited First\n\nSecond\n')
     expect(wrapper.vm.hasPendingChanges()).toBe(false)
   })
 

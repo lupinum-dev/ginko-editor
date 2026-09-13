@@ -107,7 +107,7 @@ By default, the editor owns file drops within its own surface. To include an
 outer writing workspace, pass its element as `image-drop-target`. Drops outside
 the editor append to the document; nested independent editors keep their own
 drop handling. The playground uses this option for its whole workspace, including
-the reader pane. Existing editor block drags retain their normal move behavior.
+the reader pane. Dragging existing content and block-reordering controls are not supported.
 
 ```vue
 <script setup lang="ts">

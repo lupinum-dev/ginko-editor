@@ -4,8 +4,8 @@ import { Fragment } from '@tiptap/pm/model'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createAuthoringKit, type AuthoringKitV1 } from '../src/authoring'
 import { createEditorExtensions } from '../src/lib/config/editorConfig'
-import { applyTiptapDocToEditor, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown } from '../src/lib/conversionPipeline'
-import { captureBlock, observeEditorOperations, trackEditorOperation, waitForEditorOperations, commitEditorTransaction, canMoveBlock, canPerformBlockAction, moveBlock, parentBlock, performBlockAction, selectedBlock, selectParentBlock, type BlockReference } from '../src/lib/block-movement'
+import { applyTiptapDocToEditor, prepareMarkdownForVisualEditing } from '../src/lib/conversionPipeline'
+import { captureBlock, observeEditorOperations, trackEditorOperation, waitForEditorOperations, commitEditorTransaction, canPerformBlockAction, parentBlock, performBlockAction, selectedBlock, selectParentBlock, type BlockReference } from '../src/lib/editor-operations'
 import * as conversion from '../src/lib/conversionPipeline'
 import { actOnBlock, canActOnBlock } from '../src/lib/nodeviews/block-actions'
 
@@ -57,9 +57,8 @@ function wrapDefaultSlot(editor: Editor, block: BlockReference) {
   const next = block.node.copy(Fragment.from(slot))
   editor.view.dispatch(editor.state.tr.replaceWith(block.pos, block.pos + block.node.nodeSize, next).setMeta('addToHistory', false))
 }
-const columns = '<split>\n<pane width="small">\nFirst\n</pane>\n<pane width="large">\nA much longer second column\n</pane>\n</split>'
 
-describe('validated block movement', () => {
+describe('validated editor operations', () => {
   it('drains mixed-context operations with accurate pending counts, isolated by editor', async () => {
     const editor = await setup('First\n\nSecond'), other = await setup('Other')
     const convert = conversion.convertTiptapDocToMarkdown
@@ -71,7 +70,7 @@ describe('validated block movement', () => {
     const counts: number[] = []
     const unsubscribe = observeEditorOperations(editor, count => counts.push(count))
     const source = paragraph(editor, 'First')
-    const first = performBlockAction(editor, source, 'down')
+    const first = performBlockAction(editor, source, 'delete')
     const second = performBlockAction(editor, source, 'duplicate')
     expect(counts).toEqual([0, 1, 2])
     let settled = false
@@ -109,53 +108,13 @@ describe('validated block movement', () => {
 
   it('includes an operation started while the previous operation finishes draining', async () => {
     const editor = await setup('First\n\nSecond')
-    const first = performBlockAction(editor, paragraph(editor, 'First'), 'down')
+    const first = performBlockAction(editor, paragraph(editor, 'Second'), 'delete')
     let second: ReturnType<typeof performBlockAction> | undefined
     void first.then(() => { second = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate') })
     await waitForEditorOperations(editor)
     expect(second).toBeDefined()
     expect(await second).toEqual({ ok: true })
-    expect(editor.state.doc.content.content.map(node => node.textContent)).toEqual(['Second', 'First', 'First'])
-  })
-
-  it('moves native blocks up and down and isolates the move from nearby typing in Undo history', async () => {
-    const editor = await setup('First\n\nSecond\n\nThird')
-    editor.commands.setTextSelection(2)
-    editor.commands.insertContent('X')
-    const beforeMove = editor.getJSON(), source = paragraph(editor, 'FXirst')
-    expect(canPerformBlockAction(editor, source, 'down')).toBe(true)
-    expect(await performBlockAction(editor, source, 'down')).toEqual({ ok: true })
-    expect(editor.state.doc.child(0).textContent).toBe('Second')
-    expect(editor.state.selection.from).toBe(editor.state.doc.child(0).nodeSize)
-    const afterMove = editor.getJSON()
-    editor.commands.setTextSelection(2)
-    editor.commands.insertContent('Y')
-    editor.commands.undo()
-    expect(editor.getJSON()).toEqual(afterMove)
-    editor.commands.undo()
-    expect(editor.getJSON()).toEqual(beforeMove)
-    editor.commands.undo()
-    expect(editor.state.doc.firstChild?.textContent).toBe('First')
-    const third = paragraph(editor, 'Third')
-    expect(await performBlockAction(editor, third, 'up')).toEqual({ ok: true })
-    expect(editor.state.doc.child(1).textContent).toBe('Third')
-  })
-
-  it('moves an item within and between lists without converting it to a paragraph', async () => {
-    const editor = await setup('- First\n- Second\n\nBetween\n\n1. Third\n2. Fourth')
-    const item = (text: string) => find(editor, block => block.node.type.name === 'listItem' && block.node.textContent === text)
-    const first = item('First')
-    expect(await performBlockAction(editor, first, 'down')).toEqual({ ok: true })
-    expect(editor.state.doc.firstChild?.firstChild?.textContent).toBe('Second')
-    const numbered = find(editor, block => block.node.type.name === 'orderedList')
-    expect(await moveBlock(editor, item('First'), { block: numbered, placement: 'end' })).toEqual({ ok: true })
-    expect(editor.state.doc.firstChild?.childCount).toBe(1)
-    expect(find(editor, block => block.node.type.name === 'orderedList').node.lastChild?.textContent).toBe('First')
-    expect(canMoveBlock(editor, item('First'), { block: paragraph(editor, 'Between'), placement: 'after' })).toBe(false)
-    const wholeList = find(editor, block => block.node.type.name === 'bulletList')
-    expect(await moveBlock(editor, wholeList, { block: paragraph(editor, 'Between'), placement: 'after' })).toEqual({ ok: true })
-    expect(editor.state.doc.firstChild?.textContent).toBe('Between')
-    expect(editor.state.doc.child(1).type.name).toBe('bulletList')
+    expect(editor.state.doc.content.content.map(node => node.textContent)).toEqual(['First', 'First'])
   })
 
   it('validates shared structural transactions and rejects a stale transaction', async () => {
@@ -189,89 +148,12 @@ describe('validated block movement', () => {
     expect(editor.getText().trim()).toBe('Only text')
   })
 
-  it('moves content between containers and back to the root without dropping either body', async () => {
-    const editor = await setup('<note>\nInside\n</note>\n\nOutside', await kit())
-    expect(await moveBlock(editor, paragraph(editor, 'Outside'), { block: component(editor, 'note'), placement: 'end' })).toEqual({ ok: true })
-    expect(component(editor, 'note').node.textContent).toBe('InsideOutside')
-    const inside = paragraph(editor, 'Inside'), note = component(editor, 'note')
-    expect(await moveBlock(editor, inside, { block: note, placement: 'after' })).toEqual({ ok: true })
-    expect(editor.state.doc.child(1).textContent).toBe('Inside')
-    expect(component(editor, 'note').node.textContent).toBe('Outside')
-    const outside = paragraph(editor, 'Outside')
-    expect(await moveBlock(editor, outside, { block: component(editor, 'note'), placement: 'after' })).toEqual({ ok: true })
-    const converted = await convertTiptapDocToMarkdown(editor.getJSON())
-    const reloaded = await setup(converted.value!, await kit())
-    expect(component(reloaded, 'note').node.textContent).toBe('')
-    expect(reloaded.state.doc.child(1).textContent).toBe('Outside')
-  })
-
-  it('uses an explicit default slot when moving into a component', async () => {
-    const editor = await setup('<note>\nInside\n</note>\n\nOutside', await kit())
-    wrapDefaultSlot(editor, component(editor, 'note'))
-    expect(await moveBlock(editor, paragraph(editor, 'Outside'), { block: component(editor, 'note'), placement: 'start' })).toEqual({ ok: true })
-    expect(component(editor, 'note').node.firstChild?.type.name).toBe('slot')
-    expect(component(editor, 'note').node.firstChild?.firstChild?.textContent).toBe('Outside')
-  })
-
-  it.each([false, true])('swaps paired column contents while preserving position-owned widths, explicit slot=%s', async (explicit) => {
-    const editor = await setup(columns, await kit())
-    if (explicit) wrapDefaultSlot(editor, component(editor, 'split'))
-    const before = editor.getJSON()
-    const first = find(editor, block => block.node.attrs.tag === 'pane' && block.node.attrs.props.width === 'small')
-    expect(canPerformBlockAction(editor, first, 'delete')).toBe(false)
-    expect(canPerformBlockAction(editor, first, 'duplicate')).toBe(false)
-    expect(canPerformBlockAction(editor, first, 'up')).toBe(false)
-    expect(canPerformBlockAction(editor, first, 'down')).toBe(true)
-    expect(await performBlockAction(editor, first, 'down')).toEqual({ ok: true })
-    const left = find(editor, block => block.node.attrs.tag === 'pane' && block.node.attrs.props.width === 'small')
-    const right = find(editor, block => block.node.attrs.tag === 'pane' && block.node.attrs.props.width === 'large')
-    expect(left.node.textContent).toBe('A much longer second column')
-    expect(right.node.textContent).toBe('First')
-    expect(editor.state.selection.from).toBe(right.pos)
-    editor.commands.undo()
-    expect(editor.getJSON()).toEqual(before)
-  })
-
-  it('protects paired columns, their container shape, and schema-required wrappers', async () => {
-    const editor = await setup(columns + '\n\nOutside\n\n- Item', await kit())
-    const pane = component(editor, 'pane'), split = component(editor, 'split'), outside = paragraph(editor, 'Outside')
-    expect(canMoveBlock(editor, pane, { block: outside, placement: 'after' })).toBe(false)
-    expect(canMoveBlock(editor, outside, { block: split, placement: 'end' })).toBe(false)
-    const listParagraph = paragraph(editor, 'Item')
-    expect(canMoveBlock(editor, listParagraph, { block: outside, placement: 'after' })).toBe(false)
-    const before = editor.getJSON()
-    expect((await moveBlock(editor, pane, { block: outside, placement: 'after' })).ok).toBe(false)
-    expect(editor.getJSON()).toEqual(before)
-  })
-
-  it('rejects a move forbidden by Content allowedParents before mutation', async () => {
-    const editor = await setup('<note>\n<restricted>\nKeep here\n</restricted>\n</note>\n\nOutside', await kit())
-    const before = editor.getJSON()
-    expect(editor.extensionManager.extensions.find(extension => extension.name === 'element')?.options.getAuthoringKit?.()).toBeDefined()
-    const result = await moveBlock(editor, component(editor, 'restricted'), { block: paragraph(editor, 'Outside'), placement: 'after' })
-    expect(result).toEqual({ ok: false, reason: 'unavailable' })
-    expect(canMoveBlock(editor, component(editor, 'restricted'), { block: paragraph(editor, 'Outside'), placement: 'after' })).toBe(false)
-    expect(editor.getJSON()).toEqual(before)
-  })
-
-  it('rejects self moves, descendant targets and stale source or target positions', async () => {
-    const editor = await setup('<note>\nInside\n</note>\n\nOutside', await kit())
-    const note = component(editor, 'note'), inside = paragraph(editor, 'Inside'), outside = paragraph(editor, 'Outside')
-    expect(canMoveBlock(editor, note, { block: note, placement: 'end' })).toBe(false)
-    expect(canMoveBlock(editor, note, { block: inside, placement: 'after' })).toBe(false)
-    editor.commands.insertContent('Changed')
-    const before = editor.getJSON()
-    expect((await moveBlock(editor, outside, { block: component(editor, 'note'), placement: 'end' })).ok).toBe(false)
-    expect((await moveBlock(editor, paragraph(editor, 'Outside'), { block: note, placement: 'end' })).ok).toBe(false)
-    expect(editor.getJSON()).toEqual(before)
-  })
-
   it('rejects in-flight changes in document, selection, editability, kit, and output options', async () => {
     for (const change of ['document', 'selection', 'disabled', 'kit', 'output'] as const) {
       const editor = await setup('First\n\nSecond')
       let authoringKit: AuthoringKitV1 | undefined, output: 'mdc' | 'markdown' = 'mdc'
       const nextKit = await kit()
-      const pending = moveBlock(editor, paragraph(editor, 'First'), { block: paragraph(editor, 'Second'), placement: 'after' }, { getAuthoringKit: () => authoringKit, getOutputOptions: () => ({ imageOutput: output }) })
+      const pending = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate', { getAuthoringKit: () => authoringKit, getOutputOptions: () => ({ imageOutput: output }) })
       if (change === 'document') editor.commands.setContent('<p>Replacement</p>')
       if (change === 'selection') editor.commands.setTextSelection(3)
       if (change === 'disabled') { editor.setEditable(false); editor.setEditable(true) }
@@ -283,9 +165,9 @@ describe('validated block movement', () => {
     }
   })
 
-  it('cancels a pending movement when the editor is destroyed', async () => {
+  it('cancels a pending operation when the editor is destroyed', async () => {
     const editor = await setup('First\n\nSecond')
-    const pending = moveBlock(editor, paragraph(editor, 'First'), { block: paragraph(editor, 'Second'), placement: 'after' })
+    const pending = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate')
     editor.destroy()
     expect(await pending).toEqual({ ok: false, reason: 'stale' })
   })

@@ -1,5 +1,4 @@
 export const defaultMessages = {
-  blockLabelPreview: '{kind} · {text}', headingLevel: 'Heading {level}', listItem: 'List item', quoteLabel: 'Quote', imageLabel: 'Image', tableLabel: 'Table', fileLabel: 'File', videoLabel: 'Video', checkingDocument: 'Checking document…',
   editingMode: 'Editing mode', availableBlocks: 'Available blocks', insertShort: 'Insert', navigate: 'navigate', insertHelp: 'insert', closeHelp: 'close', changesNeedAttention: 'Changes need attention', sourceOnly: 'Source only', convertingChanges: 'Converting changes', visualEditor: 'Visual editor', markdownSource: 'Markdown source', finishImageUpload: 'Finish or remove the image upload before leaving the editor.', visualRecovery: 'Your changes are still here. Correct the document or use Undo before switching modes.', sourceUnavailable: 'Visual editing is unavailable for this source.',
 
   undo: 'Undo', redo: 'Redo', paragraph: 'Paragraph', heading: 'Heading', textStyle: 'Text style', lists: 'Lists',
@@ -9,7 +8,7 @@ export const defaultMessages = {
   rows: 'Rows', columns: 'Columns', apply: 'Apply', removeLink: 'Remove link', linkAddress: 'Link address',
   invalidLink: 'Enter a valid link.', formatting: 'Text formatting', more: 'More formatting',
   visual: 'Visual', markdown: 'Markdown', searchBlocks: 'Search blocks', noBlocks: 'No matching blocks.',
-  selectParent: 'Select parent', moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Move to…', duplicate: 'Duplicate', delete: 'Delete',
+  duplicate: 'Duplicate', delete: 'Delete',
   cancel: 'Cancel', loading: 'Loading…', loadMore: 'Load more', upload: 'Upload',
   blockSettings: 'Block settings', componentSettings: '{label} settings', calloutType: 'Callout type',
   defaultValue: 'Default', emptyText: 'Empty text', invalidNumber: 'Enter a valid number.',
@@ -43,14 +42,7 @@ export const defaultMessages = {
   imageInsertFailed: 'The image could not be inserted. Try again.', imageUploadFailed: 'The image could not be uploaded. Try again.',
   oneImagePlaceholder: 'Choose one image for this placeholder.', dropReplaceImage: 'Drop to replace this image', dropAddImage: 'Drop to add an image', oneImageDrop: 'Drop one image at a time.',
   imageReferenceRequired: 'Choose an image with a stored id or URL.', imageTextRequired: 'The image {field} must be text.', imageNumberRequired: 'The image {field} must be a finite number.',
-  blockActions: 'Block actions', blockDragHint: 'Drag to move · Click for block actions',
-  blockDeleted: 'Block deleted.', blockDuplicated: 'Block duplicated.', blockMoved: 'Block moved.',
-  staleBlock: 'The document changed. Select the block again.', blockChangeForbidden: 'This change is not allowed here. Your document is unchanged.',
-  blockMoveForbidden: 'This move is not allowed here. Your document is unchanged.',
-  blockMoving: 'Moving block. Drop at an insertion line, or press Escape to cancel.', moveCanceled: 'Move canceled.', moveCanceledUnchanged: 'Move canceled. Your document is unchanged.',
-  findDestination: 'Find a destination', findDestinationPlaceholder: 'Find a destination…',
-  noDestinations: 'No available destinations.', destinationPlacement: '{placement} {label}', backToBlockActions: '← Block actions',
-  before: 'Before', after: 'After', insideFirst: 'Inside, first', insideLast: 'Inside, last',
+
 }
 
 export type EditorMessageKey = keyof typeof defaultMessages

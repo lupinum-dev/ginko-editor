@@ -21,8 +21,8 @@ import type {
 } from './types'
 import GinkoToolbar from './ui/GinkoToolbar.vue'
 import GinkoSelectionToolbar from './ui/GinkoSelectionToolbar.vue'
-import GinkoBlockControls from './ui/GinkoBlockControls.vue'
-import { observeEditorOperations, waitForEditorOperations, type BlockMovementContext } from './lib/block-movement'
+import { handleBlockShortcut } from './ui/block-shortcuts'
+import { observeEditorOperations, waitForEditorOperations, type EditorOperationContext } from './lib/editor-operations'
 import { useEditorActions, handleActionShortcut, hasCustomActionShortcut, matchesShortcut, type EditorMessages, type EditorShortcuts, type EditorToolbarGroup } from './ui/commands'
 import { createEditorOverlayController, editorOverlayKey } from './ui/context'
 import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
@@ -108,7 +108,6 @@ let pendingVisualUpdate: Promise<EditorFlushResult> | undefined
 let disposed = false
 let applyingDocument = false
 const selectionRevision = ref(0)
-const blockControls = ref<InstanceType<typeof GinkoBlockControls>>()
 const insertOverlayOwner = {}
 const insertMenuOpen = ref(false)
 const insertMenuOrigin = ref<'button' | 'slash'>('button')
@@ -200,7 +199,7 @@ watch(editor, (instance, _, cleanup) => {
   if (instance) cleanup(observeEditorOperations(instance, count => { pendingCommands.value = count }))
 }, { immediate: true, flush: 'sync' })
 
-const movementContext: BlockMovementContext = { getAuthoringKit: () => props.authoringKit, getOutputOptions: () => outputOptions.value, canMutate: () => canMutateVisualContent() }
+const operationContext: EditorOperationContext = { getAuthoringKit: () => props.authoringKit, getOutputOptions: () => outputOptions.value, canMutate: () => canMutateVisualContent() }
 const actions = useEditorActions(editor, {
   enabled: () => canMutateVisualContent(),
   messages: () => props.messages,
@@ -208,7 +207,7 @@ const actions = useEditorActions(editor, {
   image: requestImage, file: requestFile, video: requestVideo,
   insert: () => { void openInsertMenu('button') },
   mediaEnabled: kind => kind === 'image' ? props.enableImages : kind === 'file' ? props.enableFiles : props.enableVideo,
-  context: movementContext,
+  context: operationContext,
 })
 
 const filteredRecipes = computed(() => {
@@ -351,7 +350,7 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
   try {
     restoreInsertSelection(selectionAtStart)
     const result = await runRecipeCommand(instance, recipe, {
-      ...movementContext,
+      ...operationContext,
       canMutate: () => !disposed && insertMenuOpen.value && insertSelection === selectionAtStart && canMutateVisualContent(),
     })
     if (disposed) return
@@ -391,11 +390,11 @@ function handleEditorKeydown(event: BrowserKeyboardEvent) {
   const instance = editor.value
   if (!instance || event.isComposing) return
   if (hasCustomActionShortcut(event, props.shortcuts) && handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
-  const customBlockShortcut = (['moveUp', 'moveDown', 'blockMenu', 'duplicate'] as const).some(key => typeof props.shortcuts?.[key] === 'string' && matchesShortcut(event, props.shortcuts[key]))
-  if (customBlockShortcut && !insertMenuOpen.value && blockControls.value?.handleKeydown(event)) return
+  const customBlockShortcut = typeof props.shortcuts?.duplicate === 'string' && matchesShortcut(event, props.shortcuts.duplicate)
+  if (customBlockShortcut && !insertMenuOpen.value && handleBlockShortcut(instance, event, operationContext, props.shortcuts)) return
   if (handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
   if (protectComponentBoundary(instance, event)) return
-  if (!insertMenuOpen.value && blockControls.value?.handleKeydown(event)) return
+  if (!insertMenuOpen.value && handleBlockShortcut(instance, event, operationContext, props.shortcuts)) return
   if (!insertMenuOpen.value) {
     if (event.metaKey || event.ctrlKey || event.altKey || event.key !== '/' || !canOpenSlashMenu(instance)) return
     event.preventDefault()
@@ -931,17 +930,10 @@ defineExpose({
         :editor="editor"
         :actions="actions"
       />
-      <GinkoBlockControls
-        v-if="!disabled"
-        ref="blockControls"
-        :editor="editor"
-        :actions="actions"
-        :context="movementContext"
-        :shortcuts="shortcuts"
-      />
       <div
         class="ginko-editor__surface-frame"
         @keydown.capture="handleEditorKeydown"
+        @dragstart.capture.prevent.stop
       >
         <EditorContent
           class="ginko-editor__surface"

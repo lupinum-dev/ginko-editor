@@ -3,7 +3,7 @@ export { defaultMessages, type EditorMessages } from './messages'
 import type { Editor } from '@tiptap/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
-import { commitEditorTransaction, type BlockMovementContext } from '../lib/block-movement'
+import { commitEditorTransaction, type EditorOperationContext } from '../lib/editor-operations'
 
 export type EditorCommand =
   | { kind: 'undo' | 'redo' | 'paragraph' | 'bulletList' | 'orderedList' | 'blockquote' | 'codeBlock' | 'divider' | 'image' | 'file' | 'video' | 'insert' }
@@ -14,7 +14,7 @@ export type EditorCommand =
 
 export type EditorToolbarItem = EditorCommand | { kind: 'menu'; label: string; items: readonly EditorCommand[] }
 export type EditorToolbarGroup = readonly EditorToolbarItem[]
-export type EditorShortcuts = Partial<Record<'moveUp' | 'moveDown' | 'blockMenu' | 'duplicate' | 'undo' | 'redo' | 'bold' | 'italic' | 'strike' | 'code', string | false>>
+export type EditorShortcuts = Partial<Record<'duplicate' | 'undo' | 'redo' | 'bold' | 'italic' | 'strike' | 'code', string | false>>
 export interface EditorAction {
   id: string
   label: string
@@ -146,7 +146,7 @@ export function useEditorActions(editor: Ref<Editor | undefined>, options: Comma
   enabled: () => boolean
   messages: () => EditorMessages | undefined
   shortcuts: () => EditorShortcuts | undefined
-  context: BlockMovementContext
+  context: EditorOperationContext
 }) {
   const revision = ref(0)
   const pendingAction = ref<string>()

@@ -260,7 +260,7 @@ describe('editor-specific authoring kits', () => {
     }
   })
 
-  it('moves, duplicates, deletes, and undoes selected components as single history actions', async () => {
+  it('duplicates, deletes, and undoes selected components as single history actions', async () => {
     const kit = await createAuthoringKit(sourceFor('info'))
     const wrapper = mount(GinkoEditor, {
       attachTo: document.body,
@@ -276,14 +276,6 @@ describe('editor-specific authoring kits', () => {
       wrapper.vm.editor!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
       const actions = async () => (await openSettings(wrapper)).get('.ginko-editor__block-actions')
-
-      await (await actions()).get('button[data-action="down"]').trigger('click')
-      await flushPromises()
-      await wrapper.vm.flush()
-      expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/Second[\s\S]*First/)
-      wrapper.vm.editor!.commands.undo()
-      await wrapper.vm.flush()
-      expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/First[\s\S]*Second/)
 
       await (await actions()).get('button[data-action="duplicate"]').trigger('click')
       await flushPromises()
