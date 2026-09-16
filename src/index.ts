@@ -3,7 +3,15 @@ import './ui/canvas.css'
 export { default as GinkoEditor } from './GinkoEditor.vue'
 export { default as GinkoToolbar } from './ui/GinkoToolbar.vue'
 export { default as GinkoImagePicker } from './GinkoImagePicker.vue'
-export type { EditorAction, EditorActions, EditorCommand, EditorToolbarItem, EditorToolbarGroup, EditorMessages, EditorShortcuts } from './ui/commands'
+export type {
+  EditorAction,
+  EditorActions,
+  EditorCommand,
+  EditorToolbarItem,
+  EditorToolbarGroup,
+  EditorMessages,
+  EditorShortcuts,
+} from './ui/commands'
 export { composeAuthoringKits, createAuthoringKit, parseAuthoringSource } from './authoring'
 export type {
   AuthoringControl,

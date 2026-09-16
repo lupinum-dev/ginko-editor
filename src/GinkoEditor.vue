@@ -3,12 +3,34 @@ import { closeHistory } from '@tiptap/pm/history'
 import type { Selection } from '@tiptap/pm/state'
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, useId, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  ref,
+  useId,
+  watch,
+} from 'vue'
 
 import type { AuthoringKitV1, AuthoringRecipeV1 } from './authoring'
-import { createEditorExtensions, isCurrentlyNormalizingTable, normalizeTableCells } from './lib/config/editorConfig'
-import type { ConversionErrorPayload, ConversionRecoveredPayload, ConversionResult } from './lib/conversionPipeline'
-import { applyTiptapDocToEditor, convertTiptapDocToMarkdown, prepareMarkdownForVisualEditing, validateMarkdownForAuthoring } from './lib/conversionPipeline'
+import {
+  createEditorExtensions,
+  isCurrentlyNormalizingTable,
+  normalizeTableCells,
+} from './lib/config/editorConfig'
+import type {
+  ConversionErrorPayload,
+  ConversionRecoveredPayload,
+  ConversionResult,
+} from './lib/conversionPipeline'
+import {
+  applyTiptapDocToEditor,
+  convertTiptapDocToMarkdown,
+  prepareMarkdownForVisualEditing,
+  validateMarkdownForAuthoring,
+} from './lib/conversionPipeline'
 import { toConversionErrorPayload } from './lib/conversionState'
 import type {
   AssetInfo,
@@ -22,8 +44,20 @@ import type {
 import GinkoToolbar from './ui/GinkoToolbar.vue'
 import GinkoSelectionToolbar from './ui/GinkoSelectionToolbar.vue'
 import { handleBlockShortcut } from './ui/block-shortcuts'
-import { observeEditorOperations, waitForEditorOperations, type EditorOperationContext } from './lib/editor-operations'
-import { useEditorActions, handleActionShortcut, hasCustomActionShortcut, matchesShortcut, type EditorMessages, type EditorShortcuts, type EditorToolbarGroup } from './ui/commands'
+import {
+  observeEditorOperations,
+  waitForEditorOperations,
+  type EditorOperationContext,
+} from './lib/editor-operations'
+import {
+  useEditorActions,
+  handleActionShortcut,
+  hasCustomActionShortcut,
+  matchesShortcut,
+  type EditorMessages,
+  type EditorShortcuts,
+  type EditorToolbarGroup,
+} from './ui/commands'
 import { createEditorOverlayController, editorOverlayKey } from './ui/context'
 import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
 import { runRecipeCommand } from './ui/recipe-command'
@@ -100,7 +134,9 @@ const hasPendingVisualChanges = ref(false)
 const pendingImages = ref(0)
 const pendingCommands = ref(0)
 const imageUploadNotice = ref('')
-const hasPendingChanges = computed(() => hasPendingVisualChanges.value || pendingImages.value > 0 || pendingCommands.value > 0)
+const hasPendingChanges = computed(() =>
+  hasPendingVisualChanges.value || pendingImages.value > 0 || pendingCommands.value > 0,
+)
 let pendingEcho: string | undefined
 let revision = 0
 let syncTimer: ReturnType<typeof globalThis.setTimeout> | undefined
@@ -818,7 +854,10 @@ defineExpose({
       <div
         ref="insertMenu"
         class="ginko-editor__insert-menu"
-        :class="{ 'ginko-editor__insert-menu--preview': activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview'] }"
+        :class="{
+          'ginko-editor__insert-menu--preview':
+            activeRecipe && !isImageRecipe(activeRecipe) && $slots['recipe-preview'],
+        }"
         :style="insertPosition"
         @keydown="handleInsertSearchKeydown"
       >
@@ -858,7 +897,17 @@ defineExpose({
               class="ginko-editor__recipe-symbol"
               aria-hidden="true"
             >{{ recipeSymbol(recipe) }}</span>
-            <span class="ginko-editor__recipe-text"><strong>{{ recipe.label }}</strong><small>{{ recipe.description || (recipe.keywords?.length ? `/${recipe.keywords[0]}` : `Insert ${recipe.label.toLocaleLowerCase()}`) }}</small></span>
+            <span class="ginko-editor__recipe-text">
+              <strong>{{ recipe.label }}</strong>
+              <small>
+                {{
+                  recipe.description
+                    || (recipe.keywords?.length
+                      ? `/${recipe.keywords[0]}`
+                      : `Insert ${recipe.label.toLocaleLowerCase()}`)
+                }}
+              </small>
+            </span>
             <span
               v-if="index === insertIndex"
               aria-hidden="true"
@@ -888,7 +937,19 @@ defineExpose({
           {{ insertError }}
         </p>
         <p class="ginko-editor__insert-help">
-          <span><kbd>↑</kbd><kbd>↓</kbd> {{ actions.text('navigate') }}</span><span><kbd>↵</kbd> {{ actions.text('insertHelp') }}</span><span><kbd>esc</kbd> {{ actions.text('closeHelp') }}</span>
+          <span>
+            <kbd>↑</kbd>
+            <kbd>↓</kbd>
+            {{ actions.text('navigate') }}
+          </span>
+          <span>
+            <kbd>↵</kbd>
+            {{ actions.text('insertHelp') }}
+          </span>
+          <span>
+            <kbd>esc</kbd>
+            {{ actions.text('closeHelp') }}
+          </span>
         </p>
       </div>
     </Teleport>
@@ -954,64 +1015,391 @@ defineExpose({
 </template>
 
 <style scoped>
-.ginko-editor { --ginko-border: var(--border, #e5e5e3); --ginko-bg: var(--background, #fff); --ginko-muted: var(--muted, #f3f3f1); --ginko-muted-text: var(--muted-foreground, #6f6f6b); --ginko-text: var(--foreground, #292925); position: relative; overflow: visible; border: 1px solid var(--ginko-border); border-radius: var(--radius, .625rem); background: var(--ginko-bg); color: var(--ginko-text); font-family: inherit; font-size: 14px; line-height: 1.5; }
-.ginko-editor button { min-height: 2.25rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; cursor: pointer; padding: .35rem .65rem; white-space: nowrap; }
-.ginko-editor button:hover, .ginko-editor button[aria-pressed='true'] { background: var(--ginko-muted); }
-.ginko-editor button:focus-visible, .ginko-editor input:focus-visible, .ginko-editor select:focus-visible, .ginko-editor textarea:focus-visible { outline-offset: 2px; }
-.ginko-editor__header { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .5rem; border-bottom: 1px solid var(--ginko-border); padding: .45rem .55rem; }
-.ginko-editor__insert-trigger { justify-self: start; display: inline-flex; align-items: center; gap: .35rem; font-weight: 650; }
-.ginko-editor__insert-trigger span[aria-hidden='true'] { font-size: 1.2rem; line-height: 1; }
-.ginko-editor__modes { display: flex; gap: .2rem; }
-.ginko-editor__status { color: var(--ginko-muted-text); font-size: .78rem; white-space: nowrap; }
-.ginko-editor__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* The menu overlays the page without changing the writer's document geometry. */
-.ginko-editor__insert-menu { position: fixed; z-index: 50; display: flex; flex-direction: column; width: min(320px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--ginko-border); border-radius: .75rem; background: var(--ginko-bg); box-shadow: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06); padding: .35rem; }
-@media (min-width: 700px) {
-  .ginko-editor__insert-menu--preview { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; width: min(620px, calc(100vw - 24px)); }
-  .ginko-editor__insert-menu--preview .ginko-editor__insert-search, .ginko-editor__insert-menu--preview .ginko-editor__insert-results, .ginko-editor__insert-menu--preview .ginko-editor__insert-help, .ginko-editor__insert-menu--preview .ginko-editor__insert-error { grid-column: 1; }
-  .ginko-editor__insert-menu--preview .ginko-editor__recipe-preview { display: flex; align-items: safe center; min-width: 0; grid-column: 2; grid-row: 1 / 5; max-height: none; margin: -.35rem -.35rem -.35rem .35rem; padding: 1.1rem; border-top: 0; border-left: 1px solid var(--ginko-border); background: color-mix(in srgb, var(--ginko-bg) 97%, var(--ginko-text)); }
+.ginko-editor {
+  --ginko-border: var(--border, #e5e5e3);
+  --ginko-bg: var(--background, #fff);
+  --ginko-muted: var(--muted, #f3f3f1);
+  --ginko-muted-text: var(--muted-foreground, #6f6f6b);
+  --ginko-text: var(--foreground, #292925);
+  position: relative;
+  overflow: visible;
+  border: 1px solid var(--ginko-border);
+  border-radius: var(--radius, .625rem);
+  background: var(--ginko-bg);
+  color: var(--ginko-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
 }
-.ginko-editor__insert-search { display: flex; align-items: center; gap: .65rem; border-bottom: 1px solid var(--ginko-border); margin: 0 .35rem .35rem; padding: .2rem .35rem .55rem; color: var(--ginko-muted-text); }
-.ginko-editor__insert-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ginko-text); padding: .4rem 0; font: inherit; }
-.ginko-editor__insert-search:focus-within { border-bottom-color: var(--ginko-muted-text); }
-.ginko-editor__insert-results { overflow-y: auto; overscroll-behavior: contain; min-height: 48px; flex: 1 1 auto; }
-.ginko-editor__insert-results button { display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 57px; padding: .5rem; text-align: start; white-space: normal; }
-.ginko-editor__insert-results button[aria-selected='true'] { background: var(--ginko-muted); }
-.ginko-editor__recipe-symbol { display: grid; place-items: center; flex: 0 0 35px; height: 35px; border: 1px solid var(--ginko-border); border-radius: .4rem; background: var(--ginko-bg); font: 500 16px/1 ui-sans-serif, system-ui, sans-serif; }
-.ginko-editor__recipe-text { display: grid; gap: .1rem; flex: 1; }
-.ginko-editor__recipe-text strong { font-size: .85rem; font-weight: 550; }
-.ginko-editor__recipe-text small { font-size: .73rem; color: var(--ginko-muted-text); line-height: 1.4; }
-.ginko-editor__recipe-preview { flex: 0 0 auto; max-height: 150px; overflow: auto; border-top: 1px solid var(--ginko-border); padding: .7rem; }
-.ginko-editor__insert-empty, .ginko-editor__insert-error { margin: 0; padding: .75rem; font-size: .85rem; }
-.ginko-editor__insert-empty { color: var(--ginko-muted-text); }
-.ginko-editor__insert-error { color: #b54a35; }
-.ginko-editor__insert-help { display: flex; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--ginko-border); margin: .3rem 0 0; padding: .55rem .35rem .15rem; color: var(--ginko-muted-text); font-size: .68rem; }
-.ginko-editor__insert-help kbd { font: inherit; margin-inline-end: .2rem; }
-.ginko-editor__warning { display: grid; gap: .15rem; border-bottom: 1px solid #e4a11b; background: #fff8e6; padding: .65rem .8rem; color: #5c4300; }
-.ginko-editor__surface { padding: clamp(1rem, 3vw, 1.75rem); }
-.ginko-editor__surface :deep(.ProseMirror) { max-width: 46rem; min-height: 22rem; margin-inline: auto; outline: none; font-size: 1rem; line-height: 1.7; }
-.ginko-editor__surface :deep(.ProseMirror p.mdc-editor-empty:first-child::before) { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--ginko-muted-text); }
-.ginko-editor__surface :deep(.ProseMirror h1) { font-size: 2rem; font-weight: 650; }
-.ginko-editor__surface :deep(.ProseMirror h2) { font-size: 1.5rem; font-weight: 650; }
-.ginko-editor__surface :deep(.ProseMirror h3) { font-size: 1.2rem; font-weight: 650; }
-.ginko-editor__surface :deep(.ProseMirror ul) { list-style: disc; padding-inline-start: 1.5rem; }
-.ginko-editor__surface :deep(.ProseMirror ol) { list-style: decimal; padding-inline-start: 1.5rem; }
-.ginko-editor__surface :deep(.ProseMirror blockquote) { border-inline-start: 3px solid var(--ginko-text); padding-inline-start: 1rem; margin-inline: 0; }
-.ginko-editor__surface :deep(.ProseMirror pre) { background: var(--ginko-muted); border-radius: .5rem; padding: 1rem; overflow-x: auto; }
-.ginko-editor__surface :deep(.ProseMirror > :first-child) { margin-top: 0; }
-.ginko-editor__surface :deep(.ProseMirror > * + *) { margin-block-start: 1em; }
-.ginko-editor__surface :deep(.ProseMirror h1), .ginko-editor__surface :deep(.ProseMirror h2), .ginko-editor__surface :deep(.ProseMirror h3) { line-height: 1.2; letter-spacing: -.02em; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']) { position: relative; min-height: 3.5rem; border: 1px dashed var(--ginko-border); border-radius: .5rem; padding: 1.8rem .7rem .5rem; }
-.ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']::before) { position: absolute; inset-block-start: .45rem; inset-inline-start: .6rem; content: attr(name); color: var(--ginko-muted-text); font-size: .68rem; font-weight: 650; text-transform: uppercase; }
-.ginko-editor__surface :deep(.ProseMirror img) { display: block; max-width: 100%; height: auto; }
-.ginko-editor__surface :deep(table) { width: 100%; border-collapse: collapse; }
-.ginko-editor__surface :deep(td), .ginko-editor__surface :deep(th) { border: 1px solid var(--ginko-border); padding: .5rem; }
-.ginko-editor__source { box-sizing: border-box; display: block; width: 100%; min-height: 280px; resize: vertical; border: 0; background: var(--ginko-bg); color: var(--ginko-text); padding: 1rem; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline: none; }
+
+.ginko-editor button {
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: .4rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: .35rem .65rem;
+  white-space: nowrap;
+}
+
+.ginko-editor button:hover, .ginko-editor button[aria-pressed='true'] {
+  background: var(--ginko-muted);
+}
+
+.ginko-editor button:focus-visible,
+.ginko-editor input:focus-visible,
+.ginko-editor select:focus-visible,
+.ginko-editor textarea:focus-visible {
+  outline-offset: 2px;
+}
+
+.ginko-editor__header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: .5rem;
+  border-bottom: 1px solid var(--ginko-border);
+  padding: .45rem .55rem;
+}
+
+.ginko-editor__insert-trigger {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-weight: 650;
+}
+
+.ginko-editor__insert-trigger span[aria-hidden='true'] {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.ginko-editor__modes {
+  display: flex;
+  gap: .2rem;
+}
+
+.ginko-editor__status {
+  color: var(--ginko-muted-text);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
+.ginko-editor__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The menu overlays the page without changing the writer's document geometry. */
+.ginko-editor__insert-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--ginko-border);
+  border-radius: .75rem;
+  background: var(--ginko-bg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06);
+  padding: .35rem;
+}
+
+@media (min-width: 700px) {
+  .ginko-editor__insert-menu--preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    width: min(620px, calc(100vw - 24px));
+  }
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-search,
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-results,
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-help,
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-error {
+    grid-column: 1;
+  }
+  .ginko-editor__insert-menu--preview .ginko-editor__recipe-preview {
+    display: flex;
+    align-items: safe center;
+    min-width: 0;
+    grid-column: 2;
+    grid-row: 1 / 5;
+    max-height: none;
+    margin: -.35rem -.35rem -.35rem .35rem;
+    padding: 1.1rem;
+    border-top: 0;
+    border-left: 1px solid var(--ginko-border);
+    background: color-mix(in srgb, var(--ginko-bg) 97%, var(--ginko-text));
+  }
+}
+
+.ginko-editor__insert-search {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  border-bottom: 1px solid var(--ginko-border);
+  margin: 0 .35rem .35rem;
+  padding: .2rem .35rem .55rem;
+  color: var(--ginko-muted-text);
+}
+
+.ginko-editor__insert-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ginko-text);
+  padding: .4rem 0;
+  font: inherit;
+}
+
+.ginko-editor__insert-search:focus-within {
+  border-bottom-color: var(--ginko-muted-text);
+}
+
+.ginko-editor__insert-results {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 48px;
+  flex: 1 1 auto;
+}
+
+.ginko-editor__insert-results button {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: 100%;
+  min-height: 57px;
+  padding: .5rem;
+  text-align: start;
+  white-space: normal;
+}
+
+.ginko-editor__insert-results button[aria-selected='true'] {
+  background: var(--ginko-muted);
+}
+
+.ginko-editor__recipe-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 35px;
+  height: 35px;
+  border: 1px solid var(--ginko-border);
+  border-radius: .4rem;
+  background: var(--ginko-bg);
+  font: 500 16px/1 ui-sans-serif, system-ui, sans-serif;
+}
+
+.ginko-editor__recipe-text {
+  display: grid;
+  gap: .1rem;
+  flex: 1;
+}
+
+.ginko-editor__recipe-text strong {
+  font-size: .85rem;
+  font-weight: 550;
+}
+
+.ginko-editor__recipe-text small {
+  font-size: .73rem;
+  color: var(--ginko-muted-text);
+  line-height: 1.4;
+}
+
+.ginko-editor__recipe-preview {
+  flex: 0 0 auto;
+  max-height: 150px;
+  overflow: auto;
+  border-top: 1px solid var(--ginko-border);
+  padding: .7rem;
+}
+
+.ginko-editor__insert-empty, .ginko-editor__insert-error {
+  margin: 0;
+  padding: .75rem;
+  font-size: .85rem;
+}
+
+.ginko-editor__insert-empty {
+  color: var(--ginko-muted-text);
+}
+
+.ginko-editor__insert-error {
+  color: #b54a35;
+}
+
+.ginko-editor__insert-help {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  border-top: 1px solid var(--ginko-border);
+  margin: .3rem 0 0;
+  padding: .55rem .35rem .15rem;
+  color: var(--ginko-muted-text);
+  font-size: .68rem;
+}
+
+.ginko-editor__insert-help kbd {
+  font: inherit;
+  margin-inline-end: .2rem;
+}
+
+.ginko-editor__warning {
+  display: grid;
+  gap: .15rem;
+  border-bottom: 1px solid #e4a11b;
+  background: #fff8e6;
+  padding: .65rem .8rem;
+  color: #5c4300;
+}
+
+.ginko-editor__surface {
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+
+.ginko-editor__surface :deep(.ProseMirror) {
+  max-width: 46rem;
+  min-height: 22rem;
+  margin-inline: auto;
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.ginko-editor__surface :deep(.ProseMirror p.mdc-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ginko-muted-text);
+}
+
+.ginko-editor__surface :deep(.ProseMirror h1) {
+  font-size: 2rem;
+  font-weight: 650;
+}
+
+.ginko-editor__surface :deep(.ProseMirror h2) {
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.ginko-editor__surface :deep(.ProseMirror h3) {
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.ginko-editor__surface :deep(.ProseMirror ul) {
+  list-style: disc;
+  padding-inline-start: 1.5rem;
+}
+
+.ginko-editor__surface :deep(.ProseMirror ol) {
+  list-style: decimal;
+  padding-inline-start: 1.5rem;
+}
+
+.ginko-editor__surface :deep(.ProseMirror blockquote) {
+  border-inline-start: 3px solid var(--ginko-text);
+  padding-inline-start: 1rem;
+  margin-inline: 0;
+}
+
+.ginko-editor__surface :deep(.ProseMirror pre) {
+  background: var(--ginko-muted);
+  border-radius: .5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.ginko-editor__surface :deep(.ProseMirror > :first-child) {
+  margin-top: 0;
+}
+
+.ginko-editor__surface :deep(.ProseMirror > * + *) {
+  margin-block-start: 1em;
+}
+
+.ginko-editor__surface :deep(.ProseMirror h1),
+.ginko-editor__surface :deep(.ProseMirror h2),
+.ginko-editor__surface :deep(.ProseMirror h3) {
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+
+.ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']) {
+  position: relative;
+  min-height: 3.5rem;
+  border: 1px dashed var(--ginko-border);
+  border-radius: .5rem;
+  padding: 1.8rem .7rem .5rem;
+}
+
+.ginko-editor__surface :deep(.ProseMirror div[data-type='Slot']::before) {
+  position: absolute;
+  inset-block-start: .45rem;
+  inset-inline-start: .6rem;
+  content: attr(name);
+  color: var(--ginko-muted-text);
+  font-size: .68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.ginko-editor__surface :deep(.ProseMirror img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.ginko-editor__surface :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ginko-editor__surface :deep(td), .ginko-editor__surface :deep(th) {
+  border: 1px solid var(--ginko-border);
+  padding: .5rem;
+}
+
+.ginko-editor__source {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: 0;
+  background: var(--ginko-bg);
+  color: var(--ginko-text);
+  padding: 1rem;
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  outline: none;
+}
+
 @media (max-width: 34rem) {
-  .ginko-editor button { min-height: 2.75rem; }
-  .ginko-editor__header { grid-template-columns: 1fr auto; }
-  .ginko-editor__status { grid-column: 1 / -1; grid-row: 2; padding-inline: .65rem; }
-  .ginko-editor__surface { padding: 1rem; }
-  .ginko-editor__surface :deep(.ProseMirror) { min-height: 18rem; }
+  .ginko-editor button {
+    min-height: 2.75rem;
+  }
+  .ginko-editor__header {
+    grid-template-columns: 1fr auto;
+  }
+  .ginko-editor__status {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-inline: .65rem;
+  }
+  .ginko-editor__surface {
+    padding: 1rem;
+  }
+  .ginko-editor__surface :deep(.ProseMirror) {
+    min-height: 18rem;
+  }
 }
 </style>
