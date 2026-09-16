@@ -113,7 +113,13 @@ export const Element = Node.create<ElementOptions>({
   },
 
   addNodeView() {
-    return props => componentView(props, () => this.options.getAuthoringKit?.(), () => this.options.getOutputOptions?.() ?? {}, this.options.overlay)
+    return props =>
+      componentView(
+        props,
+        () => this.options.getAuthoringKit?.(),
+        () => this.options.getOutputOptions?.() ?? {},
+        this.options.overlay,
+      )
   },
 
   renderHTML({ HTMLAttributes }) {

@@ -8,7 +8,11 @@ import * as conversion from '../src/lib/conversionPipeline'
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 
 async function setup(modelValue = '') {
@@ -33,7 +37,10 @@ describe('writing block menu', () => {
   })
   it('uses the host overlay container and removes its menu on teardown', async () => {
     const overlay = document.body.appendChild(document.createElement('div'))
-    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: 'Original', overlayContainer: overlay } })
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: { modelValue: 'Original', overlayContainer: overlay },
+    })
     try {
       await flushPromises()
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
@@ -83,18 +90,41 @@ describe('writing block menu', () => {
   })
 
   it('rejects a nested component forbidden by its surrounding component policy', async () => {
-    const block = { kind: 'block', media: null, props: {}, slots: ['default'], allowedParents: null, allowedChildren: null } as const
-    const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: {
-      note: { ...block, allowedChildren: ['note'] }, other: block,
-    } }, implementation: {
-      note: { componentName: 'Note', props: {}, slots: ['default'] }, other: { componentName: 'Other', props: {}, slots: ['default'] },
-    }, authoring: { note: { label: 'Note' }, other: { label: 'Other' } }, recipes: [{ id: 'nested', label: 'Nested example', source: '> <other>\n> Inside\n> </other>' }] })
-    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: '<note>\nKeep\n</note>', authoringKit: kit } })
+    const block = {
+      kind: 'block',
+      media: null,
+      props: {},
+      slots: ['default'],
+      allowedParents: null,
+      allowedChildren: null,
+    } as const
+    const kit = await createAuthoringKit({
+      version: 1,
+      policy: {
+        version: 2,
+        components: {
+          note: { ...block, allowedChildren: ['note'] },
+          other: block,
+        },
+      },
+      implementation: {
+        note: { componentName: 'Note', props: {}, slots: ['default'] },
+        other: { componentName: 'Other', props: {}, slots: ['default'] },
+      },
+      authoring: { note: { label: 'Note' }, other: { label: 'Other' } },
+      recipes: [{ id: 'nested', label: 'Nested example', source: '> <other>\n> Inside\n> </other>' }],
+    })
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: { modelValue: '<note>\nKeep\n</note>', authoringKit: kit },
+    })
     try {
       await flushPromises()
       const editor = wrapper.vm.editor!
       let position = 0
-      editor.state.doc.descendants((node, pos) => { if (node.type.name === 'paragraph' && node.textContent === 'Keep') position = pos + 1 })
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'paragraph' && node.textContent === 'Keep') position = pos + 1
+      })
       editor.commands.setTextSelection(position)
       const before = editor.getJSON()
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
@@ -107,14 +137,26 @@ describe('writing block menu', () => {
   })
 
   it.each([false, true])('tracks recipe preparation in flush and cancels closed menus: %s', async cancel => {
-    const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: {} }, implementation: {}, authoring: {}, recipes: [{ id: 'example', label: 'Example', source: '# Example' }] })
-    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: '', authoringKit: kit, syncDebounceMs: 10000 } })
+    const kit = await createAuthoringKit({
+      version: 1,
+      policy: { version: 2, components: {} },
+      implementation: {},
+      authoring: {},
+      recipes: [{ id: 'example', label: 'Example', source: '# Example' }],
+    })
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: { modelValue: '', authoringKit: kit, syncDebounceMs: 10000 },
+    })
     let release!: () => void
     try {
       await flushPromises()
       const original = conversion.prepareMarkdownForVisualEditing
       const gate = new Promise<void>(resolve => { release = resolve })
-      vi.spyOn(conversion, 'prepareMarkdownForVisualEditing').mockImplementationOnce(async (...args) => { await gate; return original(...args) })
+      vi.spyOn(conversion, 'prepareMarkdownForVisualEditing').mockImplementationOnce(async (...args) => {
+        await gate
+        return original(...args)
+      })
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
       await wrapper.get('[role="combobox"]').setValue('Example')
       await wrapper.get('[role="combobox"]').trigger('keydown', { key: 'Enter' })
@@ -165,7 +207,13 @@ describe('writing block menu', () => {
   })
 
   it('does not reserve consumer recipe identifiers for built-in actions', async () => {
-    const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: {} }, implementation: {}, authoring: {}, recipes: [{ id: 'ginko.image', label: 'Host guide', source: '# Host guide' }] })
+    const kit = await createAuthoringKit({
+      version: 1,
+      policy: { version: 2, components: {} },
+      implementation: {},
+      authoring: {},
+      recipes: [{ id: 'ginko.image', label: 'Host guide', source: '# Host guide' }],
+    })
     const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: '', authoringKit: kit } })
     try {
       await flushPromises()

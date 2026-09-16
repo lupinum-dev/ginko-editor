@@ -58,10 +58,29 @@ onBeforeUnmount(() => finish(null))
 onMounted(async () => {
   authoringKit.value = await createAuthoringKit({
     version: 1,
-    implementation: { note: { componentName: 'HostNote', props: {}, slots: ['default', 'tip'] } },
-    policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default', 'tip'], allowedParents: null, allowedChildren: null, media: null } } },
+    implementation: {
+      note: { componentName: 'HostNote', props: {}, slots: ['default', 'tip'] },
+    },
+    policy: {
+      version: 2,
+      components: {
+        note: {
+          kind: 'block',
+          props: {},
+          slots: ['default', 'tip'],
+          allowedParents: null,
+          allowedChildren: null,
+          media: null,
+        },
+      },
+    },
     authoring: { note: { label: 'Note', slots: { tip: { label: 'Tip' } } } },
-    recipes: [{ id: 'note', label: 'Note', description: 'Useful context', source: '<note>\nText\n\n<template #tip>\nTip\n</template>\n</note>' }],
+    recipes: [{
+      id: 'note',
+      label: 'Note',
+      description: 'Useful context',
+      source: '<note>\nText\n\n<template #tip>\nTip\n</template>\n</note>',
+    }],
   })
 })
 async function flush() {
@@ -71,33 +90,87 @@ async function flush() {
 </script>
 <template>
   <main class="host-theme">
-    <GinkoEditor v-model="source" :enable-images="false" :enable-files="false" :enable-video="false" />
-    <GinkoEditor v-if="authoringKit" ref="editor" v-model="customSource"
-      :authoring-kit="authoringKit" :image-upload="uploadImage" :image-picker="pickImage"
-      :messages="messages" :shortcuts="shortcuts" :overlay-container="overlay"
-      :enable-files="false" :enable-video="false">
+    <GinkoEditor
+      v-model="source"
+      :enable-images="false"
+      :enable-files="false"
+      :enable-video="false"
+    />
+    <GinkoEditor
+      v-if="authoringKit"
+      ref="editor"
+      v-model="customSource"
+      :authoring-kit="authoringKit"
+      :image-upload="uploadImage"
+      :image-picker="pickImage"
+      :messages="messages"
+      :shortcuts="shortcuts"
+      :overlay-container="overlay"
+      :enable-files="false"
+      :enable-video="false"
+    >
       <template #toolbar="{ actions }">
         <GinkoToolbar :actions="actions" :items="toolbar">
           <template #bold="{ action }">
-            <ToolbarButton v-if="action" as-child>
-              <Button type="button" :variant="action.active ? 'secondary' : 'ghost'"
-                :disabled="action.disabled" :aria-pressed="action.active"
-                :aria-label="action.label" :title="action.shortcut"
-                @mousedown.prevent @click="action.run()">{{ action.label }}</Button>
+            <ToolbarButton
+              v-if="action"
+              as-child
+            >
+              <Button
+                type="button"
+                :variant="action.active ? 'secondary' : 'ghost'"
+                :disabled="action.disabled"
+                :aria-pressed="action.active"
+                :aria-label="action.label"
+                :title="action.shortcut"
+                @mousedown.prevent
+                @click="action.run()"
+              >
+                {{ action.label }}
+              </Button>
             </ToolbarButton>
           </template>
         </GinkoToolbar>
       </template>
-      <template #recipe-preview="{ recipe }"><p>{{ recipe.description ?? recipe.label }}</p></template>
+      <template #recipe-preview="{ recipe }">
+        <p>{{ recipe.description ?? recipe.label }}</p>
+      </template>
     </GinkoEditor>
-    <GinkoImagePicker :open="open" v-model:query="query" :images="images"
-      :messages="messages" :overlay-container="overlay" :has-more="false"
-      :loading="false" :enable-upload="false" :error="error || undefined"
-      @select="finish" @update:open="value => { if (!value) finish(null) }" />
+    <GinkoImagePicker
+      :open="open"
+      v-model:query="query"
+      :images="images"
+      :messages="messages"
+      :overlay-container="overlay"
+      :has-more="false"
+      :loading="false"
+      :enable-upload="false"
+      :error="error || undefined"
+      @select="finish"
+      @update:open="value => { if (!value) finish(null) }"
+    />
     <div ref="overlay" />
-    <button type="button" @click="flush">Flush changes</button><p>{{ error }}</p>
+    <button
+      type="button"
+      @click="flush"
+    >
+      Flush changes
+    </button>
+    <p>{{ error }}</p>
   </main>
 </template>
 <style>
-.host-theme { --background: #fff; --foreground: #171717; --border: #e5e5e5; --muted: #f5f5f5; --muted-foreground: #737373; --accent: #f5f5f5; --accent-foreground: #171717; --popover: #fff; --popover-foreground: #171717; --ring: #737373; --radius: .625rem; }
+.host-theme {
+  --background: #fff;
+  --foreground: #171717;
+  --border: #e5e5e5;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --popover: #fff;
+  --popover-foreground: #171717;
+  --ring: #737373;
+  --radius: 0.625rem;
+}
 </style>

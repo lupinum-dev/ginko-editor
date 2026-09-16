@@ -8,7 +8,8 @@ const localContentCandidate = realpathSync(
 const usesLocalDocsCandidate = existsSync(resolve(localDocsLayer, 'authoring.ts'))
 if (!usesLocalDocsCandidate) {
   throw new Error(
-    'The playground currently requires the accepted Ginko Docs candidate. Run pnpm docs:build from the repository root.',
+    'The playground currently requires the accepted Ginko Docs candidate. '
+    + 'Run pnpm docs:build from the repository root.',
   )
 }
 const { hostComponentSources } = await import('./app/playground/authoring-sources')

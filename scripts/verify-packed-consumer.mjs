@@ -14,7 +14,8 @@ const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 
 if (!contentArchive) {
   throw new Error(
-    'Set GINKO_CONTENT_TARBALL to the accepted Ginko Content archive until a version with the CMS parser helpers is published.',
+    'Set GINKO_CONTENT_TARBALL to the accepted Ginko Content archive '
+    + 'until a version with the CMS parser helpers is published.',
   )
 }
 
@@ -30,6 +31,17 @@ async function write(path, contents) {
   await writeFile(path, contents)
 }
 
+const cssMarkers = [
+  '.ginko-editor',
+  '.ginko-block',
+  '.ginko-popover__panel',
+  '.ginko-table',
+  '.ginko-image-upload',
+  '.ginko-toolbar',
+  '.ginko-image-picker',
+  '.host-button',
+]
+
 async function containsCss(directory, marker) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
@@ -44,8 +56,23 @@ async function verifyDeclarations(consumer) {
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
   if (manifest.exports?.['./style.css'] !== './dist/style.css') throw new Error('The packed CSS export is missing.')
   const entryTypes = await readFile(join(packageRoot, 'dist', 'index.d.ts'), 'utf8')
-  for (const name of ['GinkoEditor', 'GinkoToolbar', 'GinkoImagePicker', 'EditorActions', 'EditorCommand', 'EditorMessages', 'EditorShortcuts', 'EditorToolbarGroup', 'EditorImage', 'EditorImagePickerItem', 'ImagePicker']) {
-    if (!entryTypes.includes(name)) throw new Error(`The packed public declaration is missing: ${name}.`)
+  const publicNames = [
+    'GinkoEditor',
+    'GinkoToolbar',
+    'GinkoImagePicker',
+    'EditorActions',
+    'EditorCommand',
+    'EditorMessages',
+    'EditorShortcuts',
+    'EditorToolbarGroup',
+    'EditorImage',
+    'EditorImagePickerItem',
+    'ImagePicker',
+  ]
+  for (const name of publicNames) {
+    if (!entryTypes.includes(name)) {
+      throw new Error(`The packed public declaration is missing: ${name}.`)
+    }
   }
   const authoringEntry = manifest.exports?.['./authoring']
   if (authoringEntry?.import !== './dist/authoring.js' || authoringEntry?.types !== './dist/authoring.d.ts') {
@@ -90,26 +117,51 @@ async function verifyVueConsumer(consumer) {
       },
     }, null, 2)}\n`,
   )
-  await write(join(consumer, 'index.html'), '<div id="app"></div><script type="module" src="/src.ts"></script>\n')
+  await write(
+    join(consumer, 'index.html'),
+    '<div id="app"></div><script type="module" src="/src.ts"></script>\n',
+  )
   await write(
     join(consumer, 'src.ts'),
-    "import { createApp } from 'vue'\nimport App from './App.vue'\nimport '@lupinum/ginko-editor/style.css'\n\ncreateApp(App).mount('#app')\n",
+    'import { createApp } from \'vue\'\n'
+    + 'import App from \'./App.vue\'\n'
+    + 'import \'@lupinum/ginko-editor/style.css\'\n'
+    + '\n'
+    + 'createApp(App).mount(\'#app\')\n',
   )
   await writeEditorExample(consumer, 'App.vue')
   await write(
     join(consumer, 'vite.config.ts'),
-    "import vue from '@vitejs/plugin-vue'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({ plugins: [vue()] })\n",
+    'import vue from \'@vitejs/plugin-vue\'\n'
+    + 'import { defineConfig } from \'vite\'\n'
+    + '\n'
+    + 'export default defineConfig({ plugins: [vue()] })\n',
   )
+  const vueCompilerOptions = {
+    lib: ['ESNext', 'DOM'],
+    module: 'ESNext',
+    moduleResolution: 'Bundler',
+    skipLibCheck: true,
+    strict: true,
+    target: 'ESNext',
+    types: ['node'],
+  }
   await write(
     join(consumer, 'tsconfig.json'),
-    `${JSON.stringify({ compilerOptions: { lib: ['ESNext', 'DOM'], module: 'ESNext', moduleResolution: 'Bundler', skipLibCheck: true, strict: true, target: 'ESNext', types: ['node'] }, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
+    `${JSON.stringify({ compilerOptions: vueCompilerOptions, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
   )
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
+  run(
+    'npm',
+    ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive],
+    consumer,
+  )
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-toolbar', '.ginko-image-picker', '.host-button']) {
-    if (!(await containsCss(join(consumer, 'dist'), marker))) throw new Error(`The Vue production build dropped package CSS: ${marker}.`)
+  for (const marker of cssMarkers) {
+    if (!(await containsCss(join(consumer, 'dist'), marker))) {
+      throw new Error(`The Vue production build dropped package CSS: ${marker}.`)
+    }
   }
 }
 
@@ -142,8 +194,10 @@ async function verifyNuxtConsumer(consumer) {
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
-  for (const marker of ['.ginko-editor', '.ginko-block', '.ginko-popover__panel', '.ginko-table', '.ginko-image-upload', '.ginko-toolbar', '.ginko-image-picker', '.host-button']) {
-    if (!(await containsCss(join(consumer, '.output'), marker))) throw new Error(`The Nuxt production build dropped package CSS: ${marker}.`)
+  for (const marker of cssMarkers) {
+    if (!(await containsCss(join(consumer, '.output'), marker))) {
+      throw new Error(`The Nuxt production build dropped package CSS: ${marker}.`)
+    }
   }
 }
 

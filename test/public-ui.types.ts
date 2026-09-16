@@ -5,7 +5,12 @@ import type {
 
 export const storedImage = { id: 'asset-1', alt: 'A forest', cropWidth: 0.5 } satisfies EditorImage
 export const hostedImage = { url: '/images/forest.jpg', width: 640 } satisfies EditorImage
-export const pickerItem = { key: 'asset-1', label: 'Forest.jpg', image: storedImage, thumbnailUrl: '/thumbnails/forest.jpg' } satisfies EditorImagePickerItem
+export const pickerItem = {
+  key: 'asset-1',
+  label: 'Forest.jpg',
+  image: storedImage,
+  thumbnailUrl: '/thumbnails/forest.jpg',
+} satisfies EditorImagePickerItem
 export const picker: ImagePicker = async ({ signal, current }) => {
   signal.throwIfAborted()
   return current ?? storedImage

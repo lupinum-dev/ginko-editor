@@ -9,19 +9,43 @@ import { captureBlock, performBlockAction } from '../src/lib/editor-operations'
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); vi.restoreAllMocks() })
 async function setup(source = 'Hello world') {
-  const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: source, syncDebounceMs: 10000, enableImages: true, enableFiles: true, enableVideo: true } })
+  const wrapper = mount(GinkoEditor, {
+    attachTo: document.body,
+    props: {
+      modelValue: source,
+      syncDebounceMs: 10000,
+      enableImages: true,
+      enableFiles: true,
+      enableVideo: true,
+    },
+  })
   wrappers.push(wrapper); await flushPromises()
   return { wrapper, editor: wrapper.vm.editor!, toolbar: wrapper.getComponent(GinkoToolbar) }
 }
 
-async function settle() { await flushPromises(); await new Promise(resolve => setTimeout(resolve, 10)); await flushPromises() }
+async function settle() {
+  await flushPromises()
+  await new Promise(resolve => setTimeout(resolve, 10))
+  await flushPromises()
+}
 
-const modKey = (key: string, options: KeyboardEventInit = {}) => new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, [/Mac|iPhone|iPad/.test(navigator.platform) ? 'metaKey' : 'ctrlKey']: true, ...options })
+const modKey = (key: string, options: KeyboardEventInit = {}) =>
+  new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    [/Mac|iPhone|iPad/.test(navigator.platform) ? 'metaKey' : 'ctrlKey']: true,
+    ...options,
+  })
 
 describe('writing toolbar', () => {
   it('keeps selected text and exposes active formatting and undo/redo', async () => {
@@ -31,7 +55,10 @@ describe('writing toolbar', () => {
     const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true }); bold.element.dispatchEvent(down)
     expect(down.defaultPrevented).toBe(true)
     await bold.trigger('click'); await settle()
-    expect(editor.getJSON().content?.[0].content).toMatchObject([{ text: 'Hello', marks: [{ type: 'bold' }] }, { text: ' world' }])
+    expect(editor.getJSON().content?.[0].content).toMatchObject([
+      { text: 'Hello', marks: [{ type: 'bold' }] },
+      { text: ' world' },
+    ])
     expect(bold.attributes('aria-pressed')).toBe('true')
     await toolbar.get('button[aria-label="Undo"]').trigger('click'); await settle()
     expect(editor.getJSON().content?.[0].content?.[0].marks).toBeUndefined()
@@ -45,20 +72,30 @@ describe('writing toolbar', () => {
     await toolbar.get('button[aria-label="Bold"]').trigger('click'); await settle()
     expect(editor.state.storedMarks?.map(mark => mark.type.name)).toContain('bold')
     editor.view.dispatch(editor.state.tr.insertText('!'))
-    expect(editor.getJSON().content?.[0].content).toMatchObject([{ text: 'Hello' }, { text: '!', marks: [{ type: 'bold' }] }, { text: ' world' }])
+    expect(editor.getJSON().content?.[0].content).toMatchObject([
+      { text: 'Hello' },
+      { text: '!', marks: [{ type: 'bold' }] },
+      { text: ' world' },
+    ])
   })
 
   it('honors configured table sizes and keeps repeated picker instances separate', async () => {
     const { wrapper, toolbar } = await setup()
-    await wrapper.setProps({ toolbarItems: [[{ kind: 'table', rows: 2, columns: 4 }, { kind: 'table', rows: 5, columns: 1 }]] })
+    await wrapper.setProps({
+      toolbarItems: [[{ kind: 'table', rows: 2, columns: 4 }, { kind: 'table', rows: 5, columns: 1 }]],
+    })
     const buttons = toolbar.findAll('button[aria-label="Insert table"]')
     await buttons[0].trigger('click'); await settle()
     expect(wrapper.findAll('form')).toHaveLength(1)
-    expect(wrapper.findAll('input[type="number"]').map(input => (input.element as HTMLInputElement).value)).toEqual(['2', '4'])
+    expect(
+      wrapper.findAll('input[type="number"]').map(input => (input.element as HTMLInputElement).value),
+    ).toEqual(['2', '4'])
     await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' }); await settle()
     await buttons[1].trigger('click'); await settle()
     expect(wrapper.findAll('form')).toHaveLength(1)
-    expect(wrapper.findAll('input[type="number"]').map(input => (input.element as HTMLInputElement).value)).toEqual(['5', '1'])
+    expect(
+      wrapper.findAll('input[type="number"]').map(input => (input.element as HTMLInputElement).value),
+    ).toEqual(['5', '1'])
   })
 
   it('flushes a formatting operation started immediately before closing', async () => {
@@ -79,7 +116,9 @@ describe('writing toolbar', () => {
     expect(event.defaultPrevented).toBe(true)
     expect((await wrapper.vm.flush()).ok).toBe(true)
     expect(editor.getJSON().content?.[0].content?.[0].marks).toEqual([{ type: 'italic' }])
-    expect(toolbar.get('button[aria-label="Italic"]').attributes('title')).toContain(/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘B' : 'Ctrl+B')
+    expect(toolbar.get('button[aria-label="Italic"]').attributes('title')).toContain(
+      /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘B' : 'Ctrl+B',
+    )
     const previous = editor.state.doc
     editor.view.dom.dispatchEvent(modKey('i'))
     await settle()
@@ -98,7 +137,9 @@ describe('writing toolbar', () => {
     await wrapper.setProps({ shortcuts: { bold: 'Alt-b' } })
     editor.view.dom.dispatchEvent(modKey('b')); await settle()
     expect(editor.state.doc).toBe(before)
-    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', altKey: true, bubbles: true, cancelable: true }))
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'b', altKey: true, bubbles: true, cancelable: true }),
+    )
     await wrapper.vm.flush()
     expect(editor.getJSON().content?.[0].content?.[0].marks).toEqual([{ type: 'bold' }])
   })
@@ -123,7 +164,9 @@ describe('writing toolbar', () => {
     await wrapper.setProps({ shortcuts: { redo: 'Alt-r' } })
     editor.view.dom.dispatchEvent(modKey('y'))
     expect(editor.state.doc).toBe(restored)
-    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', altKey: true, bubbles: true, cancelable: true }))
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'r', altKey: true, bubbles: true, cancelable: true }),
+    )
     expect(editor.state.doc.eq(changed)).toBe(true)
   })
 
@@ -133,7 +176,10 @@ describe('writing toolbar', () => {
     const convert = conversion.convertTiptapDocToMarkdown
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
-    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => { await gate; return convert(...args) })
+    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => {
+      await gate
+      return convert(...args)
+    })
     toolbar.get('button[aria-label="Bold"]').element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     let finished = false
     const flushing = wrapper.vm.flush().then(result => { finished = true; return result })
@@ -178,7 +224,11 @@ describe('writing toolbar', () => {
   it('owns its themed popup and cleanup when the exported toolbar is mounted independently', async () => {
     const { editor, toolbar } = await setup()
     editor.commands.setTextSelection({ from: 1, to: 6 })
-    const standalone = mount(GinkoToolbar, { attachTo: document.body, props: { actions: toolbar.props('actions'), items: [[{ kind: 'link' }]] }, attrs: { style: '--accent: rgb(12, 34, 56); font-family: serif' } })
+    const standalone = mount(GinkoToolbar, {
+      attachTo: document.body,
+      props: { actions: toolbar.props('actions'), items: [[{ kind: 'link' }]] },
+      attrs: { style: '--accent: rgb(12, 34, 56); font-family: serif' },
+    })
     let portal: Element | null
     try {
       await standalone.get('button[aria-label="Link"]').trigger('click'); await settle()
@@ -188,7 +238,10 @@ describe('writing toolbar', () => {
       expect(standalone.findAll('[role="dialog"]')).toHaveLength(1)
       await standalone.get('input').setValue('/standalone')
       await standalone.get('form').trigger('submit'); await settle()
-      expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({ text: 'Hello', marks: [{ type: 'link', attrs: { href: '/standalone' } }] })
+      expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({
+        text: 'Hello',
+        marks: [{ type: 'link', attrs: { href: '/standalone' } }],
+      })
     } finally { standalone.unmount(); await flushPromises() }
     expect(portal?.isConnected).toBe(false)
     expect(editor.isDestroyed).toBe(false)
@@ -227,12 +280,17 @@ describe('writing toolbar', () => {
     expect(document.activeElement).toBe(input.element)
     await input.setValue('https://example.com/first')
     await wrapper.get('form').trigger('submit'); await settle()
-    expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({ text: 'Hello', marks: [{ type: 'link', attrs: { href: 'https://example.com/first' } }] })
+    expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({
+      text: 'Hello',
+      marks: [{ type: 'link', attrs: { href: 'https://example.com/first' } }],
+    })
     editor.commands.setTextSelection(3)
     await toolbar.get('button[aria-label="Link"]').trigger('click'); await settle()
     expect((wrapper.get('input').element as HTMLInputElement).value).toBe('https://example.com/first')
     await wrapper.get('input').setValue('/second'); await wrapper.get('form').trigger('submit'); await settle()
-    expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({ marks: [{ type: 'link', attrs: { href: '/second' } }] })
+    expect(editor.getJSON().content?.[0].content?.[0]).toMatchObject({
+      marks: [{ type: 'link', attrs: { href: '/second' } }],
+    })
     await toolbar.get('button[aria-label="Link"]').trigger('click'); await settle()
     await wrapper.findAll('button').find(button => button.text() === 'Remove link')!.trigger('click'); await settle()
     expect(editor.getText().trim()).toBe('Hello world')
@@ -244,7 +302,9 @@ describe('writing toolbar', () => {
     editor.commands.setTextSelection({ from: 1, to: 6 })
     const before = editor.state.doc
     await toolbar.get('button[aria-label="Link"]').trigger('click'); await settle()
-    await wrapper.get('input').setValue('javascript:alert(1)'); await wrapper.get('form').trigger('submit'); await settle()
+    await wrapper.get('input').setValue('javascript:alert(1)')
+    await wrapper.get('form').trigger('submit')
+    await settle()
     expect(wrapper.get('[role="alert"]').text()).toBe('Enter a valid link.')
     expect(editor.state.doc).toBe(before)
     editor.commands.setTextSelection(1); await settle()
@@ -255,7 +315,9 @@ describe('writing toolbar', () => {
     const { wrapper, editor, toolbar } = await setup()
     editor.commands.setTextSelection(6)
     await toolbar.get('button[aria-label="Link"]').trigger('click'); await settle()
-    await wrapper.get('input').setValue('https://example.com'); await wrapper.get('form').trigger('submit'); await settle()
+    await wrapper.get('input').setValue('https://example.com')
+    await wrapper.get('form').trigger('submit')
+    await settle()
     expect(editor.getText()).toBe('Hellohttps://example.com world')
   })
 
@@ -276,7 +338,10 @@ describe('writing toolbar', () => {
     const { wrapper, toolbar } = await setup()
     await toolbar.get('button[aria-label="Add image"]').trigger('click'); await settle()
     expect(wrapper.emitted('request-image')).toHaveLength(1)
-    await wrapper.setProps({ toolbarItems: [[{ kind: 'mark', mark: 'bold' }, { kind: 'file' }]], messages: { bold: 'Fett' } })
+    await wrapper.setProps({
+      toolbarItems: [[{ kind: 'mark', mark: 'bold' }, { kind: 'file' }]],
+      messages: { bold: 'Fett' },
+    })
     expect(toolbar.find('button[aria-label="Fett"]').exists()).toBe(true)
     await toolbar.get('button[aria-label="Add file"]').trigger('click'); await settle()
     expect(wrapper.emitted('request-file')).toHaveLength(1)

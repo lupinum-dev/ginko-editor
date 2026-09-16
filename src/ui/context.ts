@@ -1,5 +1,9 @@
 import { shallowReadonly, shallowRef, type InjectionKey } from 'vue'
-import { translateEditorMessage, type EditorMessages, type EditorMessageKey } from './messages'
+import {
+  translateEditorMessage,
+  type EditorMessages,
+  type EditorMessageKey,
+} from './messages'
 
 export interface EditorOverlayOptions {
   getContainer?: () => HTMLElement | undefined
@@ -11,7 +15,8 @@ export interface EditorOverlayOptions {
 export function createEditorOverlayController(options: EditorOverlayOptions = {}) {
   const active = shallowRef<object>()
   let dismiss: (() => void) | undefined
-  let portal: HTMLElement | undefined, themeObserver: MutationObserver | undefined
+  let portal: HTMLElement | undefined
+  let themeObserver: MutationObserver | undefined
   function syncTheme() {
     const source = options.getThemeElement?.()
     if (!portal || !source) return
@@ -22,18 +27,26 @@ export function createEditorOverlayController(options: EditorOverlayOptions = {}
     portal.style.colorScheme = style.colorScheme
     for (let index = 0; index < style.length; index++) {
       const name = style.item(index)
-      if (name.startsWith('--')) portal.style.setProperty(name, style.getPropertyValue(name))
+      if (name.startsWith('--')) {
+        portal.style.setProperty(name, style.getPropertyValue(name))
+      }
     }
   }
   function getContainer() {
-    const container = options.getContainer?.(), source = options.getThemeElement?.()
+    const container = options.getContainer?.()
+    const source = options.getThemeElement?.()
     if (!container || typeof document === 'undefined') return container
     if (!portal) {
       portal = document.createElement('div')
       portal.className = 'ginko-editor ginko-overlay'
       themeObserver = new MutationObserver(syncTheme)
+
       let ancestor: HTMLElement | null = source ?? null
-      while (ancestor) { themeObserver.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style'] }); ancestor = ancestor.parentElement }
+
+      while (ancestor) {
+        themeObserver.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style'] })
+        ancestor = ancestor.parentElement
+      }
     }
     if (portal.parentElement !== container) container.append(portal)
     syncTheme()
@@ -65,11 +78,19 @@ export function createEditorOverlayController(options: EditorOverlayOptions = {}
     },
     getContainer,
     getThemeElement: () => options.getThemeElement?.(),
-    text: (key: EditorMessageKey, parameters?: Readonly<Record<string, string | number>>) => translateEditorMessage(options.getMessages?.(), key, parameters),
+    text: (
+      key: EditorMessageKey,
+      parameters?: Readonly<Record<string, string | number>>,
+    ) => translateEditorMessage(options.getMessages?.(), key, parameters),
     destroy() {
-      dismiss?.(); dismiss = undefined; active.value = undefined
+      dismiss?.()
+      dismiss = undefined
+      active.value = undefined
       themeObserver?.disconnect()
-      const element = portal; portal = undefined
+
+      const element = portal
+      portal = undefined
+
       queueMicrotask(() => element?.remove())
     },
   }

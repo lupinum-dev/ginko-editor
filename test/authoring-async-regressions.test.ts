@@ -24,8 +24,38 @@ vi.mock('../src/lib/conversionPipeline', async (importOriginal) => {
 function source(): AuthoringKitSourceV1 {
   return {
     version: 1,
-    policy: { version: 2, components: { note: { kind: 'block', media: null, props: { title: { required: false, types: ['string'], allowedValues: null } }, slots: ['default'], allowedParents: null, allowedChildren: null } } },
-    implementation: { note: { componentName: 'Note', props: { title: { required: false, types: ['string'], options: ['one', 'two'] } }, slots: ['default'] } },
+    policy: {
+      version: 2,
+      components: {
+        note: {
+          kind: 'block',
+          media: null,
+          props: {
+            title: {
+              required: false,
+              types: ['string'],
+              allowedValues: null,
+            },
+          },
+          slots: ['default'],
+          allowedParents: null,
+          allowedChildren: null,
+        },
+      },
+    },
+    implementation: {
+      note: {
+        componentName: 'Note',
+        props: {
+          title: {
+            required: false,
+            types: ['string'],
+            options: ['one', 'two'],
+          },
+        },
+        slots: ['default'],
+      },
+    },
     authoring: { note: { label: 'Note' } },
     recipes: [],
   }
@@ -34,7 +64,13 @@ function source(): AuthoringKitSourceV1 {
 describe('async authoring validation regressions', () => {
   for (const action of ['replace', 'unmount'] as const) {
     it(`does not emit a stale visual result when ${action} occurs during authoring validation`, async () => {
-      const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: await createAuthoringKit(source()), syncDebounceMs: 10000 } })
+      const wrapper = mount(GinkoEditor, {
+        props: {
+          modelValue: 'Original\n',
+          authoringKit: await createAuthoringKit(source()),
+          syncDebounceMs: 10000,
+        },
+      })
       let unmounted = false
       try {
         await flushPromises()
@@ -67,7 +103,14 @@ describe('async authoring validation regressions', () => {
   }
 
   it('blocks both active flush callers when an image placeholder is added during conversion', async () => {
-    const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: await createAuthoringKit(source()), syncDebounceMs: 10000, imageUpload: async () => ({ url: '/image.png' }) } })
+    const wrapper = mount(GinkoEditor, {
+      props: {
+        modelValue: 'Original\n',
+        authoringKit: await createAuthoringKit(source()),
+        syncDebounceMs: 10000,
+        imageUpload: async () => ({ url: '/image.png' }),
+      },
+    })
     let release!: () => void
     try {
       await flushPromises()
@@ -81,12 +124,20 @@ describe('async authoring validation regressions', () => {
       const second = wrapper.vm.flush()
       wrapper.vm.editor!.commands.insertImageUpload()
       release()
-      for (const result of await Promise.all([first, second])) expect(result).toMatchObject({ ok: false, error: { code: 'image_upload_pending' } })
+      for (const result of await Promise.all([first, second])) {
+        expect(result).toMatchObject({ ok: false, error: { code: 'image_upload_pending' } })
+      }
     } finally { release?.(); state.pause = undefined; wrapper.unmount() }
   })
 
   it('emits only the newest local edit when another edit occurs during validation', async () => {
-    const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: await createAuthoringKit(source()), syncDebounceMs: 10000 } })
+    const wrapper = mount(GinkoEditor, {
+      props: {
+        modelValue: 'Original\n',
+        authoringKit: await createAuthoringKit(source()),
+        syncDebounceMs: 10000,
+      },
+    })
     try {
       await flushPromises()
       let signalStarted!: () => void
@@ -117,7 +168,13 @@ describe('async authoring validation regressions', () => {
   it('finishes a pending edit against its original kit before loading a replacement kit', async () => {
     const kit = await createAuthoringKit(source())
     const replacementKit = await createAuthoringKit(source())
-    const wrapper = mount(GinkoEditor, { props: { modelValue: 'Original\n', authoringKit: kit, syncDebounceMs: 10000 } })
+    const wrapper = mount(GinkoEditor, {
+      props: {
+        modelValue: 'Original\n',
+        authoringKit: kit,
+        syncDebounceMs: 10000,
+      },
+    })
     try {
       await flushPromises()
       let signalStarted!: () => void

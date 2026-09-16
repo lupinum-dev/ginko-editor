@@ -191,10 +191,20 @@ function validateComponent(
       fail(`${tag}.authoring.props.${prop} requires policy allowedValues.`)
     }
   }
-  if (authoring.canvas?.switchGroup !== undefined && !authoring.canvas.switchGroup.trim()) fail(`${tag}.canvas.switchGroup must not be empty.`)
-  if (authoring.canvas?.tone && !['neutral', 'info', 'warning', 'danger', 'success', 'idea'].includes(authoring.canvas.tone)) fail(`${tag}.canvas.tone is unsupported.`)
+  if (authoring.canvas?.switchGroup !== undefined && !authoring.canvas.switchGroup.trim()) {
+    fail(`${tag}.canvas.switchGroup must not be empty.`)
+  }
+  if (
+    authoring.canvas?.tone
+    && !['neutral', 'info', 'warning', 'danger', 'success', 'idea'].includes(authoring.canvas.tone)
+  ) {
+    fail(`${tag}.canvas.tone is unsupported.`)
+  }
   const titleProp = authoring.canvas?.titleProp
-  if (titleProp && (!policy.props[titleProp]?.types.includes('string') || authoring.props?.[titleProp]?.control !== 'text')) {
+  if (
+    titleProp
+    && (!policy.props[titleProp]?.types.includes('string') || authoring.props?.[titleProp]?.control !== 'text')
+  ) {
     fail(`${tag}.canvas.titleProp must reference an authored text property.`)
   }
   for (const slot of Object.keys(authoring.slots ?? {})) {
@@ -247,17 +257,33 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
     if (!columns) continue
     const child = source.policy.components[columns.childTag]
     const allowed = child?.props[columns.sizeProp]?.allowedValues
-    if (source.policy.components[tag].kind !== 'block' || child?.kind !== 'block' || !allowed?.length || columns.presets.length < 2) {
+    if (
+      source.policy.components[tag].kind !== 'block'
+      || child?.kind !== 'block'
+      || !allowed?.length
+      || columns.presets.length < 2
+    ) {
       fail(`${tag}.canvas.columns must reference a block child with discrete sizes and at least two presets.`)
     }
     const parent = source.policy.components[tag]
-    if ((parent.allowedChildren && !parent.allowedChildren.includes(columns.childTag)) || (child.allowedParents && !child.allowedParents.includes(tag))) {
+    if (
+      (parent.allowedChildren && !parent.allowedChildren.includes(columns.childTag))
+      || (child.allowedParents && !child.allowedParents.includes(tag))
+    ) {
       fail(`${tag}.canvas.columns must respect parent and child placement policy.`)
     }
     let lastRatio = 0
     const pairs = new Set<string>()
     for (const preset of columns.presets) {
-      if (!Number.isFinite(preset.ratio) || pairs.has(JSON.stringify(preset.values)) || !preset.label.trim() || preset.values.length !== 2 || preset.values.some(value => !allowed.includes(value)) || preset.ratio <= lastRatio || preset.ratio >= 1) {
+      if (
+        !Number.isFinite(preset.ratio)
+        || pairs.has(JSON.stringify(preset.values))
+        || !preset.label.trim()
+        || preset.values.length !== 2
+        || preset.values.some(value => !allowed.includes(value))
+        || preset.ratio <= lastRatio
+        || preset.ratio >= 1
+      ) {
         fail(`${tag}.canvas.columns presets must use allowed size pairs and increasing ratios between zero and one.`)
       }
       pairs.add(JSON.stringify(preset.values))
@@ -329,5 +355,11 @@ export async function composeAuthoringKits(
     }
   }
 
-  return await createAuthoringKit({ authoring, implementation, policy: { version: 2, components }, recipes, version: 1 })
+  return await createAuthoringKit({
+    authoring,
+    implementation,
+    policy: { version: 2, components },
+    recipes,
+    version: 1,
+  })
 }

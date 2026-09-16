@@ -38,7 +38,14 @@ function sourceFor(tag: string): AuthoringKitSourceV1 {
     policy: {
       version: 2,
       components: {
-        [tag]: { kind: 'block', media: null, props: {}, slots: ['default'], allowedParents: null, allowedChildren: null },
+        [tag]: {
+          kind: 'block',
+          media: null,
+          props: {},
+          slots: ['default'],
+          allowedParents: null,
+          allowedChildren: null,
+        },
       },
     },
     recipes: [{ id: tag, label: tag, source: `<${tag}>\nText\n</${tag}>` }],
@@ -413,7 +420,8 @@ describe('editor-specific authoring kits', () => {
       await wrapper.vm.$nextTick()
 
       expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(42)
-      expect(((await openSettings(wrapper)).get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('42')
+      const restored = (await openSettings(wrapper)).get('input[inputmode="decimal"]')
+      expect((restored.element as HTMLInputElement).value).toBe('42')
       expect(wrapper.text()).not.toContain('Enter a valid number.')
     } finally {
       wrapper.unmount()

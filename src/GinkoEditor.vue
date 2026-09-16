@@ -75,7 +75,14 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   assetProvider?: AssetProvider
   authoringKit?: AuthoringKitV1
-  codeBlockTheme?: 'atom-dark' | 'dark' | 'default' | 'github-dark' | 'github-dim' | 'github-light' | 'visual-studio-dark'
+  codeBlockTheme?:
+    | 'atom-dark'
+    | 'dark'
+    | 'default'
+    | 'github-dark'
+    | 'github-dim'
+    | 'github-light'
+    | 'visual-studio-dark'
   disabled?: boolean
   enableDebug?: boolean
   enableFiles?: boolean
@@ -157,7 +164,11 @@ type BrowserKeyboardEvent = InstanceType<typeof globalThis.KeyboardEvent>
 const insertSearch = ref<BrowserInputElement>()
 const insertMenuId = useId()
 const editorRoot = ref<InstanceType<typeof globalThis.HTMLElement>>()
-const overlays = createEditorOverlayController({ getContainer: () => props.overlayContainer ?? editorRoot.value, getThemeElement: () => editorRoot.value, getMessages: () => props.messages })
+const overlays = createEditorOverlayController({
+  getContainer: () => props.overlayContainer ?? editorRoot.value,
+  getThemeElement: () => editorRoot.value,
+  getMessages: () => props.messages,
+})
 provide(editorOverlayKey, overlays)
 const insertMenu = ref<InstanceType<typeof globalThis.HTMLElement>>()
 let menuResizeObserver: InstanceType<typeof globalThis.ResizeObserver> | undefined
@@ -208,10 +219,16 @@ const editor = useEditor({
     onImageUploadPending: count => { pendingImages.value = count; if (!count) imageUploadNotice.value = '' },
     imageActions: imageProps => {
       const source = typeof imageProps.src === 'string' ? imageProps.src : ''
-      const id = typeof imageProps.id === 'string' && imageProps.id ? imageProps.id : resolvedAssetProvider.value.parseUrl(source)?.id
+      const id = typeof imageProps.id === 'string' && imageProps.id
+        ? imageProps.id
+        : resolvedAssetProvider.value.parseUrl(source)?.id
       return {
         replace: props.enableImages ? requestImage : undefined,
-        metadata: props.enableImageMetadata && id ? () => { if (canMutateVisualContent()) emit('request-image-metadata', id) } : undefined,
+        metadata: props.enableImageMetadata && id
+          ? () => {
+            if (canMutateVisualContent()) emit('request-image-metadata', id)
+          }
+          : undefined,
       }
     },
     imageOutput: props.imageOutput,
@@ -235,7 +252,11 @@ watch(editor, (instance, _, cleanup) => {
   if (instance) cleanup(observeEditorOperations(instance, count => { pendingCommands.value = count }))
 }, { immediate: true, flush: 'sync' })
 
-const operationContext: EditorOperationContext = { getAuthoringKit: () => props.authoringKit, getOutputOptions: () => outputOptions.value, canMutate: () => canMutateVisualContent() }
+const operationContext: EditorOperationContext = {
+  getAuthoringKit: () => props.authoringKit,
+  getOutputOptions: () => outputOptions.value,
+  canMutate: () => canMutateVisualContent(),
+}
 const actions = useEditorActions(editor, {
   enabled: () => canMutateVisualContent(),
   messages: () => props.messages,
@@ -248,7 +269,10 @@ const actions = useEditorActions(editor, {
 
 const filteredRecipes = computed(() => {
   const query = insertQuery.value.trim().toLocaleLowerCase()
-  const recipes = [...(props.authoringKit?.recipes ?? []), ...writingRecipes.filter(recipe => props.enableImages || !isImageRecipe(recipe))]
+  const recipes = [
+    ...(props.authoringKit?.recipes ?? []),
+    ...writingRecipes.filter(recipe => props.enableImages || !isImageRecipe(recipe)),
+  ]
   if (!query) return recipes
   return recipes.filter((recipe) =>
     [recipe.id, recipe.label, recipe.description ?? '', ...(recipe.keywords ?? [])]
@@ -281,7 +305,13 @@ function positionInsertMenu() {
   const height = Math.min(insertMenu.value?.getBoundingClientRect().height || available, available)
   const top = opensAbove ? Math.max(12, anchor.top - height - 8) : anchor.bottom + 8
   insertPosition.value = {
-    left: `${Math.max(8, Math.min(anchor.left, globalThis.innerWidth - (insertMenu.value?.getBoundingClientRect().width || 320) - 12))}px`,
+    left: `${Math.max(
+      8,
+      Math.min(
+        anchor.left,
+        globalThis.innerWidth - (insertMenu.value?.getBoundingClientRect().width || 320) - 12,
+      ),
+    )}px`,
     top: `${top}px`,
     maxHeight: `${available}px`,
   }
@@ -387,7 +417,11 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
     restoreInsertSelection(selectionAtStart)
     const result = await runRecipeCommand(instance, recipe, {
       ...operationContext,
-      canMutate: () => !disposed && insertMenuOpen.value && insertSelection === selectionAtStart && canMutateVisualContent(),
+      canMutate: () =>
+        !disposed
+        && insertMenuOpen.value
+        && insertSelection === selectionAtStart
+        && canMutateVisualContent(),
     })
     if (disposed) return
     if (result.ok) { closeInsertMenu(false); instance.view.focus(); return }
@@ -425,9 +459,23 @@ function handleInsertKeys(event: BrowserKeyboardEvent) {
 function handleEditorKeydown(event: BrowserKeyboardEvent) {
   const instance = editor.value
   if (!instance || event.isComposing) return
-  if (hasCustomActionShortcut(event, props.shortcuts) && handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
-  const customBlockShortcut = typeof props.shortcuts?.duplicate === 'string' && matchesShortcut(event, props.shortcuts.duplicate)
-  if (customBlockShortcut && !insertMenuOpen.value && handleBlockShortcut(instance, event, operationContext, props.shortcuts)) return
+  if (
+    hasCustomActionShortcut(event, props.shortcuts)
+    && handleActionShortcut(instance, event, actions.value, props.shortcuts)
+  ) {
+    return
+  }
+
+  const customBlockShortcut = typeof props.shortcuts?.duplicate === 'string'
+    && matchesShortcut(event, props.shortcuts.duplicate)
+
+  if (
+    customBlockShortcut
+    && !insertMenuOpen.value
+    && handleBlockShortcut(instance, event, operationContext, props.shortcuts)
+  ) {
+    return
+  }
   if (handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
   if (protectComponentBoundary(instance, event)) return
   if (!insertMenuOpen.value && handleBlockShortcut(instance, event, operationContext, props.shortcuts)) return
@@ -570,7 +618,18 @@ async function flush(): Promise<EditorFlushResult> {
   if (viewMode.value === 'raw') return { emitted: false, ok: true }
   if (pendingImages.value) {
     imageUploadNotice.value = overlays.text('finishImageUpload')
-    return { ok: false, error: { code: 'image_upload_pending', phase: 'validate', message: imageUploadNotice.value, recoverable: true, traceId: 'image-upload', issues: [], timeline: [] } }
+    return {
+      ok: false,
+      error: {
+        code: 'image_upload_pending',
+        phase: 'validate',
+        message: imageUploadNotice.value,
+        recoverable: true,
+        traceId: 'image-upload',
+        issues: [],
+        timeline: [],
+      },
+    }
   }
 
   let emitted = false
@@ -629,7 +688,11 @@ function updateRaw(value: string) {
 }
 
 function canMutateVisualContent(featureEnabled = true) {
-  return featureEnabled && !disposed && !props.disabled && viewMode.value === 'visual' && editor.value?.isEditable === true
+  return featureEnabled
+    && !disposed
+    && !props.disabled
+    && viewMode.value === 'visual'
+    && editor.value?.isEditable === true
 }
 
 function storedAssetSource(asset: Partial<AssetInfo>) {
@@ -643,7 +706,23 @@ function storedAssetSource(asset: Partial<AssetInfo>) {
 function imagePayload(asset: Partial<AssetInfo>) {
   const src = storedAssetSource(asset)
   if (!src.trim()) return
-  return { alt: asset.alt, filename: asset.filename, height: asset.height, id: asset.id, src, title: asset.title, width: asset.width, fit: asset.fit, quality: asset.quality, focalX: asset.focalX, focalY: asset.focalY, cropX: asset.cropX, cropY: asset.cropY, cropWidth: asset.cropWidth, cropHeight: asset.cropHeight }
+  return {
+    alt: asset.alt,
+    filename: asset.filename,
+    height: asset.height,
+    id: asset.id,
+    src,
+    title: asset.title,
+    width: asset.width,
+    fit: asset.fit,
+    quality: asset.quality,
+    focalX: asset.focalX,
+    focalY: asset.focalY,
+    cropX: asset.cropX,
+    cropY: asset.cropY,
+    cropWidth: asset.cropWidth,
+    cropHeight: asset.cropHeight,
+  }
 }
 
 function insertImageAsset(asset: Partial<AssetInfo>): boolean {
@@ -661,7 +740,14 @@ function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSi
   if (!instance || !canMutateVisualContent(props.enableImages)) return false
   const payload = imagePayload(asset)
   if (!payload) return false
-  return instance.chain().command(({ tr }) => { closeHistory(tr); return true }).insertContentAt({ from: pos, to: pos + replaceSize }, { type: 'image', attrs: { props: payload } }, { updateSelection: false }).run()
+  return instance.chain().command(({ tr }) => {
+    closeHistory(tr)
+    return true
+  }).insertContentAt(
+    { from: pos, to: pos + replaceSize },
+    { type: 'image', attrs: { props: payload } },
+    { updateSelection: false },
+  ).run()
 }
 
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
@@ -669,7 +755,14 @@ function insertFileAsset(asset: Partial<AssetInfo>): boolean {
   if (!instance || !canMutateVisualContent(props.enableFiles)) return false
   const src = storedAssetSource(asset)
   if (!src.trim()) return false
-  const payload = { filename: asset.filename, id: asset.id, size: asset.size, src, title: asset.title || asset.filename, type: asset.mimeType }
+  const payload = {
+    filename: asset.filename,
+    id: asset.id,
+    size: asset.size,
+    src,
+    title: asset.title || asset.filename,
+    type: asset.mimeType,
+  }
   return instance.isActive('file')
     ? instance.chain().focus().updateAttributes('file', { props: payload }).run()
     : instance.chain().focus().setFile(payload).run()
@@ -686,7 +779,13 @@ function insertVideo(value: VideoInfo): boolean {
 
 function removeSelectedMedia(): boolean {
   const instance = editor.value
-  if (!instance || !canMutateVisualContent() || !['image', 'file', 'video'].some((name) => instance.isActive(name))) return false
+  if (
+    !instance
+    || !canMutateVisualContent()
+    || !['image', 'file', 'video'].some(name => instance.isActive(name))
+  ) {
+    return false
+  }
   instance.view.dispatch(instance.state.tr.deleteSelection())
   return true
 }
@@ -743,14 +842,38 @@ watch(hasPendingChanges, (pending) => emit('pending-change', pending), {
   flush: 'sync',
 })
 let assetContextRevision = 0
-watch([viewMode, () => props.disabled, () => props.enableImages, () => props.enableFiles, () => props.enableVideo, () => props.assetProvider], () => {
+watch([
+  viewMode,
+  () => props.disabled,
+  () => props.enableImages,
+  () => props.enableFiles,
+  () => props.enableVideo,
+  () => props.assetProvider,
+], () => {
   assetContextRevision += 1
 }, { flush: 'sync' })
-watch([() => props.imageDropTarget, () => props.assetProvider, () => props.enableImageMetadata, () => props.enableImages, () => props.messages], () => {
+
+watch([
+  () => props.imageDropTarget,
+  () => props.assetProvider,
+  () => props.enableImageMetadata,
+  () => props.enableImages,
+  () => props.messages,
+], () => {
   const instance = editor.value
   if (instance && !instance.isDestroyed) instance.view.dispatch(instance.state.tr)
 }, { deep: true })
-watch([() => props.imageUpload, () => props.imagePicker, () => props.disabled, () => props.enableImages, () => props.assetProvider, () => props.authoringKit], () => { editor.value?.commands.clearImageUploads() }, { flush: 'sync' })
+
+watch([
+  () => props.imageUpload,
+  () => props.imagePicker,
+  () => props.disabled,
+  () => props.enableImages,
+  () => props.assetProvider,
+  () => props.authoringKit,
+], () => {
+  editor.value?.commands.clearImageUploads()
+}, { flush: 'sync' })
 watch(() => props.disabled, (disabled) => {
   editor.value?.setEditable(!disabled)
   if (disabled) closeInsertMenu(false)

@@ -11,8 +11,14 @@ import {
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
-const docsSource = realpathSync(resolve(process.env.GINKO_DOCS_CANDIDATE ?? resolve(root, '../ginko-docs/layer')))
-const contentSource = realpathSync(resolve(process.env.GINKO_CONTENT_CANDIDATE ?? resolve(root, 'node_modules/@lupinum/ginko-content')))
+const docsSource = realpathSync(
+  resolve(process.env.GINKO_DOCS_CANDIDATE ?? resolve(root, '../ginko-docs/layer')),
+)
+const contentSource = realpathSync(
+  resolve(
+    process.env.GINKO_CONTENT_CANDIDATE ?? resolve(root, 'node_modules/@lupinum/ginko-content'),
+  ),
+)
 const installedDocsPackage = realpathSync(resolve(root, 'docs/node_modules/@lupinum/ginko-docs'))
 const installedDocsDependencies = resolve(installedDocsPackage, '../..')
 const candidateRoot = resolve(root, 'docs/.candidate')
@@ -33,7 +39,8 @@ if (
   )
 ) {
   throw new Error(
-    'GINKO_CONTENT_CANDIDATE must point to the built, accepted Content candidate; the registry beta does not yet contain the required parser contract.',
+    'GINKO_CONTENT_CANDIDATE must point to the built, accepted Content candidate; '
+    + 'the registry beta does not yet contain the required parser contract.',
   )
 }
 

@@ -12,7 +12,11 @@ import type { AssetInfo, EditorAssetRequest } from '../src/types'
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => { for (const wrapper of wrappers.splice(0)) wrapper.unmount() })
@@ -24,7 +28,12 @@ async function setup(props: InstanceType<typeof GinkoEditor>['$props'] = { model
 }
 function paste(wrapper: Awaited<ReturnType<typeof setup>>, source: string) {
   const event = new Event('paste', { bubbles: true, cancelable: true })
-  Object.defineProperty(event, 'clipboardData', { value: { types: ['text/markdown'], getData: (type: string) => type === 'text/markdown' ? source : '' } })
+  Object.defineProperty(event, 'clipboardData', {
+    value: {
+      types: ['text/markdown'],
+      getData: (type: string) => (type === 'text/markdown' ? source : ''),
+    },
+  })
   wrapper.get('.ProseMirror').element.dispatchEvent(event)
 }
 async function imageRequest(wrapper: Awaited<ReturnType<typeof setup>>) {
@@ -50,7 +59,9 @@ describe('deep review regressions', () => {
     expect(reloaded.attributes('data-mode')).toBe('visual')
     expect(reloaded.vm.editor!.state.doc.textContent).toBe('Continue writing')
   })
-  it.each(writingRecipes.filter(recipe => !isImageRecipe(recipe)))('inserts, saves, reloads and undoes $label', async (recipe) => {
+  it.each(writingRecipes.filter(recipe => !isImageRecipe(recipe)))(
+    'inserts, saves, reloads and undoes $label',
+    async (recipe) => {
     const wrapper = await setup()
     await wrapper.get('button[aria-label="Insert block"]').trigger('click')
     await wrapper.get('[role="combobox"]').setValue(recipe.id)
@@ -106,7 +117,15 @@ describe('deep review regressions', () => {
   })
 
   it('never silently serializes an unknown text mark', async () => {
-    const result = await convertTiptapDocToMarkdown({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep formatting', marks: [{ type: 'underline' }] }] }] })
+    const result = await convertTiptapDocToMarkdown({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Keep formatting', marks: [{ type: 'underline' }] }],
+        },
+      ],
+    })
     expect(result.ok).toBe(false)
     expect(result.issues[0]?.code).toBe('unknown_mark_type')
   })
@@ -127,7 +146,9 @@ describe('deep review regressions', () => {
     expect((await wrapper.vm.flush()).ok).toBe(true)
   })
 
-  it.each(['selection', 'disabled'] as const)('invalidates asset requests after a temporary %s change', async (change) => {
+  it.each(['selection', 'disabled'] as const)(
+    'invalidates asset requests after a temporary %s change',
+    async (change) => {
     const wrapper = await setup({ modelValue: 'Document' })
     const request = await imageRequest(wrapper)
     if (change === 'selection') {
@@ -157,13 +178,24 @@ describe('deep review regressions', () => {
     const wrapper = await setup({ modelValue: '', assetProvider: { buildUrl: () => '/old.png', parseUrl: () => null } })
     await wrapper.setProps({ assetProvider: { buildUrl: asset => `/resolved/${asset.id}`, parseUrl: () => null } })
     expect(wrapper.vm.insertImageAsset({ id: 'image-identity', alt: 'Image' })).toBe(true)
-    wrapper.vm.editor!.commands.updateAttributes('image', { props: { id: 'image-identity', src: 'image-identity', alt: 'Image', fit: 'cover', focalX: 0.25, quality: 80 } })
+    wrapper.vm.editor!.commands.updateAttributes('image', {
+      props: {
+        id: 'image-identity',
+        src: 'image-identity',
+        alt: 'Image',
+        fit: 'cover',
+        focalX: 0.25,
+        quality: 80,
+      },
+    })
     wrapper.vm.editor!.commands.setTextSelection(wrapper.vm.editor!.state.doc.content.size - 1)
     expect(wrapper.vm.insertFileAsset({ id: 'file-identity', filename: 'Document' })).toBe(true)
     expect(wrapper.get('img').attributes('src')).toBe('/resolved/image-identity')
     expect(wrapper.get('a[data-type="file"]').attributes('href')).toBe('/resolved/file-identity')
     wrapper.vm.editor!.commands.setContent(wrapper.vm.editor!.getHTML())
-    expect(wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props).toMatchObject({ fit: 'cover', focalX: 0.25, quality: 80 })
+    expect(
+      wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props,
+    ).toMatchObject({ fit: 'cover', focalX: 0.25, quality: 80 })
     expect((await wrapper.vm.flush()).ok).toBe(true)
     const source = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
     expect(source).toContain('image-identity')
@@ -171,7 +203,11 @@ describe('deep review regressions', () => {
     expect(source).not.toContain('/resolved/')
   })
 
-  it.each(['javascript:alert(1)', 'data:text/html,unsafe', 'data:image/svg+xml,unsafe'])('keeps unsafe file destinations inert: %s', async (src) => {
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,unsafe',
+    'data:image/svg+xml,unsafe',
+  ])('keeps unsafe file destinations inert: %s', async (src) => {
     const wrapper = await setup()
     wrapper.vm.insertFileAsset({ url: src, filename: 'Untrusted file' })
     expect(wrapper.get('a[data-type="file"]').attributes('href')).toBeUndefined()
@@ -182,7 +218,9 @@ describe('deep review regressions', () => {
     wrapper.vm.insertImageAsset({ id: 'missing-image', alt: 'Awaiting resolution' })
     expect(wrapper.get('img').attributes('src')).toBeUndefined()
     wrapper.vm.editor!.commands.setContent(wrapper.vm.editor!.getHTML())
-    expect(wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props).toMatchObject({ src: 'missing-image', alt: 'Awaiting resolution' })
+    expect(
+      wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props,
+    ).toMatchObject({ src: 'missing-image', alt: 'Awaiting resolution' })
   })
 
   it('keeps attributed inline syntax literal instead of dropping its properties', async () => {
@@ -191,14 +229,36 @@ describe('deep review regressions', () => {
     wrapper.vm.editor!.commands.insertContent({ type: 'text', text: literal })
     const view = wrapper.vm.editor!.view
     const { from, to } = view.state.selection
-    const handled = view.someProp('handleTextInput', handler => handler(view, from, to, ' ', () => view.state.tr.insertText(' ', from, to)))
+    const handled = view.someProp('handleTextInput', handler =>
+      handler(view, from, to, ' ', () => view.state.tr.insertText(' ', from, to)),
+    )
     if (!handled) view.dispatch(view.state.tr.insertText(' ', from, to))
     expect(wrapper.vm.editor!.getText()).toBe(`${literal} `)
     expect(wrapper.find('[data-type="inline-element"]').exists()).toBe(false)
   })
 
   it('hides component editing controls in read-only mode', async () => {
-    const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: { note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, implementation: { note: { componentName: 'Note', props: {}, slots: ['default'] } }, authoring: { note: { label: 'Note' } }, recipes: [] })
+    const kit = await createAuthoringKit({
+      version: 1,
+      policy: {
+        version: 2,
+        components: {
+          note: {
+            kind: 'block',
+            props: {},
+            slots: ['default'],
+            allowedParents: null,
+            allowedChildren: null,
+            media: null,
+          },
+        },
+      },
+      implementation: {
+        note: { componentName: 'Note', props: {}, slots: ['default'] },
+      },
+      authoring: { note: { label: 'Note' } },
+      recipes: [],
+    })
     const wrapper = await setup({ modelValue: '<note>\nText\n</note>', authoringKit: kit })
     wrapper.vm.editor!.commands.setTextSelection(2)
     await wrapper.vm.$nextTick()
@@ -208,7 +268,13 @@ describe('deep review regressions', () => {
   })
 
   it('freezes nested data before asynchronous recipe validation even with a shallow-frozen source', async () => {
-    const source: AuthoringKitSourceV1 = { version: 1, policy: { version: 2, components: {} }, implementation: {}, authoring: {}, recipes: [{ id: 'heading', label: 'Heading', source: '# Heading' }] }
+    const source: AuthoringKitSourceV1 = {
+      version: 1,
+      policy: { version: 2, components: {} },
+      implementation: {},
+      authoring: {},
+      recipes: [{ id: 'heading', label: 'Heading', source: '# Heading' }],
+    }
     const pending = createAuthoringKit(Object.freeze(source))
     expect(() => { source.recipes[0]!.source = '<unknown />' }).toThrow()
     const kit = await pending
@@ -216,7 +282,49 @@ describe('deep review regressions', () => {
   })
 
   it('represents typed select values and boolean defaults without rewriting omitted values', async () => {
-    const kit = await createAuthoringKit({ version: 1, policy: { version: 2, components: { card: { kind: 'block', props: { choice: { types: ['string', 'number', 'boolean'], required: false, allowedValues: [1, '1', false, 'false', ''] }, visible: { types: ['boolean'], required: false, allowedValues: null } }, slots: ['default'], allowedParents: null, allowedChildren: null, media: null } } }, implementation: { card: { componentName: 'Card', props: { choice: { types: ['string', 'number', 'boolean'], required: false }, visible: { types: ['boolean'], required: false, default: true } }, slots: ['default'] } }, authoring: { card: { label: 'Card', props: { choice: { label: 'Choice', control: 'select' }, visible: { label: 'Visible', control: 'toggle' } } } }, recipes: [] })
+    const kit = await createAuthoringKit({
+      version: 1,
+      policy: {
+        version: 2,
+        components: {
+          card: {
+            kind: 'block',
+            props: {
+              choice: {
+                types: ['string', 'number', 'boolean'],
+                required: false,
+                allowedValues: [1, '1', false, 'false', ''],
+              },
+              visible: { types: ['boolean'], required: false, allowedValues: null },
+            },
+            slots: ['default'],
+            allowedParents: null,
+            allowedChildren: null,
+            media: null,
+          },
+        },
+      },
+      implementation: {
+        card: {
+          componentName: 'Card',
+          props: {
+            choice: { types: ['string', 'number', 'boolean'], required: false },
+            visible: { types: ['boolean'], required: false, default: true },
+          },
+          slots: ['default'],
+        },
+      },
+      authoring: {
+        card: {
+          label: 'Card',
+          props: {
+            choice: { label: 'Choice', control: 'select' },
+            visible: { label: 'Visible', control: 'toggle' },
+          },
+        },
+      },
+      recipes: [],
+    })
     const wrapper = await setup({ modelValue: '<card>\nContent\n</card>', authoringKit: kit })
     wrapper.vm.editor!.commands.setNodeSelection(0)
     await wrapper.vm.$nextTick()

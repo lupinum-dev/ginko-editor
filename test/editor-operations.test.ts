@@ -5,23 +5,52 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createAuthoringKit, type AuthoringKitV1 } from '../src/authoring'
 import { createEditorExtensions } from '../src/lib/config/editorConfig'
 import { applyTiptapDocToEditor, prepareMarkdownForVisualEditing } from '../src/lib/conversionPipeline'
-import { captureBlock, observeEditorOperations, trackEditorOperation, waitForEditorOperations, commitEditorTransaction, canPerformBlockAction, parentBlock, performBlockAction, selectedBlock, selectParentBlock, type BlockReference } from '../src/lib/editor-operations'
+import {
+  canPerformBlockAction,
+  captureBlock,
+  commitEditorTransaction,
+  observeEditorOperations,
+  parentBlock,
+  performBlockAction,
+  selectedBlock,
+  selectParentBlock,
+  trackEditorOperation,
+  waitForEditorOperations,
+  type BlockReference,
+} from '../src/lib/editor-operations'
 import * as conversion from '../src/lib/conversionPipeline'
 import { actOnBlock, canActOnBlock } from '../src/lib/nodeviews/block-actions'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const editors: Editor[] = []
-afterEach(() => { editors.splice(0).forEach(editor => { const element = editor.options.element; editor.destroy(); if (element instanceof HTMLElement) element.remove() }); vi.restoreAllMocks() })
+afterEach(() => {
+  editors.splice(0).forEach(editor => {
+    const element = editor.options.element
+    editor.destroy()
+    if (element instanceof HTMLElement) element.remove()
+  })
+  vi.restoreAllMocks()
+})
 const block = { kind: 'block', media: null, slots: ['default'], allowedParents: null, allowedChildren: null } as const
 async function kit() {
   return createAuthoringKit({ version: 1, recipes: [], policy: { version: 2, components: {
     note: { ...block, props: {} },
     split: { ...block, props: {}, allowedChildren: ['pane'] },
-    pane: { ...block, props: { width: { types: ['string'], required: false, allowedValues: ['small', 'large'] } }, allowedParents: ['split'] },
+    pane: {
+      ...block,
+      props: {
+        width: { types: ['string'], required: false, allowedValues: ['small', 'large'] },
+      },
+      allowedParents: ['split'],
+    },
     restricted: { ...block, props: {}, allowedParents: ['note'] },
   } }, implementation: {
     note: { componentName: 'Note', props: {}, slots: ['default'] },
@@ -29,12 +58,40 @@ async function kit() {
     pane: { componentName: 'Pane', props: { width: { types: ['string'], required: false } }, slots: ['default'] },
     restricted: { componentName: 'Restricted', props: {}, slots: ['default'] },
   }, authoring: {
-    note: { label: 'Note' }, split: { label: 'Split', canvas: { columns: { childTag: 'pane', sizeProp: 'width', presets: [{ label: 'Narrow / wide', values: ['small', 'large'], ratio: 1 / 3 }, { label: 'Wide / narrow', values: ['large', 'small'], ratio: 2 / 3 }] } } },
-    pane: { label: 'Pane' }, restricted: { label: 'Restricted' },
+    note: { label: 'Note' },
+    split: {
+      label: 'Split',
+      canvas: {
+        columns: {
+          childTag: 'pane',
+          sizeProp: 'width',
+          presets: [
+            { label: 'Narrow / wide', values: ['small', 'large'], ratio: 1 / 3 },
+            { label: 'Wide / narrow', values: ['large', 'small'], ratio: 2 / 3 },
+          ],
+        },
+      },
+    },
+    pane: { label: 'Pane' },
+    restricted: { label: 'Restricted' },
   } })
 }
 async function setup(source: string, authoringKit?: AuthoringKitV1) {
-  const editor = new Editor({ element: document.body.appendChild(document.createElement('div')), content: '<p></p>', extensions: createEditorExtensions({ codeBlockTheme: 'github-dark', enableDebug: false, enableFiles: true, enableVideo: true, fileOutput: 'mdc', imageOutput: 'mdc', showMarkdownMarkers: false, videoOutput: 'mdc', getAuthoringKit: () => authoringKit }) })
+  const editor = new Editor({
+    element: document.body.appendChild(document.createElement('div')),
+    content: '<p></p>',
+    extensions: createEditorExtensions({
+      codeBlockTheme: 'github-dark',
+      enableDebug: false,
+      enableFiles: true,
+      enableVideo: true,
+      fileOutput: 'mdc',
+      imageOutput: 'mdc',
+      showMarkdownMarkers: false,
+      videoOutput: 'mdc',
+      getAuthoringKit: () => authoringKit,
+    }),
+  })
   editors.push(editor)
   const prepared = await prepareMarkdownForVisualEditing(source, undefined, editor.schema, authoringKit)
   expect(prepared.ok, JSON.stringify(prepared.issues)).toBe(true)
@@ -50,12 +107,19 @@ function find(editor: Editor, predicate: (block: BlockReference) => boolean): Bl
   if (!found) throw new Error('Block not found')
   return found
 }
-const paragraph = (editor: Editor, text: string) => find(editor, block => block.node.type.name === 'paragraph' && block.node.textContent === text)
+const paragraph = (editor: Editor, text: string) => find(
+  editor,
+  block => block.node.type.name === 'paragraph' && block.node.textContent === text,
+)
 const component = (editor: Editor, tag: string) => find(editor, block => block.node.attrs.tag === tag)
 function wrapDefaultSlot(editor: Editor, block: BlockReference) {
   const slot = editor.schema.nodes.slot!.create({ name: 'default', props: {} }, block.node.content)
   const next = block.node.copy(Fragment.from(slot))
-  editor.view.dispatch(editor.state.tr.replaceWith(block.pos, block.pos + block.node.nodeSize, next).setMeta('addToHistory', false))
+  editor.view.dispatch(
+    editor.state.tr
+      .replaceWith(block.pos, block.pos + block.node.nodeSize, next)
+      .setMeta('addToHistory', false),
+  )
 }
 
 describe('validated editor operations', () => {
@@ -132,8 +196,14 @@ describe('validated editor operations', () => {
   it('runs Content policy validation for shared structural transactions before dispatch', async () => {
     const editor = await setup('<note>\nKeep\n</note>', await kit())
     const note = component(editor, 'note'), before = editor.getJSON()
-    const transaction = editor.state.tr.setNodeMarkup(note.pos, undefined, { ...note.node.attrs, props: { ...note.node.attrs.props, unsupported: 'value' } })
-    expect(await commitEditorTransaction(editor, transaction)).toEqual({ ok: false, reason: 'invalid-content' })
+    const transaction = editor.state.tr.setNodeMarkup(note.pos, undefined, {
+      ...note.node.attrs,
+      props: { ...note.node.attrs.props, unsupported: 'value' },
+    })
+    expect(await commitEditorTransaction(editor, transaction)).toEqual({
+      ok: false,
+      reason: 'invalid-content',
+    })
     expect(editor.getJSON()).toEqual(before)
   })
 
@@ -153,7 +223,10 @@ describe('validated editor operations', () => {
       const editor = await setup('First\n\nSecond')
       let authoringKit: AuthoringKitV1 | undefined, output: 'mdc' | 'markdown' = 'mdc'
       const nextKit = await kit()
-      const pending = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate', { getAuthoringKit: () => authoringKit, getOutputOptions: () => ({ imageOutput: output }) })
+      const pending = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate', {
+        getAuthoringKit: () => authoringKit,
+        getOutputOptions: () => ({ imageOutput: output }),
+      })
       if (change === 'document') editor.commands.setContent('<p>Replacement</p>')
       if (change === 'selection') editor.commands.setTextSelection(3)
       if (change === 'disabled') { editor.setEditable(false); editor.setEditable(true) }
@@ -187,7 +260,8 @@ describe('validated editor operations', () => {
     expect(editor.state.doc.childCount).toBe(3)
     editor.commands.undo()
     expect(editor.state.doc.childCount).toBe(2)
-    expect(await actOnBlock(editor, note.node.type.create(note.node.attrs, note.node.content, note.node.marks), note.pos, 'delete')).toBe(false)
+    const staleNode = note.node.type.create(note.node.attrs, note.node.content, note.node.marks)
+    expect(await actOnBlock(editor, staleNode, note.pos, 'delete')).toBe(false)
     const current = component(editor, 'note')
     expect(await actOnBlock(editor, current.node, current.pos, 'delete')).toBe(true)
     expect(editor.getText()).toBe('Outside')

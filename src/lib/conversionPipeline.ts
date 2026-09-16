@@ -338,7 +338,13 @@ function normalizeComarkNodes(nodes: unknown[]): unknown[] {
     const [tag, rawProps, ...children] = node
     const props = { ...((rawProps && typeof rawProps === 'object' ? rawProps : {}) as Record<string, unknown>) }
     const metadata = props.$
-    if (metadata && typeof metadata === 'object' && 'syntax' in metadata && (metadata.syntax === 'angle' || metadata.syntax === 'colon') && 'block' in metadata) {
+    if (
+      metadata
+      && typeof metadata === 'object'
+      && 'syntax' in metadata
+      && (metadata.syntax === 'angle' || metadata.syntax === 'colon')
+      && 'block' in metadata
+    ) {
       // Content may change delimiters to preserve edited property values.
       // Component identity and inline/block placement carry the meaning.
       props.$ = { component: 1, block: metadata.block }

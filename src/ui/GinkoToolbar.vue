@@ -1,6 +1,20 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { ToolbarRoot, ToolbarButton, ToolbarSeparator, TooltipProvider, DropdownMenuRoot, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, PopoverRoot, PopoverTrigger, PopoverContent, PopoverPortal } from 'reka-ui'
+import {
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+  PopoverContent,
+  PopoverPortal,
+  PopoverRoot,
+  PopoverTrigger,
+  ToolbarButton,
+  ToolbarRoot,
+  ToolbarSeparator,
+  TooltipProvider,
+} from 'reka-ui'
 import type { EditorActions, EditorToolbarGroup, EditorCommand } from './commands'
 import { defaultMessages, defaultToolbarItems } from './commands'
 import { createEditorOverlayController, editorOverlayKey } from './context'
@@ -8,36 +22,94 @@ import GinkoActionButton from './GinkoActionButton.vue'
 import GinkoToolbarIcon from './GinkoToolbarIcon.vue'
 
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ actions: EditorActions; items?: readonly EditorToolbarGroup[]; compact?: boolean }>()
+
+const props = defineProps<{
+  actions: EditorActions
+  items?: readonly EditorToolbarGroup[]
+  compact?: boolean
+}>()
+
 const toolbarRoot = ref<InstanceType<typeof ToolbarRoot>>()
-const rootElement = () => { const element: unknown = toolbarRoot.value?.$el; return typeof globalThis.HTMLElement !== 'undefined' && element instanceof globalThis.HTMLElement ? element : undefined }
+
+const rootElement = () => {
+  const element: unknown = toolbarRoot.value?.$el
+  return typeof globalThis.HTMLElement !== 'undefined' && element instanceof globalThis.HTMLElement
+    ? element
+    : undefined
+}
+
 const inheritedUi = inject(editorOverlayKey, undefined)
-const ui = inheritedUi ?? createEditorOverlayController({ getContainer: rootElement, getThemeElement: rootElement })
+const ui = inheritedUi
+  ?? createEditorOverlayController({ getContainer: rootElement, getThemeElement: rootElement })
+
 const emit = defineEmits<{ 'open-change': [open: boolean] }>()
+
 const panel = ref<string>()
 const captured = shallowRef<EditorActions>()
 const owner = {}
-const href = ref(''), error = ref(''), rows = ref(3), columns = ref(3)
-const groups = computed(() => (props.items ?? defaultToolbarItems).map(group => group.filter(item => item.kind === 'menu' || props.actions.get(item).available)))
+const href = ref('')
+const error = ref('')
+const rows = ref(3)
+const columns = ref(3)
+
+const groups = computed(() =>
+  (props.items ?? defaultToolbarItems).map(group =>
+    group.filter(item => item.kind === 'menu' || props.actions.get(item).available),
+  ),
+)
+
 function setOpen(id: string, open: boolean, command?: EditorCommand) {
   captured.value = open ? props.actions.capture() : undefined
-  if (open && command?.kind === 'link') href.value = captured.value?.get({ kind: 'link' }).value ?? ''
-  if (open && command?.kind === 'table') { rows.value = command.rows; columns.value = command.columns }
+
+  if (open && command?.kind === 'link') {
+    href.value = captured.value?.get({ kind: 'link' }).value ?? ''
+  }
+
+  if (open && command?.kind === 'table') {
+    rows.value = command.rows
+    columns.value = command.columns
+  }
+
   panel.value = open ? id : undefined
 }
-watch(panel, value => {
+
+watch(panel, (value) => {
   emit('open-change', !!value)
   error.value = ''
+
   if (value) ui?.open(owner, () => { panel.value = undefined })
   else ui?.release(owner)
 })
-watch(() => props.actions, () => { if (captured.value && !captured.value.isCurrent()) panel.value = undefined })
-onBeforeUnmount(() => { ui.release(owner); if (!inheritedUi) ui.destroy() })
-function menuLabel(label: string) { return label in defaultMessages ? props.actions.text(label as keyof typeof defaultMessages) : label }
-async function run(command: EditorCommand) { const result = await (captured.value ?? props.actions).get(command).run(); if (result) panel.value = undefined; return result }
+
+watch(() => props.actions, () => {
+  if (captured.value && !captured.value.isCurrent()) panel.value = undefined
+})
+
+onBeforeUnmount(() => {
+  ui.release(owner)
+  if (!inheritedUi) ui.destroy()
+})
+
+function menuLabel(label: string) {
+  return label in defaultMessages
+    ? props.actions.text(label as keyof typeof defaultMessages)
+    : label
+}
+
+async function run(command: EditorCommand) {
+  const result = await (captured.value ?? props.actions).get(command).run()
+
+  if (result) panel.value = undefined
+
+  return result
+}
+
 async function applyLink(remove = false) {
   const value = remove ? '' : href.value.trim()
-  if ((!remove && !value) || !await run({ kind: 'link', href: value })) error.value = props.actions.text('invalidLink')
+
+  if ((!remove && !value) || !await run({ kind: 'link', href: value })) {
+    error.value = props.actions.text('invalidLink')
+  }
 }
 </script>
 <template>
@@ -79,7 +151,13 @@ async function applyLink(remove = false) {
                     :title="menuLabel(item.label)"
                     @mousedown.prevent
                   >
-                    <GinkoToolbarIcon :name="item.label === 'lists' ? 'bullets' : item.label === 'more' ? 'more' : 'paragraph'" />
+                    <GinkoToolbarIcon
+                      :name="item.label === 'lists'
+                        ? 'bullets'
+                        : item.label === 'more'
+                          ? 'more'
+                          : 'paragraph'"
+                    />
                     <GinkoToolbarIcon
                       v-if="item.label !== 'more'"
                       name="chevron"
@@ -100,7 +178,8 @@ async function applyLink(remove = false) {
                       :data-active="actions.get(command).active || undefined"
                       @select="run(command)"
                     >
-                      <GinkoToolbarIcon :name="actions.get(command).id" />{{ actions.get(command).label }}
+                      <GinkoToolbarIcon :name="actions.get(command).id" />
+                      {{ actions.get(command).label }}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenuPortal>
@@ -134,12 +213,15 @@ async function applyLink(remove = false) {
                       v-if="item.kind === 'link'"
                       @submit.prevent="applyLink()"
                     >
-                      <label>{{ actions.text('linkAddress') }}<input
-                        v-model="href"
-                        type="text"
-                        placeholder="https://…"
-                        :aria-label="actions.text('linkAddress')"
-                      ></label>
+                      <label>
+                        {{ actions.text('linkAddress') }}
+                        <input
+                          v-model="href"
+                          type="text"
+                          placeholder="https://…"
+                          :aria-label="actions.text('linkAddress')"
+                        >
+                      </label>
                       <p
                         v-if="error"
                         role="alert"
@@ -153,7 +235,8 @@ async function applyLink(remove = false) {
                           @click="applyLink(true)"
                         >
                           {{ actions.text('removeLink') }}
-                        </button><button
+                        </button>
+                        <button
                           class="ginko-button"
                           type="submit"
                         >
@@ -182,17 +265,24 @@ async function applyLink(remove = false) {
                         />
                       </div>
                       <div class="ginko-toolbar__dimensions">
-                        <label>{{ actions.text('rows') }}<input
-                          v-model.number="rows"
-                          type="number"
-                          min="1"
-                          max="20"
-                        ></label><label>{{ actions.text('columns') }}<input
-                          v-model.number="columns"
-                          type="number"
-                          min="1"
-                          max="20"
-                        ></label>
+                        <label>
+                          {{ actions.text('rows') }}
+                          <input
+                            v-model.number="rows"
+                            type="number"
+                            min="1"
+                            max="20"
+                          >
+                        </label>
+                        <label>
+                          {{ actions.text('columns') }}
+                          <input
+                            v-model.number="columns"
+                            type="number"
+                            min="1"
+                            max="20"
+                          >
+                        </label>
                       </div>
                       <button
                         class="ginko-button"

@@ -7,7 +7,11 @@ import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring'
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()) })
@@ -16,17 +20,35 @@ function source(): AuthoringKitSourceV1 {
   return {
     version: 1,
     implementation: {
-      notice: { componentName: 'Notice', props: { heading: { required: false, types: ['string'] } }, slots: ['default'] },
+      notice: {
+        componentName: 'Notice',
+        props: { heading: { required: false, types: ['string'] } },
+        slots: ['default'],
+      },
       split: { componentName: 'Split', props: {}, slots: ['default'] },
-      pane: { componentName: 'Pane', props: { width: { required: false, types: ['string'], default: 'medium' } }, slots: ['default'] },
+      pane: {
+        componentName: 'Pane',
+        props: { width: { required: false, types: ['string'], default: 'medium' } },
+        slots: ['default'],
+      },
     },
     policy: { version: 2, components: {
       notice: { ...block, props: { heading: { types: ['string'], required: false, allowedValues: null } } },
       split: { ...block, props: {}, allowedChildren: ['pane'] },
-      pane: { ...block, props: { width: { types: ['string'], required: false, allowedValues: ['small', 'medium', 'large'] } }, allowedParents: ['split'] },
+      pane: {
+        ...block,
+        props: {
+          width: { types: ['string'], required: false, allowedValues: ['small', 'medium', 'large'] },
+        },
+        allowedParents: ['split'],
+      },
     } },
     authoring: {
-      notice: { label: 'Notice', props: { heading: { label: 'Heading', control: 'text' } }, canvas: { titleProp: 'heading' } },
+      notice: {
+        label: 'Notice',
+        props: { heading: { label: 'Heading', control: 'text' } },
+        canvas: { titleProp: 'heading' },
+      },
       split: { label: 'Columns', canvas: { columns: { childTag: 'pane', sizeProp: 'width', presets: [
         { label: 'Small / Large', values: ['small', 'large'], ratio: 1 / 3 },
         { label: 'Equal', values: ['medium', 'medium'], ratio: .5 },
@@ -37,7 +59,14 @@ function source(): AuthoringKitSourceV1 {
   }
 }
 async function setup(modelValue: string, kit?: AuthoringKitSourceV1) {
-  const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue, syncDebounceMs: 10000, ...(kit ? { authoringKit: await createAuthoringKit(kit) } : {}) } })
+  const wrapper = mount(GinkoEditor, {
+    attachTo: document.body,
+    props: {
+      modelValue,
+      syncDebounceMs: 10000,
+      ...(kit ? { authoringKit: await createAuthoringKit(kit) } : {}),
+    },
+  })
   wrappers.push(wrapper); await flushPromises(); return wrapper
 }
 const columns = '<split>\n<pane width="small">\nFirst\n</pane>\n<pane width="large">\nSecond\n</pane>\n</split>'
@@ -53,44 +82,68 @@ describe('direct canvas editing', () => {
     await wrapper.get('input[aria-label="Notice Heading"]').setValue('A "better" heading')
     const output = await saved(wrapper)
     const reloaded = await setup(output, source())
-    expect((reloaded.get('input[aria-label="Notice Heading"]').element as HTMLInputElement).value).toBe('A "better" heading')
+    expect(
+      (reloaded.get('input[aria-label="Notice Heading"]').element as HTMLInputElement).value,
+    ).toBe('A "better" heading')
     expect(reloaded.vm.editor!.getText().trim()).toBe('Body')
     expect(wrapper.find('.ginko-editor__fields input').exists()).toBe(false)
   })
   it('changes both widths together and restores both with one Undo', async () => {
     const wrapper = await setup(columns, source())
-    await wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').trigger('keydown', { key: 'ArrowRight' })
+    await wrapper
+      .get('[tag="split"] > .ginko-block__body > [role="separator"]')
+      .trigger('keydown', { key: 'ArrowRight' })
     const output = await saved(wrapper)
     expect(output.match(/width="medium"/g)).toHaveLength(2)
     const reloaded = await setup(output, source())
-    expect(reloaded.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext')).toBe('Equal')
+    expect(
+      reloaded.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
+    ).toBe('Equal')
     wrapper.vm.editor!.commands.undo(); await flushPromises()
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext')).toBe('Small / Large')
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
+    ).toBe('Small / Large')
   })
   it('preserves imported custom pairs until the user chooses a legal pair', async () => {
     const wrapper = await setup(columns.replace('large', 'small'), source())
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext')).toBe('Custom widths')
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
+    ).toBe('Custom widths')
     expect(await wrapper.vm.flush()).toMatchObject({ ok: true, emitted: false })
-    await wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').trigger('keydown', { key: 'End' })
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext')).toBe('Large / Small')
+    await wrapper
+      .get('[tag="split"] > .ginko-block__body > [role="separator"]')
+      .trigger('keydown', { key: 'End' })
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
+    ).toBe('Large / Small')
   })
   it('does not rewrite source when selecting the existing column ratio', async () => {
     const wrapper = await setup(columns, source())
-    await wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').trigger('keydown', { key: 'Home' })
+    await wrapper
+      .get('[tag="split"] > .ginko-block__body > [role="separator"]')
+      .trigger('keydown', { key: 'Home' })
     expect(await wrapper.vm.flush()).toMatchObject({ ok: true, emitted: false })
   })
   it('keeps larger layouts intact and does not offer the two-column divider', async () => {
     const wrapper = await setup(columns.replace('</split>', '<pane>\nThird\n</pane>\n</split>'), source())
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes()).toHaveProperty('hidden')
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes(),
+    ).toHaveProperty('hidden')
     expect(wrapper.vm.editor!.getText()).toContain('Third')
   })
   it('disables title and layout editing when read-only changes at runtime', async () => {
     const wrapper = await setup(columns + '\n<notice heading="Before">\nBody\n</notice>', source())
     await wrapper.setProps({ disabled: true })
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes()).toHaveProperty('hidden')
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes(),
+    ).toHaveProperty('hidden')
     expect(wrapper.get('input[aria-label="Notice Heading"]').attributes()).toHaveProperty('disabled')
-    await wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').trigger('keydown', { key: 'End' })
-    expect(wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext')).toBe('Small / Large')
+    await wrapper
+      .get('[tag="split"] > .ginko-block__body > [role="separator"]')
+      .trigger('keydown', { key: 'End' })
+    expect(
+      wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
+    ).toBe('Small / Large')
   })
   it('rejects canvas instructions that contradict placement policy', async () => {
     const kit = source(); kit.policy.components.split.allowedChildren = ['notice']
@@ -118,7 +171,10 @@ describe('direct canvas editing', () => {
     await wrapper.get('select[aria-label="Code language"]').setValue('ts')
     await wrapper.get('input[aria-label="Code file name"]').setValue('answer.ts')
     const reloaded = await setup(await saved(wrapper))
-    expect(reloaded.vm.editor!.getJSON().content?.[0].attrs).toMatchObject({ language: 'ts', filename: 'answer.ts' })
+    expect(reloaded.vm.editor!.getJSON().content?.[0].attrs).toMatchObject({
+      language: 'ts',
+      filename: 'answer.ts',
+    })
   })
   it('edits image description inline and preserves the asset reference after reload', async () => {
     const wrapper = await setup('')
@@ -128,11 +184,15 @@ describe('direct canvas editing', () => {
     await flushPromises()
     await wrapper.get('input[aria-label="Image description"]').setValue('A clear description')
     const output = await saved(wrapper), reloaded = await setup(output)
-    expect(reloaded.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props).toMatchObject({ id: 'stable-image', alt: 'A clear description' })
+    expect(
+      reloaded.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props,
+    ).toMatchObject({ id: 'stable-image', alt: 'A clear description' })
     await wrapper.get('button[aria-label="Remove image"]').trigger('click')
     expect(wrapper.vm.editor!.getJSON().content?.some(node => node.type === 'image')).toBe(false)
     wrapper.vm.editor!.commands.undo()
-    expect(wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props.alt).toBe('A clear description')
+    expect(
+      wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props.alt,
+    ).toBe('A clear description')
   })
   it('refreshes resolved image URLs without rewriting or replacing the stored image', async () => {
     const wrapper = await setup('')
@@ -145,13 +205,25 @@ describe('direct canvas editing', () => {
     expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/after.png')
     expect(wrapper.vm.editor!.state.doc).toBe(document)
   })
-  it.each(['Add row above', 'Add row below', 'Add column left', 'Add column right', 'Delete column', 'Delete row', 'Move row to header'])('preserves tables after %s', async action => {
+  it.each([
+    'Add row above',
+    'Add row below',
+    'Add column left',
+    'Add column right',
+    'Delete column',
+    'Delete row',
+    'Move row to header',
+  ])('preserves tables after %s', async action => {
     const wrapper = await setup('| Name | Details |\n| --- | --- |\n| Item | Description |\n| Other | Detail |')
     const editor = wrapper.vm.editor!
     let firstCell = 0
-    editor.state.doc.descendants((node, pos) => { if (node.type.name === 'tableCell' && !firstCell) firstCell = pos + 2 })
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'tableCell' && !firstCell) firstCell = pos + 2
+    })
     editor.commands.setTextSelection(firstCell); await flushPromises()
-    await wrapper.get(`.ginko-table__${action.includes('column') ? 'column' : 'row'}-handle button`).trigger('click')
+    await wrapper
+      .get(`.ginko-table__${action.includes('column') ? 'column' : 'row'}-handle button`)
+      .trigger('click')
     await flushPromises()
     await wrapper.get(`button[aria-label="${action}"]`).trigger('click')
     const output = await saved(wrapper)

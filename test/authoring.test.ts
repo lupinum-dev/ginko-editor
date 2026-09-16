@@ -48,7 +48,8 @@ const learningObjective = {
     keywords: ['goal', 'lesson'],
     label: 'Advanced objective',
     source:
-      '<learning-objective level="advanced" assessed>\nGoal\n\n<template #tip>\nHint\n</template>\n</learning-objective>',
+      '<learning-objective level="advanced" assessed>\n'
+      + 'Goal\n\n<template #tip>\nHint\n</template>\n</learning-objective>',
   }],
   version: 1,
 } as const satisfies AuthoringKitSourceV1

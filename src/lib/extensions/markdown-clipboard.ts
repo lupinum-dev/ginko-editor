@@ -101,7 +101,10 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     }
   }
   function prepare(view: EditorView) {
-    if (disposed || view.state.selection.empty) { cached = undefined; return undefined }
+    if (disposed || view.state.selection.empty) {
+      cached = undefined
+      return undefined
+    }
     const settings = output(), key = JSON.stringify(settings)
     const { doc, selection } = view.state
     if (cached?.doc === doc && cached.selection.eq(selection) && cached.key === key) return cached
@@ -111,7 +114,12 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     if (content.firstChild?.type.name === 'tableRow') {
       content = Fragment.from(view.state.schema.nodes.table.create(null, content))
     } else if (['tableCell', 'tableHeader'].includes(content.firstChild?.type.name ?? '')) {
-      content = Fragment.from(view.state.schema.nodes.table.create(null, view.state.schema.nodes.tableRow.create(null, content)))
+      content = Fragment.from(
+        view.state.schema.nodes.table.create(
+          null,
+          view.state.schema.nodes.tableRow.create(null, content),
+        ),
+      )
     }
     const snapshot: Snapshot = { doc, selection, key, promise: Promise.resolve(null) }
     snapshot.promise = convertTiptapDocToMarkdown({ type: 'doc', content: content.toJSON() }, settings)
@@ -128,7 +136,10 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     if (isNativeTextField(event.target)) return true
     if (view.state.selection.empty || disposed) return false
     // A read-only document still supports copying, but never native cutting.
-    if (cut && !editor.isEditable) { event.preventDefault(); return true }
+    if (cut && !editor.isEditable) {
+      event.preventDefault()
+      return true
+    }
     const snapshot = prepare(view)
     if (!snapshot) return false
     event.preventDefault()
@@ -136,7 +147,10 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     const before = view.state
     options.onCopyError?.(undefined)
     const fail = () => {
-      if (!disposed && currentRequest === request) options.onCopyError?.('The selection could not be copied as Markdown. Keep it selected and copy again, or use Markdown mode.')
+      if (!disposed && currentRequest === request)
+        options.onCopyError?.(
+          'The selection could not be copied as Markdown. Keep it selected and copy again, or use Markdown mode.',
+        )
     }
     const removeCopiedSelection = () => {
       if (cut && !disposed && editor.isEditable && view.state === before && JSON.stringify(output()) === snapshot.key) {
@@ -155,16 +169,21 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     // retain browser user activation while Content serializes the selection.
     const clipboard = globalThis.navigator?.clipboard
     const Item = globalThis.ClipboardItem
-    if (!clipboard?.write || !Item) { fail(); return true }
+    if (!clipboard?.write || !Item) {
+      fail()
+      return true
+    }
     try {
       const text = snapshot.promise.then(value => {
-        if (value === null || disposed || currentRequest !== request) throw new Error('Markdown copy is unavailable or superseded.')
+        if (value === null || disposed || currentRequest !== request)
+          throw new Error('Markdown copy is unavailable or superseded.')
         return value
       })
       const data: Record<string, Promise<Blob>> = {
         'text/plain': text.then(value => new Blob([value], { type: 'text/plain' })),
       }
-      if (Item.supports?.('text/markdown')) data['text/markdown'] = text.then(value => new Blob([value], { type: 'text/markdown' }))
+      if (Item.supports?.('text/markdown'))
+        data['text/markdown'] = text.then(value => new Blob([value], { type: 'text/markdown' }))
       // Item construction or write() can throw synchronously. Observe each
       // representation promise as well so that cancellation never leaks a rejection.
       Object.values(data).forEach(promise => { void promise.catch(() => {}) })
@@ -172,7 +191,15 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     } catch { fail() }
     return true
   }
-  return { prepare, handle, destroy() { disposed = true; cached = undefined; request += 1 } }
+  return {
+    prepare,
+    handle,
+    destroy() {
+      disposed = true
+      cached = undefined
+      request += 1
+    },
+  }
 }
 
 function handleMarkdownPaste(editor: Editor, event: Event, options: MarkdownClipboardOptions) {
@@ -209,7 +236,10 @@ export function extractMarkdownFromClipboard(event: ClipboardEvent): null | stri
 }
 
 export function hasSemanticHtml(html: string): boolean {
-  return /\bdata-pm-slice=/.test(html) || /<(?:h[1-6]|ul|ol|li|strong|em|blockquote|table|img|pre|code|[abi])[\s/>]/i.test(html)
+  return (
+    /\bdata-pm-slice=/.test(html) ||
+    /<(?:h[1-6]|ul|ol|li|strong|em|blockquote|table|img|pre|code|[abi])[\s/>]/i.test(html)
+  )
 }
 
 export function isProbablyMarkdown(value: string): boolean {
@@ -248,10 +278,27 @@ async function applyMarkdownPaste(
   let stale = false
   const invalidate = () => { stale = true }
   editor.on('transaction', invalidate)
-  const isCurrent = () => !stale && !editor.isDestroyed && editor.isEditable && options.canPaste?.() !== false && options.getAuthoringKit?.() === authoringKit
-  const reject = () => { if (isCurrent()) options.onPasteError?.('This content cannot be pasted safely here. Your document is unchanged. Use Markdown mode to keep the original source.') }
+  const isCurrent = () =>
+    !stale &&
+    !editor.isDestroyed &&
+    editor.isEditable &&
+    options.canPaste?.() !== false &&
+    options.getAuthoringKit?.() === authoringKit
+  const reject = () => {
+    if (isCurrent())
+      options.onPasteError?.(
+        'This content cannot be pasted safely here. Your document is unchanged. '
+        + 'Use Markdown mode to keep the original source.',
+      )
+  }
   try {
-    const result = await prepareMarkdownForVisualEditing(markdown, outputOptions, editor.schema, authoringKit, 'fragment')
+    const result = await prepareMarkdownForVisualEditing(
+      markdown,
+      outputOptions,
+      editor.schema,
+      authoringKit,
+      'fragment',
+    )
     if (!isCurrent()) return
     if (!result.ok || !result.value) {
       reject()
@@ -266,7 +313,10 @@ async function applyMarkdownPaste(
     const transaction = before.tr.replaceSelection(new Slice(fragment, 0, 0))
     if (authoringKit) {
       const candidate = await convertTiptapDocToMarkdown(transaction.doc.toJSON(), outputOptions)
-      if (!candidate.ok || candidate.value === undefined) { reject(); return }
+      if (!candidate.ok || candidate.value === undefined) {
+        reject()
+        return
+      }
       const issue = await validateMarkdownForAuthoring(candidate.value, authoringKit)
       if (issue) {
         reject()

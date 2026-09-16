@@ -10,7 +10,11 @@ import { isProbablyMarkdown } from '../src/lib/extensions/markdown-clipboard'
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => {
@@ -25,10 +29,16 @@ async function setup(source: string) {
   expect(wrapper.vm.editor).toBeDefined()
   return wrapper
 }
-function copy(wrapper: Awaited<ReturnType<typeof setup>>, type = 'copy', target: Element = wrapper.vm.editor!.view.dom) {
+function copy(
+  wrapper: Awaited<ReturnType<typeof setup>>,
+  type = 'copy',
+  target: Element = wrapper.vm.editor!.view.dom,
+) {
   const data = new Map<string, string>()
   const event = new Event(type, { bubbles: true, cancelable: true })
-  Object.defineProperty(event, 'clipboardData', { value: { setData: (flavor: string, value: string) => data.set(flavor, value) } })
+  Object.defineProperty(event, 'clipboardData', {
+    value: { setData: (flavor: string, value: string) => data.set(flavor, value) },
+  })
   target.dispatchEvent(event)
   return { data, event }
 }
@@ -75,7 +85,10 @@ describe('canonical Markdown clipboard', () => {
     const original = conversion.convertTiptapDocToMarkdown
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
-    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => { await gate; return original(...args) })
+    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => {
+      await gate
+      return original(...args)
+    })
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     copy(wrapper, 'cut')
     editor.registerPlugin(new Plugin({ key: new PluginKey('pending-clipboard-lifecycle-test') }))
@@ -111,11 +124,19 @@ describe('canonical Markdown clipboard', () => {
     expect(source).toContain('**useful**')
     const target = await setup('')
     const event = new Event('paste', { bubbles: true, cancelable: true })
-    Object.defineProperty(event, 'clipboardData', { value: { types: ['text/plain'], getData: (type: string) => type === 'text/plain' ? source : '' } })
+    Object.defineProperty(event, 'clipboardData', {
+      value: {
+        types: ['text/plain'],
+        getData: (type: string) => (type === 'text/plain' ? source : ''),
+      },
+    })
     target.vm.editor!.view.dom.dispatchEvent(event)
     await flushPromises()
     expect(event.defaultPrevented).toBe(true)
-    expect(target.vm.editor!.getJSON().content?.[0]).toMatchObject({ type: 'element', attrs: { tag: 'info', props: { title: 'Remember' } } })
+    expect(target.vm.editor!.getJSON().content?.[0]).toMatchObject({
+      type: 'element',
+      attrs: { tag: 'info', props: { title: 'Remember' } },
+    })
     expect(target.vm.editor!.getText()).toContain('A useful detail.')
   })
 
@@ -123,7 +144,9 @@ describe('canonical Markdown clipboard', () => {
     const wrapper = await setup('| A | B |\n| --- | ---: |\n| C | D |')
     const editor = wrapper.vm.editor!
     const cells: number[] = []
-    editor.state.doc.descendants((node, pos) => { if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') cells.push(pos) })
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') cells.push(pos)
+    })
     editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, cells[1], cells[3])))
     await flushPromises()
     const source = copy(wrapper).data.get('text/plain')!
@@ -191,7 +214,10 @@ describe('canonical Markdown clipboard', () => {
     const original = conversion.convertTiptapDocToMarkdown
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
-    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementation(async (...args) => { await gate; return original(...args) })
+    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementation(async (...args) => {
+      await gate
+      return original(...args)
+    })
     const editor = wrapper.vm.editor!
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     copy(wrapper, 'cut')
@@ -209,7 +235,10 @@ describe('canonical Markdown clipboard', () => {
     const original = conversion.convertTiptapDocToMarkdown
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
-    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => { await gate; return original(...args) })
+    vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockImplementationOnce(async (...args) => {
+      await gate
+      return original(...args)
+    })
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1, 6)))
     copy(wrapper)
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 11, 17)))
@@ -270,7 +299,15 @@ describe('canonical Markdown clipboard', () => {
     expect(editor.getText()).toBe('Keep this document')
   })
 
-  it.each(['<info title="Hello">\nBody\n</info>', '::note{title="Hello"}\nBody\n::', '**bold**', '_italic_', '~~deleted~~', '`code`', ':kbd[Ctrl]'])('recognizes raw source from an external plain-text clipboard: %s', source => {
+  it.each([
+    '<info title="Hello">\nBody\n</info>',
+    '::note{title="Hello"}\nBody\n::',
+    '**bold**',
+    '_italic_',
+    '~~deleted~~',
+    '`code`',
+    ':kbd[Ctrl]',
+  ])('recognizes raw source from an external plain-text clipboard: %s', source => {
     expect(isProbablyMarkdown(source)).toBe(true)
   })
 })

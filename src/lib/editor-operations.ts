@@ -22,7 +22,8 @@ export type BlockAction = 'duplicate' | 'delete'
 export type BlockOperationResult = { ok: true } | { ok: false; reason: 'unavailable' | 'stale' | 'invalid-content' }
 
 const structuralNodes = new Set(['doc', 'slot', 'tableRow', 'tableCell', 'tableHeader'])
-const isActionableBlock = (node: ProseMirrorNode) => node.isBlock && !structuralNodes.has(node.type.name) && NodeSelection.isSelectable(node)
+const isActionableBlock = (node: ProseMirrorNode) =>
+  node.isBlock && !structuralNodes.has(node.type.name) && NodeSelection.isSelectable(node)
 
 export function captureBlock(editor: Editor, pos: number): BlockReference | undefined {
   if (editor.isDestroyed || !Number.isInteger(pos) || pos < 0 || pos >= editor.state.doc.content.size) return undefined
@@ -71,7 +72,10 @@ export function selectParentBlock(editor: Editor, block = selectedBlock(editor))
 function contextFor(editor: Editor, context?: EditorOperationContext): EditorOperationContext {
   // TipTap exposes extension options without a specific type. Element owns
   // these existing callbacks; no second authoring-kit state is introduced here.
-  const options: EditorOperationContext = editor.extensionManager.extensions.find(extension => extension.name === 'element')?.options ?? {}
+  const elementExtension = editor.extensionManager.extensions.find(
+    extension => extension.name === 'element',
+  )
+  const options: EditorOperationContext = elementExtension?.options ?? {}
   return { getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions, ...context }
 }
 
@@ -94,18 +98,35 @@ function componentParent(doc: ProseMirrorNode, pos: number): string | undefined 
   const resolved = doc.resolve(pos)
   for (let depth = resolved.depth; depth > 0; depth--) {
     const node = resolved.node(depth)
-    if ((node.type.name === 'element' || node.type.name === 'inline-element') && typeof node.attrs.tag === 'string') return node.attrs.tag
+    if (
+      (node.type.name === 'element' || node.type.name === 'inline-element')
+      && typeof node.attrs.tag === 'string'
+    ) {
+      return node.attrs.tag
+    }
   }
   return undefined
 }
 
 /** Cheap placement feedback uses the same policy facts as Content's final check. */
-function acceptsPlacement(node: ProseMirrorNode, parentTag: string | undefined, kit: AuthoringKitV1 | undefined): boolean {
+function acceptsPlacement(
+  node: ProseMirrorNode,
+  parentTag: string | undefined,
+  kit: AuthoringKitV1 | undefined,
+): boolean {
   if (!kit) return true
-  const tag = (node.type.name === 'element' || node.type.name === 'inline-element') && typeof node.attrs.tag === 'string' ? node.attrs.tag : undefined
+  const isComponent = node.type.name === 'element' || node.type.name === 'inline-element'
+  const tag = isComponent && typeof node.attrs.tag === 'string' ? node.attrs.tag : undefined
   const policy = tag ? kit.policy.components[tag] : undefined
   const parentPolicy = parentTag ? kit.policy.components[parentTag] : undefined
-  if (tag && (!policy || (policy.allowedParents && (!parentTag || !policy.allowedParents.includes(parentTag))) || (parentPolicy?.allowedChildren && !parentPolicy.allowedChildren.includes(tag)))) return false
+  if (
+    tag
+    && (!policy
+      || (policy.allowedParents && (!parentTag || !policy.allowedParents.includes(parentTag)))
+      || (parentPolicy?.allowedChildren && !parentPolicy.allowedChildren.includes(tag)))
+  ) {
+    return false
+  }
   let accepted = true
   node.forEach(child => { if (!acceptsPlacement(child, tag ?? parentTag, kit)) accepted = false })
   return accepted
@@ -116,12 +137,22 @@ function selectInsertedBlock(tr: Transaction, pos: number) {
   return tr
 }
 
-function buildAction(editor: Editor, block: BlockReference, action: BlockAction, kit: AuthoringKitV1 | undefined): Transaction | undefined {
+function buildAction(
+  editor: Editor,
+  block: BlockReference,
+  action: BlockAction,
+  kit: AuthoringKitV1 | undefined,
+): Transaction | undefined {
   if (!isCurrentBlock(editor, block)) return undefined
   if (pairedColumns(editor, block, kit)) return undefined
   const resolved = block.doc.resolve(block.pos), index = resolved.index(), tr = editor.state.tr
   if (action === 'duplicate') {
-    if (!resolved.parent.canReplace(index + 1, index + 1, Fragment.from(block.node)) || !acceptsPlacement(block.node, componentParent(block.doc, block.pos), kit)) return undefined
+    if (
+      !resolved.parent.canReplace(index + 1, index + 1, Fragment.from(block.node))
+      || !acceptsPlacement(block.node, componentParent(block.doc, block.pos), kit)
+    ) {
+      return undefined
+    }
     return selectInsertedBlock(tr.insert(block.pos + block.node.nodeSize, block.node), block.pos + block.node.nodeSize)
   }
   if (!resolved.parent.canReplace(index, index + 1)) {
@@ -129,7 +160,13 @@ function buildAction(editor: Editor, block: BlockReference, action: BlockAction,
     // Nested schema-required children must stay attached to their container.
     if (resolved.depth !== 0 || resolved.parent.childCount !== 1) return undefined
     const empty = editor.schema.nodes.paragraph?.createAndFill()
-    if (!empty || !resolved.parent.canReplace(index, index + 1, Fragment.from(empty)) || block.node.eq(empty)) return undefined
+    if (
+      !empty
+      || !resolved.parent.canReplace(index, index + 1, Fragment.from(empty))
+      || block.node.eq(empty)
+    ) {
+      return undefined
+    }
     tr.replaceWith(block.pos, block.pos + block.node.nodeSize, empty)
   } else tr.delete(block.pos, block.pos + block.node.nodeSize)
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(block.pos, tr.doc.content.size))))
@@ -137,13 +174,21 @@ function buildAction(editor: Editor, block: BlockReference, action: BlockAction,
 }
 
 /** Synchronous structural availability. Execution additionally validates Content policy. */
-export function canPerformBlockAction(editor: Editor, block: BlockReference, action: BlockAction, context?: EditorOperationContext): boolean {
+export function canPerformBlockAction(
+  editor: Editor,
+  block: BlockReference,
+  action: BlockAction,
+  context?: EditorOperationContext,
+): boolean {
   const options = contextFor(editor, context)
   if (editor.isDestroyed || !editor.isEditable || options.canMutate?.() === false) return false
   try { return Boolean(buildAction(editor, block, action, options.getAuthoringKit?.())) } catch { return false }
 }
 
-const pendingOperations = new WeakMap<Editor, { operations: Set<Promise<unknown>>; observers: Set<(count: number) => void> }>()
+const pendingOperations = new WeakMap<
+  Editor,
+  { operations: Set<Promise<unknown>>; observers: Set<(count: number) => void> }
+>()
 function editorOperations(editor: Editor) {
   let pending = pendingOperations.get(editor)
   if (!pending) { pending = { operations: new Set(), observers: new Set() }; pendingOperations.set(editor, pending) }
@@ -164,7 +209,10 @@ export function observeEditorOperations(editor: Editor, observer: (count: number
 /** Hosts flush accepted edits before saving, even when validation is asynchronous. */
 export async function waitForEditorOperations(editor: Editor): Promise<void> {
   let pending = pendingOperations.get(editor)
-  while (pending?.operations.size) { await Promise.allSettled(pending.operations); pending = pendingOperations.get(editor) }
+  while (pending?.operations.size) {
+    await Promise.allSettled(pending.operations)
+    pending = pendingOperations.get(editor)
+  }
 }
 
 /** Register before preparation begins, so an immediate save includes the whole edit. */
@@ -184,17 +232,37 @@ export function trackEditorOperation<T>(editor: Editor, run: () => Promise<T>): 
   return operation
 }
 
-function execute(editor: Editor, context: EditorOperationContext | undefined, build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined): Promise<BlockOperationResult> {
+function execute(
+  editor: Editor,
+  context: EditorOperationContext | undefined,
+  build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined,
+): Promise<BlockOperationResult> {
   return trackEditorOperation(editor, () => executeValidated(editor, context, build))
 }
 
-async function executeValidated(editor: Editor, context: EditorOperationContext | undefined, build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined): Promise<BlockOperationResult> {
+async function executeValidated(
+  editor: Editor,
+  context: EditorOperationContext | undefined,
+  build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined,
+): Promise<BlockOperationResult> {
   const options = contextFor(editor, context)
-  if (editor.isDestroyed || !editor.isEditable || options.canMutate?.() === false) return { ok: false, reason: 'unavailable' }
-  const before = editor.state, kit = options.getAuthoringKit?.(), output = options.getOutputOptions?.() ?? {}, outputKey = JSON.stringify(output)
+  if (editor.isDestroyed || !editor.isEditable || options.canMutate?.() === false) {
+    return { ok: false, reason: 'unavailable' }
+  }
+  const before = editor.state
+  const kit = options.getAuthoringKit?.()
+  const output = options.getOutputOptions?.() ?? {}
+  const outputKey = JSON.stringify(output)
   let stale = false
   const invalidate = () => { stale = true }
-  const current = () => !stale && !editor.isDestroyed && editor.isEditable && editor.state === before && options.canMutate?.() !== false && options.getAuthoringKit?.() === kit && JSON.stringify(options.getOutputOptions?.() ?? {}) === outputKey
+  const current = () =>
+    !stale
+    && !editor.isDestroyed
+    && editor.isEditable
+    && editor.state === before
+    && options.canMutate?.() !== false
+    && options.getAuthoringKit?.() === kit
+    && JSON.stringify(options.getOutputOptions?.() ?? {}) === outputKey
   editor.on('transaction', invalidate)
   editor.on('update', invalidate)
   try {
@@ -224,14 +292,27 @@ async function executeValidated(editor: Editor, context: EditorOperationContext 
   }
 }
 
-export function performBlockAction(editor: Editor, block: BlockReference, action: BlockAction, context?: EditorOperationContext): Promise<BlockOperationResult> {
+export function performBlockAction(
+  editor: Editor,
+  block: BlockReference,
+  action: BlockAction,
+  context?: EditorOperationContext,
+): Promise<BlockOperationResult> {
   if (!isCurrentBlock(editor, block)) return Promise.resolve({ ok: false, reason: 'stale' })
   return execute(editor, context, kit => buildAction(editor, block, action, kit))
 }
 
 /** Commit an already-built structural transaction through the same policy and history boundary. */
-export function commitEditorTransaction(editor: Editor, transaction: Transaction, context?: EditorOperationContext): Promise<BlockOperationResult> {
-  if (editor.isDestroyed || transaction.before !== editor.state.doc) return Promise.resolve({ ok: false, reason: 'stale' })
-  if (!transaction.docChanged || transaction.doc.eq(editor.state.doc)) return Promise.resolve({ ok: false, reason: 'unavailable' })
+export function commitEditorTransaction(
+  editor: Editor,
+  transaction: Transaction,
+  context?: EditorOperationContext,
+): Promise<BlockOperationResult> {
+  if (editor.isDestroyed || transaction.before !== editor.state.doc) {
+    return Promise.resolve({ ok: false, reason: 'stale' })
+  }
+  if (!transaction.docChanged || transaction.doc.eq(editor.state.doc)) {
+    return Promise.resolve({ ok: false, reason: 'unavailable' })
+  }
   return execute(editor, context, () => transaction)
 }
