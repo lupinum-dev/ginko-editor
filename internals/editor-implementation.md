@@ -40,12 +40,12 @@ Commit directly related tests and documentation with each behavior. Keep unpubli
 - [x] Runtime-safe schema/conversion.
 - [x] Slash and component-property behavior.
 - [x] Collaboration protocol/client and real local backend validation.
-- [ ] CMS integration.
-- [ ] Luis integration.
-- [ ] ChiliSkills integration.
-- [ ] Independent review, final verification, and cleanup.
+- [x] CMS integration.
+- [x] Luis integration.
+- [x] ChiliSkills integration.
+- [x] Independent review, final verification, and cleanup.
 
-The active goal remains authoritative for continued work. Update this record with measured outcomes and concrete limitations as stages complete.
+The authorized local implementation is complete. See `editor-handoff.md` for source locations, measured checks, deliberate limits and separate rollout actions.
 
 ### Runtime layer
 
@@ -105,3 +105,74 @@ CMS work is isolated at
 `/Users/matthias/.codex/worktrees/ginko-editor-shared/cms` on
 `feat/shared-editor`, based on the existing accepted `fix/parser-parity`
 integration. The supplied CMS checkout and its landing-page work are untouched.
+
+## Host integration results
+
+The final source and acceptance boundaries are summarized in
+[the implementation handoff](./editor-handoff.md).
+
+### CMS
+
+`feat/shared-editor` at `ba9088d` in the isolated CMS worktree uses the shared
+Editor package for entry bodies. Canonical draft checkpoints and asset references
+update in the same transaction as accepted steps. Studio save, publish, locale
+and entry switches wait for the shared session. Typed durable recovery, Web Locks,
+auth generation checks and contract fences protect session replacement.
+
+The full check passed 1,319 tests (one skipped), lint, types and builds. Both pnpm
+and strict npm packed consumers passed with the explicit local Editor archive.
+A real packed backend accepted two actual FieldRichtext editors and preserved
+independent component title/tone edits at version 5 with zero form-write races.
+The dependency audit was clean. Independent review findings were resolved.
+
+### Luis
+
+`feat/shared-document-editor` in the isolated Luis worktree preserves the user's
+uncommitted commercial-document feature. Narrative prose uses Ginko Editor with
+atomic Convex checkpoints. Stable section keys, strict legacy revision checks,
+structured-field compare-and-set behavior, PDF preparation leases and save
+barriers protect the existing document lifecycle. Content parsing now feeds one
+typed projection for both the HTML preview and PDF. Unknown or unsupported markup
+stays visible as literal source.
+
+The full check passed 395 tests, lint, types and production build. A real local
+backend and two actual NarrativeEditor instances converged at revision 7 without
+altering prices or issuing competing form saves. Two rendered PDF pages were
+visually checked; a discovered link-prop mismatch now has a PDF annotation test.
+The isolated changes patch was applied to a temporary copy of the exact baseline
+and every resulting source file matched the integration worktree. The original
+tracked WIP is unchanged. No unrelated WIP was committed.
+
+### ChiliSkills
+
+The isolated `feat/shared-module-scripts` worktree at `18eb99a` adds optional authenticated
+shared copies for slide scripts, text blocks, assignment bodies and module
+metadata. Local slides, history, files and ZIP workflows remain available.
+Workspace membership, verified email, per-module roles, upload intents, atomic
+script checkpoints, source compare-and-set writes and typed recovery are checked
+at their owning boundaries. Shared source and unreadable recovery both survive
+permission loss without becoming a second writer.
+
+The full check passed 91 tests, frontend and Convex types, lint, formatting,
+PPTist build and Nuxt production build. Real HTTP storage preserved the nonce
+header and rejected an unrelated account's claim to an unrecorded upload. Two
+actual shared script editors converged at revision 7; viewer downgrade blocked
+offline writes and retained their recovery download. The complete workspace
+saved metadata at revision 8 and produced a ZIP whose title, accepted source and
+image bytes were checked. Local mode and a 390 px shared view were inspected.
+The production dependency audit is clean; remaining peer-range notices and
+scoped dependency removal conditions are documented in the host.
+
+## Final package evidence
+
+The final code archive is Editor `0.1.0` from `e579d55`, SHA-256
+`aa075de076960731a77d83e57e91f6457d98ddd6e10b5371968a3732728ee3a9`.
+The complete Editor gate passed 309 tests, lint, types, runtime declarations,
+package build and Docs production build. Packed runtime, Vue and Nuxt consumers
+passed against registry Content `1.0.0-beta.9`. Subsequent root changes are
+documentation only, not a different runtime candidate.
+
+Ginko Content required no code change: its published beta.9 contract already
+contains the needed portable parser, policy, equality and asset helpers. The
+implementation removes beta.7 candidate dependencies from consumers. Editor and
+Docs archives still require their normal package release before registry rollout.

@@ -74,6 +74,8 @@ public API gains the required Vue lifecycle and validation boundaries.
   with Bob's JavaScript language change. Both reached version 4, showed saved
   status, and had no console warnings or errors.
 
-These checks establish local behavior. They do not establish a production
-deployment, production credentials, host-specific authorization, presence,
-load capacity, or a retention schedule.
+These package checks establish local behavior. Separate host checks now verify
+CMS, Luis and ChiliSkills authorization, checkpoints and recovery; see the
+[implementation handoff](./editor-handoff.md). They do not establish a production
+deployment, production credentials, multiplayer cursor presence or load capacity.
+The hosts bound operation history and require explicit recovery when it expires.

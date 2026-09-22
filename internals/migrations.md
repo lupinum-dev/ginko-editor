@@ -1,10 +1,10 @@
 # Active migrations
 
-## Local Content and Docs candidates for the playground
+## Local Docs authoring candidate for the playground
 
-- Why: Step 4 needs the accepted Content parser contract and Docs authoring/component-kit exports before either package is available from the registry.
-- Introduced: Gate B2, 2026-09-12.
+- Why: the Docs authoring and component-kit exports used by the playground still require an unpublished candidate. Content now uses published `1.0.0-beta.9`; it no longer requires a local source candidate.
+- Introduced: Gate B2, 2026-09-12. Content registry cutover verified 2026-09-22.
 - Depends on it: `scripts/prepare-docs-candidates.mjs`, the Editor docs build/dev scripts, and the local aliases in `docs/nuxt.config.ts`.
-- Local inputs: set `GINKO_CONTENT_CANDIDATE` to a built Content package directory and `GINKO_DOCS_CANDIDATE` to the Docs layer directory. The current sibling Docs checkout and installed Content package are defaults, but the script rejects a stale registry Content package with a corrective error.
-- Removal condition: publish Content with the accepted strict parser contract and Docs with the accepted `authoring` and `component-kit` exports; update the docs manifest to those versions; remove candidate copying, symlink setup, aliases, and this entry together.
-- Tracking: `plan.md`, Step 4 / Gate B2.
+- Local inputs: `GINKO_DOCS_CANDIDATE` selects the accepted Docs layer directory. `GINKO_CONTENT_CANDIDATE` is optional; the default is the installed registry Content package. The script copies that exact contract beside Docs so the playground uses one parser identity.
+- Removal condition: publish Docs with the accepted `authoring` and `component-kit` exports, update the docs manifest to that release and matching registry Content, then remove candidate copying, symlink setup, aliases, and this entry together. Verify the packed documentation consumer before removing the setup.
+- Tracking: `plan.md`, Step 4 / Gate B2, and `internals/editor-handoff.md`.

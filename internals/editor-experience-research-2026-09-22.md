@@ -1,7 +1,9 @@
 # Ginko Editor experience and multiplayer research
 
 Implementation update, 2026-09-22: the bounded experiment below now has a
-working Vue session, a real local Convex proof, and host-owned restart recovery.
+working Vue session, real local Convex proofs, host-owned restart recovery,
+and verified CMS, Luis, and ChiliSkills integrations. See the
+[completed implementation handoff](./editor-handoff.md).
 It uses ProseMirror's existing merge algorithm with a direct, validated Convex
 operation log rather than the React-specific component client. See
 [the measured verification record](./collaboration-verification.md) and
@@ -11,17 +13,17 @@ beta.7 candidate requirement is removed. The following research records the
 starting evidence and alternatives. Its initial preference for Yjs when restart
 recovery is required is superseded for the bounded recovery needs now tested.
 
-Research date: 2026-09-22. Status: recommendation for implementation planning, not an accepted migration or a production collaboration certification.
+Research date: 2026-09-22. Status: research and implemented local verification; production rollout remains separate.
 
-“Kinkou” is interpreted as Ginko; “Lewis” as the supplied `luis2` repository. This report covers the shared editor, Ginko Content, Ginko CMS, ChiliSkills, and Luis. No application behavior, dependencies, accounts, or remote systems were changed.
+“Kinkou” is interpreted as Ginko; “Lewis” as the supplied `luis2` repository. This report covers the shared editor, Ginko Content, Ginko CMS, ChiliSkills, and Luis. The original research was read-only. The subsequent authorized implementation changed the Editor and isolated host worktrees, as recorded in the handoff. No production deployment was performed.
 
 ## Recommendation
 
 Keep Vue 3, TipTap 3, and ProseMirror. Improve the existing editor instead of replacing it with a React editor. Keep Ginko Content as the authority for portable document meaning. Give each host a focused authoring kit and keep its business workflow outside the editor.
 
-For the first shared-editing implementation, evaluate **Convex ProseMirror sync with a Vue client adapter** in one CMS rich-text field. This is the best starting experiment for the existing Convex architecture, provided shared editing can initially require an active online session. It is not a ready-made Vue multiplayer solution.
+The implemented choice is **ProseMirror collaboration with a Vue session and a validated Convex operation log**. The bounded experiment showed that a bridge around Convex's React-specific component client would not remove the host's validation, authorization, checkpoint, and retention work. The direct log preserves one transaction for accepted operations and their portable checkpoint.
 
-For a product that must reopen shared documents offline, retain pending edits across browser restarts, and later merge them, prefer **Yjs with Hocuspocus**, while Convex continues to own application records and permissions. That introduces a collaboration service and a persistence integration. Do not independently implement both protocols in production. Decide after the bounded experiment below and before migrating shared drafts.
+The tested session retains pending operations across a reload in the same browser tab and rebases them while its epoch and retained history remain valid. For longer disconnected editing, permanent tab closure, or recovery beyond that bounded history, evaluate **Yjs with Hocuspocus**. That adds a collaboration service and a persistence integration. These broader offline guarantees are not provided by the current implementation.
 
 The important contract change is explicit: a collaborative draft becomes authoritative for active editing. MDC remains the portable checkpoint and publication format. Two independently writable representations of the same draft would create data loss.
 
@@ -47,7 +49,7 @@ Relevant implementation:
 
 The Editor's historical `plan.md` records a shared CMS integration at other revisions. That is not what this CMS checkout runs. Reconcile the relevant branch or candidate before implementation; do not assume the integration is complete or blindly replay old changes.
 
-The referenced application standard and playbook under `lupinum-app` are absent. Repository instructions and source were used instead.
+The initial `1_apps/lupinum-app` reference was stale. The standard and playbook were subsequently located and read under `/Users/matthias/Git/0_libs/lupinum-app`.
 
 ## The editor experience to build
 

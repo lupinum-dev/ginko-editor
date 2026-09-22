@@ -21,7 +21,7 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 - Node.js 22.18 or later, Node.js 24.11 or later, or Node.js 26 or later.
 - pnpm 11 for repository development.
 - Vue 3.5.40 or later and TipTap 3.31.3 in the consuming application.
-- `@lupinum/ginko-content` 1.0.0-beta.7 or later for the shared CMS contract.
+- The Ginko Content version declared in the package manifest for the shared CMS contract.
 
 ## Installation
 
