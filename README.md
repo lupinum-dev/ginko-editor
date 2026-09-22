@@ -74,6 +74,11 @@ The editor does not import Nuxt, the CMS, Convex, or an application router.
 
 Type `/` on a new paragraph or use **Insert** to search writing blocks. Native
 Markdown blocks work without an authoring kit; host kits add component recipes.
+A registered leaf `image` using the canonical `src`, `id`, `filename`, `alt`,
+`title`, `width`, and `height` media contract keeps native image controls when
+its source includes a stable ID. Restricted props, different media mappings,
+additional props or slots, and images without that ID keep their custom component
+identity instead.
 Recipes can include a short `description` and search `keywords`.
 
 The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its source

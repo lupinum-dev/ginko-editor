@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep canonical stored images in the native media editor when a host registers
+  the matching image policy, preserving metadata and custom component boundaries.
+
 - Remove block drag handles, content dragging, and block-reordering menus and
   shortcuts. Keep component duplication, deletion, column sizing and image uploads.
 

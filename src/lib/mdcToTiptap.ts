@@ -264,6 +264,31 @@ function createMdcToTiptapConverter(
   return convert
 }
 
+// Native controls can create these fields during replacement and alt editing.
+// Only the complete canonical contract and a stable id opt into that UI. Restricted or richer
+// custom components keep their component editor and all authored properties.
+const nativeImagePropTypes = {
+  src: ['asset'], id: ['string'], filename: ['string'], alt: ['string'], title: ['string'],
+  width: ['string', 'number'], height: ['string', 'number'],
+} as const
+
+function isNativePolicyImage(node: MDCNode | MDCRoot, policy: PortableComponentPolicy | undefined): boolean {
+  if (node.type !== 'element' || node.tag !== 'image' || node.children?.length ||
+      typeof node.props?.id !== 'string' || !node.props.id || node.props.src !== node.props.id ||
+      !policy || !('version' in policy) || policy.version !== 2) return false
+  const definition = policy.components.image
+  const media = definition?.media
+  if (!definition || definition.kind !== 'block' || definition.slots.length !== 0 ||
+      definition.allowedChildren?.length !== 0 || media?.sourceProp !== 'src' ||
+      media.altProp !== 'alt' || media.titleProp !== 'title' || media.filenameProp !== 'filename' ||
+      Object.keys(definition.props).length !== Object.keys(nativeImagePropTypes).length) return false
+  return Object.entries(nativeImagePropTypes).every(([key, types]) => {
+    const prop = definition.props[key]
+    return prop?.required === (key === 'src') && prop.allowedValues === null &&
+      prop.types.length === types.length && prop.types.every((type, index) => type === types[index])
+  })
+}
+
 function convertMdcNode(
   node: MDCNode | MDCRoot,
   parent: MDCNode | undefined,
@@ -293,9 +318,9 @@ function convertMdcNode(
     : undefined
   const policyComponent = classification?.kind === 'component' && classification.registered
 
-  // A policy-selected component keeps its authored identity even if its name
-  // collides with a native Markdown element handled by the built-in map.
-  if (!policyComponent && converterMap[type]) {
+  // Canonical uploaded images keep the same native media editor after reload.
+  // Other policy-selected collisions retain their authored component identity.
+  if ((!policyComponent || isNativePolicyImage(node, policy)) && converterMap[type]) {
     if (node.type === 'element' && ['table', 'td', 'th', 'tr'].includes(type)) {
       editorDebug.log('mdcNodeToTiptap table element', {
         children: (node as MDCElement).children?.length || 0,
