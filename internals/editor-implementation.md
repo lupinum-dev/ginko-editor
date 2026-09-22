@@ -36,9 +36,9 @@ Commit directly related tests and documentation with each behavior. Keep unpubli
 
 - [x] Research and implementation goal.
 - [x] Inspect branches, worktrees, preservation boundaries, and recover handbook location.
-- [ ] Restore reproducible Docs and packed-consumer candidate setup.
-- [ ] Runtime-safe schema/conversion.
-- [ ] Slash and component-property behavior.
+- [x] Restore reproducible Docs and packed-consumer candidate setup.
+- [x] Runtime-safe schema/conversion.
+- [x] Slash and component-property behavior.
 - [ ] Collaboration protocol/client and real local backend validation.
 - [ ] CMS integration.
 - [ ] Luis integration.
@@ -61,3 +61,11 @@ GINKO_CONTENT_TARBALL=/Users/matthias/.codex/worktrees/ginko-editor-step1/conten
 ```
 
 These paths select inspected local candidates; they are not supported consumer install paths or evidence of publication. Runtime validation does not yet imply collaboration support.
+
+### Authoring layer
+
+Slash queries are real paragraph text. A ProseMirror plugin follows the query through document changes. Insertion removes the query and adds its content in one transaction. Escape, cancelled image selection and stale asynchronous results preserve the original source. Built-in command search uses translated labels. Button insertion retains its search field.
+
+Component property changes use a versioned, per-property step. A variant changes its tag and source syntax in one step. These operations preserve independent properties and body edits when mapped through other changes. Inputs outside the editor group each typing burst for Undo. Wire registration survives Nuxt module reloads.
+
+The complete local gate passed with 282 tests, lint, types, package build and Docs production build. Browser checks covered inline slash typing, insertion/Undo, Escape, a 390 px viewport, column resize by keyboard, image cancellation, and title Undo preserving a preceding body edit. Independent review findings were corrected and rechecked. Packed certification also exercises custom-step decoding in the runtime entry.

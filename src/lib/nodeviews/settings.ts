@@ -10,6 +10,8 @@ import { inlinePopover } from './popover'
 import { icon } from './icons'
 import { createEditorText } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
+import { SetComponentVariantStep } from '../property-step'
+import { createPropertyInput } from '../property-input'
 
 export function blockSettings(
   editor: Editor,
@@ -21,6 +23,7 @@ export function blockSettings(
   overlay?: EditorOverlayController,
 ) {
   const text = overlay?.text ?? createEditorText()
+  const propertyInput = createPropertyInput(editor)
   const popover = inlinePopover(text('blockSettings'), 'settings', overlay)
   const { dom, panel, close } = popover
   dom.classList.add('ginko-settings')
@@ -49,20 +52,20 @@ export function blockSettings(
     if (!event.isComposing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       event.stopPropagation()
+      propertyInput.reset()
       if (event.shiftKey) editor.commands.redo()
       else editor.commands.undo()
     }
   }
   dom.addEventListener('keydown', handleUndo)
   panel.addEventListener('keydown', handleUndo)
+  panel.addEventListener('focusin', () => propertyInput.reset())
+  panel.addEventListener('focusout', () => propertyInput.reset())
   function updateProperty(name: string, value: JsonValue | undefined) {
-    const pos = getPos(), node = getNode()
+    const pos = getPos()
     if (pos === undefined || !editor.isEditable) return
-    const props = { ...node.attrs.props }
-    if (value === undefined) delete props[name]
-    else props[name] = value
     report()
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, props }))
+    editor.view.dispatch(propertyInput.transaction(pos, name, value))
   }
   async function switchVariant(tag: string) {
     // Even choosing the current variant cancels an earlier pending choice.
@@ -79,8 +82,8 @@ export function blockSettings(
       && editor.state === before
       && editor.isEditable
       && JSON.stringify(getOutputOptions()) === outputKey
-    const props = { ...node.attrs.props, $: { ...node.attrs.props.$, syntax: 'angle', block: 1, sourceName: tag } }
-    const tr = closeHistory(before.tr).setNodeMarkup(pos, undefined, { ...node.attrs, tag, props })
+    const syntax = { ...node.attrs.props.$, syntax: 'angle', block: 1, sourceName: tag }
+    const tr = closeHistory(before.tr).step(new SetComponentVariantStep(pos, tag, syntax))
     try {
       const result = await convertTiptapDocToMarkdown(tr.doc.toJSON(), output)
       if (!current()) return

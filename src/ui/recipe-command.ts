@@ -28,6 +28,7 @@ export function runRecipeCommand(
   editor: Editor,
   recipe: AuthoringRecipeV1,
   context: EditorOperationContext,
+  replaceRange?: { from: number; to: number },
 ): Promise<BlockOperationResult> {
   return trackEditorOperation(editor, async () => {
     if (editor.isDestroyed || !editor.isEditable || context.canMutate?.() === false) {
@@ -63,7 +64,7 @@ export function runRecipeCommand(
       let transaction: Transaction | undefined
 
       if (command) {
-        transaction = buildEditorCommandTransaction(editor, command)
+        transaction = buildEditorCommandTransaction(editor, command, replaceRange)
       }
       else {
         const prepared = await prepareMarkdownForVisualEditing(
@@ -79,6 +80,7 @@ export function runRecipeCommand(
 
         const accepted = editor.chain().command(({ tr }) => {
           tr.setMeta('preventDispatch', true)
+          if (replaceRange) tr.delete(replaceRange.from, replaceRange.to)
           transaction = tr
           return true
         }).insertContent(prepared.value.content ?? []).run()

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createAuthoringKit } from '../src/authoring'
 import GinkoEditor from '../src/GinkoEditor.vue'
 import * as conversion from '../src/lib/conversionPipeline'
+import type { EditorAssetRequest, AssetInfo, EditorImage } from '../src/types'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
@@ -22,6 +23,55 @@ async function setup(modelValue = '') {
 }
 
 describe('writing block menu', () => {
+  it.each([false, true])('replaces /image only when a host request succeeds: %s', async accept => {
+    const wrapper = await setup()
+    try {
+      const editor = wrapper.vm.editor!
+      editor.view.dispatch(editor.state.tr.insertText('/image'))
+      await flushPromises()
+      await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Enter' })
+      const request = wrapper.emitted('request-image')?.[0]?.[0] as EditorAssetRequest<Partial<AssetInfo>>
+      expect(editor.getText()).toBe('/image')
+      expect(request.complete(accept ? { url: '/photo.png' } : null)).toBe(accept)
+      expect(editor.getText().trim()).toBe(accept ? '' : '/image')
+      if (accept) {
+        editor.commands.undo()
+        expect(editor.getText()).toBe('/image')
+        expect(editor.getJSON().content?.some(node => node.type === 'image')).toBe(false)
+      }
+    } finally { wrapper.unmount() }
+  })
+
+  it.each(['accept', 'cancel', 'stale'] as const)('keeps a mapped slash range through the built-in picker: %s', async outcome => {
+    let finish!: (image: EditorImage | null) => void
+    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: {
+      modelValue: 'Before\n\n/image',
+      imagePicker: () => new Promise(resolve => { finish = resolve }),
+    } })
+    try {
+      await flushPromises()
+      const editor = wrapper.vm.editor!
+      editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+      // A typing transaction opens the command; merely loading source does not.
+      editor.view.dispatch(editor.state.tr.insertText('s'))
+      editor.view.dispatch(editor.state.tr.delete(editor.state.selection.from - 1, editor.state.selection.from))
+      await flushPromises()
+      await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Enter' })
+      await wrapper.get('.ginko-image-upload__browse').trigger('click')
+      editor.view.dispatch(editor.state.tr.insertText('Arrived ', 1))
+      if (outcome === 'stale') editor.view.dispatch(editor.state.tr.insertText('changed', editor.state.doc.content.size - 2))
+      finish(outcome === 'cancel' ? null : { url: '/photo.png' })
+      await flushPromises()
+      expect(editor.getText()).toContain('Arrived Before')
+      if (outcome === 'accept') {
+        expect(editor.getText()).not.toContain('/image')
+        editor.commands.undo()
+        expect(editor.getText()).toContain('/image')
+      } else expect(editor.getText()).toContain('/imag')
+      expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+
   it('dismisses a captured selection when an independent operation changes the document', async () => {
     const wrapper = await setup('Original')
     try {
@@ -173,15 +223,15 @@ describe('writing block menu', () => {
     } finally { release?.(); wrapper.unmount(); vi.restoreAllMocks() }
   })
 
-  it('keeps the document unchanged on no results, escape, and an outside click', async () => {
+  it('keeps slash text on no results and escape, and dismisses on an outside click', async () => {
     const wrapper = await setup()
     try {
-      await wrapper.get('.ProseMirror').trigger('keydown', { key: '/' })
-      const search = wrapper.get('[role="combobox"]')
-      await search.setValue('there-is-no-such-block')
+      wrapper.vm.editor!.view.dispatch(wrapper.vm.editor!.state.tr.insertText('/there-is-no-such-block'))
+      await flushPromises()
+      const search = wrapper.get('.ProseMirror')
       await search.trigger('keydown', { key: 'Enter' })
       expect(wrapper.text()).toContain('No matching blocks.')
-      expect(wrapper.vm.editor!.getText()).toBe('')
+      expect(wrapper.vm.editor!.getText()).toBe('/there-is-no-such-block')
       await search.trigger('keydown', { key: 'Escape' })
       expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
       expect(document.activeElement).toBe(wrapper.get('.ProseMirror').element)
@@ -189,6 +239,80 @@ describe('writing block menu', () => {
       document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+
+  it('types at the caret, maps its command through independent edits, and undoes insertion atomically', async () => {
+    const wrapper = await setup('First\n\nSecond')
+    try {
+      const editor = wrapper.vm.editor!
+      editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+      editor.view.dispatch(editor.state.tr.insertText(' /h2'))
+      await flushPromises()
+      const surface = wrapper.get('.ProseMirror')
+      ;(surface.element as HTMLElement).focus()
+      expect(surface.attributes('role')).toBe('combobox')
+      expect(wrapper.find('input[role="combobox"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(surface.element)
+      editor.view.dispatch(editor.state.tr.insertText('Arrived ', 1))
+      await flushPromises()
+      expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(true)
+      await surface.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+      expect(wrapper.get('.ProseMirror h2').text()).toBe('Second')
+      expect(editor.getText()).toContain('Arrived First')
+      expect(editor.getText()).not.toContain('/h2')
+      editor.commands.undo()
+      expect(editor.getText()).toContain('Second /h2')
+      expect(editor.getText()).toContain('Arrived First')
+    } finally { wrapper.unmount() }
+  })
+
+  it('dismisses when the caret moves away, the slash is deleted, or the host disables editing', async () => {
+    for (const action of ['move', 'delete', 'disable'] as const) {
+      const wrapper = await setup()
+      try {
+        const editor = wrapper.vm.editor!
+        editor.view.dispatch(editor.state.tr.insertText('/head'))
+        await flushPromises()
+        expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(true)
+        if (action === 'move') editor.commands.setTextSelection(3)
+        if (action === 'delete') editor.view.dispatch(editor.state.tr.delete(1, 2))
+        if (action === 'disable') await wrapper.setProps({ disabled: true })
+        await flushPromises()
+        expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(false)
+        expect(editor.getText()).toBe(action === 'delete' ? 'head' : '/head')
+      } finally { wrapper.unmount() }
+    }
+  })
+
+  it('does not reopen a dismissed command during continued typing or parse URLs as commands', async () => {
+    const wrapper = await setup()
+    try {
+      const editor = wrapper.vm.editor!
+      editor.view.dispatch(editor.state.tr.insertText('/head'))
+      await flushPromises()
+      await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Escape' })
+      editor.view.dispatch(editor.state.tr.insertText('ing'))
+      await flushPromises()
+      expect(editor.getText()).toBe('/heading')
+      expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(false)
+      editor.commands.selectAll()
+      editor.view.dispatch(editor.state.tr.insertText('https://example.com/path'))
+      await flushPromises()
+      expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+
+  it('searches translated built-in labels while retaining host recipe identity', async () => {
+    const wrapper = await setup()
+    try {
+      await wrapper.setProps({ messages: { heading: 'Überschrift', heading2Description: 'Ein Abschnitt.' } })
+      wrapper.vm.editor!.view.dispatch(wrapper.vm.editor!.state.tr.insertText('/uberschrift'))
+      await flushPromises()
+      expect(wrapper.findAll('[role="option"]')).toHaveLength(3)
+      expect(wrapper.text()).toContain('Überschrift 2')
+      expect(wrapper.text()).toContain('Ein Abschnitt.')
     } finally { wrapper.unmount() }
   })
 

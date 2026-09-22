@@ -11,7 +11,8 @@ registerHooks({
   },
 })
 
-const { createEditorSchema, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown } =
+const { createEditorSchema, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown,
+  SetNodePropertyStep, SetComponentVariantStep } =
   await import('@lupinum/ginko-editor/runtime')
 assert.equal(typeof document, 'undefined')
 const schema = createEditorSchema()
@@ -23,3 +24,12 @@ const serialized = await convertTiptapDocToMarkdown(doc.toJSON())
 assert.equal(serialized.ok, true, JSON.stringify(serialized.issues))
 const reopened = await prepareMarkdownForVisualEditing(serialized.value, undefined, schema)
 assert.deepEqual(reopened.value, prepared.value)
+
+const { Step } = await import('@tiptap/pm/transform')
+const component = schema.nodeFromJSON({ type: 'doc', content: [{ type: 'element',
+  attrs: { tag: 'note', props: { title: 'Before' } }, content: [{ type: 'paragraph' }] }] })
+const property = Step.fromJSON(schema, new SetNodePropertyStep(0, 'title', 'After').toJSON())
+const edited = property.apply(component).doc
+assert.equal(edited.firstChild.attrs.props.title, 'After')
+const variant = Step.fromJSON(schema, new SetComponentVariantStep(0, 'warning', undefined).toJSON())
+assert.equal(variant.apply(edited).doc.firstChild.attrs.tag, 'warning')

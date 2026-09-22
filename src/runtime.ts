@@ -1,5 +1,6 @@
 /** Runtime-neutral conversion boundary. No Vue views, styles, or host persistence. */
 export { createEditorSchema } from './lib/config/documentConfig'
+export { SetNodePropertyStep, SetComponentVariantStep } from './lib/property-step'
 export {
   convertMarkdownToTiptapDoc,
   convertTiptapDocToMarkdown,

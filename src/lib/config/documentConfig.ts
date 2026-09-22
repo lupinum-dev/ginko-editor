@@ -19,6 +19,7 @@ import { InlineElement } from '../extensions/inline-element'
 import { Slot } from '../extensions/slot'
 import { SpanStyle } from '../extensions/span-style'
 import { Video } from '../extensions/video'
+import { registerPropertyStep } from '../property-step'
 
 interface DocumentExtensionOptions {
   getAuthoringKit?: () => AuthoringKitV1 | undefined
@@ -31,6 +32,7 @@ interface DocumentExtensionOptions {
 
 /** Schema-affecting definitions are shared by the canvas and server conversion. */
 export function createDocumentExtensions(options: DocumentExtensionOptions = {}) {
+  registerPropertyStep()
   return [
     StarterKit.configure({
       codeBlock: false,

@@ -9,6 +9,8 @@ import { blockSettings } from './settings'
 import { icon } from './icons'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import type { AuthoringKitV1 } from '../../authoring'
+import { SetNodePropertyStep } from '../property-step'
+import { createPropertyInput } from '../property-input'
 
 export function componentView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
@@ -17,6 +19,7 @@ export function componentView(
   overlay?: EditorOverlayController,
 ): NodeView {
   const text = overlay?.text ?? createEditorText()
+  const titleInput = createPropertyInput(editor)
   let node = initial
   const dom = document.createElement('div')
   dom.className = 'ginko-block'
@@ -95,29 +98,27 @@ export function componentView(
     cancelDrag()
     if (index === presetIndex()) return
     const tr = closeHistory(editor.state.tr)
-    children.forEach((child, i) => tr.setNodeMarkup(pos + child.offset, undefined, {
-      ...child.node.attrs,
-      props: { ...child.node.attrs.props, [config.sizeProp]: preset.values[i] },
-    }))
+    children.forEach((child, i) => tr.step(new SetNodePropertyStep(pos + child.offset, config.sizeProp, preset.values[i])))
     editor.view.dispatch(tr)
   }
   title.addEventListener('focus', () => {
+    titleInput.reset()
     const pos = position()
     if (pos !== undefined && editor.isEditable) {
       editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos + 1))))
     }
   })
+  title.addEventListener('blur', () => titleInput.reset())
   title.addEventListener('input', () => {
     const prop = metadata()?.canvas?.titleProp, pos = position()
     if (!prop || pos === undefined || !editor.isEditable) return
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      props: { ...node.attrs.props, [prop]: title.value },
-    }))
+    editor.view.dispatch(titleInput.transaction(pos, prop, title.value))
   })
   title.addEventListener('keydown', event => {
+    if (event.isComposing) return
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
+      titleInput.reset()
       if (event.shiftKey) editor.commands.redo()
       else editor.commands.undo()
     }

@@ -18,9 +18,12 @@ export interface UploadOptions {
   insert?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
   onPendingChange?: (count: number) => void
 }
-export interface UploadStorage { add: () => boolean; clear: () => void }
+interface ReplacementRange { from: number; to: number }
+export interface UploadStorage { add: (range?: ReplacementRange) => boolean; clear: () => void }
 interface UploadEntry {
   committing?: boolean
+  range?: ReplacementRange & { text: string }
+  invalidRange?: boolean
   target?: ProseMirrorNode
   id: string
   dom: HTMLElement
@@ -75,7 +78,7 @@ function currentImage(properties: Record<string, unknown> | undefined): EditorIm
 }
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    imageUpload: { insertImageUpload: () => ReturnType; clearImageUploads: () => ReturnType }
+    imageUpload: { insertImageUpload: (range?: ReplacementRange) => ReturnType; clearImageUploads: () => ReturnType }
   }
 }
 
@@ -85,9 +88,9 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
   addStorage() { return { add: () => false, clear: () => {} } },
   addCommands() {
     return {
-      insertImageUpload: () => ({ dispatch }) =>
+      insertImageUpload: range => ({ dispatch }) =>
         dispatch
-          ? this.storage.add()
+          ? this.storage.add(range)
           : !!(this.options.upload?.() || this.options.picker?.()) &&
             this.options.enabled?.() !== false,
       clearImageUploads: () => ({ dispatch }) => {
@@ -112,9 +115,11 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       if (view && !destroyed) view.dispatch(view.state.tr.setMeta(key, { remove: id }))
     }
     this.storage.clear = () => { for (const id of [...entries.keys()]) remove(id) }
-    this.storage.add = () => add()
-    function add(drop?: { pos: number; target?: ProseMirrorNode; file: File }) {
+    this.storage.add = range => add(undefined, range)
+    function add(drop?: { pos: number; target?: ProseMirrorNode; file: File }, replacement?: ReplacementRange) {
       if (!view || !enabled() || !(options.upload?.() || options.picker?.())) return false
+      if (replacement && (!Number.isSafeInteger(replacement.from) || !Number.isSafeInteger(replacement.to)
+        || replacement.from < 0 || replacement.to <= replacement.from || replacement.to > view.state.doc.content.size)) return false
       const selection = view.state.selection
       // Insert a document-level image after the current block. Tables and
       // component-only child lists must not acquire an invalid image child.
@@ -133,7 +138,8 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
               ? selection.$from.before(1)
               : selection.$from.after(1)
             : selection.from
-      const existing = [...entries.values()].find(entry => position(entry.id) === pos && entry.target === target)
+      const existing = [...entries.values()].find(entry => position(entry.id) === pos && entry.target === target
+        && (replacement ? entry.range?.from === replacement.from && entry.range.to === replacement.to : !entry.range))
       if (existing) {
         if (drop) existing.offer(drop.file)
         else existing.dom.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
@@ -300,7 +306,11 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
           const entry = entries.get(id)!
           entry.committing = true
           let inserted: boolean | undefined
-          try { inserted = options.insert?.(asset, current, target?.nodeSize) } finally { entry.committing = false }
+          try {
+            inserted = entry.range
+              ? options.insert?.(asset, entry.range.from, entry.range.to - entry.range.from)
+              : options.insert?.(asset, current, target?.nodeSize)
+          } finally { entry.committing = false }
           if (!inserted) throw new Error(text('imageInsertFailed'))
           clearPreview()
           remove(id, false)
@@ -433,6 +443,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       }
       entries.set(id, {
         target,
+        range: replacement ? { ...replacement, text: view.state.doc.textBetween(replacement.from, replacement.to) } : undefined,
         id,
         dom,
         offer,
@@ -575,6 +586,14 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       state: {
         init: () => DecorationSet.empty,
         apply(tr, previous) {
+          if (tr.docChanged) for (const entry of entries.values()) {
+            if (!entry.range || entry.committing || entry.invalidRange) continue
+            const from = tr.mapping.mapResult(entry.range.from, 1)
+            const to = tr.mapping.mapResult(entry.range.to, -1)
+            if (from.deleted || to.deleted || to.pos <= from.pos
+              || tr.doc.textBetween(from.pos, to.pos) !== entry.range.text) entry.invalidRange = true
+            else entry.range = { ...entry.range, from: from.pos, to: to.pos }
+          }
           let next = previous.map(tr.mapping, tr.doc)
           // Wrapping the adjacent block must not move a new image into a
           // component-only child list. Keep the visible anchor at document depth.
@@ -633,6 +652,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
               const current = position(id)
               if (
                 unavailable ||
+                entry.invalidRange ||
                 current === undefined ||
                 (entry.target && instance.state.doc.nodeAt(current) !== entry.target)
               ) {

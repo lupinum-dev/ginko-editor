@@ -214,12 +214,14 @@ function execute(
   dry: boolean,
   capture?: (tr: Transaction) => void,
   host?: CommandHostActions,
+  replaceRange?: { from: number; to: number },
 ) {
   const chain = dry
     ? instance.can().chain()
     : capture
       ? instance.chain().command(({ tr }) => {
         tr.setMeta('preventDispatch', true)
+        if (replaceRange) tr.delete(replaceRange.from, replaceRange.to)
         capture(tr)
         return true
       })
@@ -273,12 +275,13 @@ function execute(
 export function buildEditorCommandTransaction(
   editor: Editor,
   command: EditorCommand,
+  replaceRange?: { from: number; to: number },
 ): Transaction | undefined {
   if (['undo', 'redo', 'image', 'file', 'video', 'insert'].includes(command.kind)) return undefined
 
   let transaction: Transaction | undefined
 
-  if (!execute(editor, command, false, tr => { transaction = tr })) return undefined
+  if (!execute(editor, command, false, tr => { transaction = tr }, undefined, replaceRange)) return undefined
 
   transaction?.setMeta('preventDispatch', false)
   return transaction

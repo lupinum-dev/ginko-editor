@@ -1,4 +1,5 @@
 import type { AuthoringRecipeV1 } from '../authoring'
+import type { EditorText, defaultMessages } from './messages'
 
 const imageRecipe: AuthoringRecipeV1 = {
   id: 'ginko.image',
@@ -100,4 +101,43 @@ export function recipeSymbol(recipe: AuthoringRecipeV1): string {
   }
 
   return symbols[recipe.id] ?? '◇'
+}
+
+/** Preserve recipe identity: host IDs must not acquire built-in behavior. */
+export function recipeCopy(recipe: AuthoringRecipeV1, text: EditorText) {
+  if (!writingRecipes.includes(recipe)) return recipe
+  const keys: Record<string, [keyof typeof defaultMessages, keyof typeof defaultMessages]> = {
+    'ginko.heading-1': ['heading', 'heading1Description'],
+    'ginko.heading-2': ['heading', 'heading2Description'],
+    'ginko.heading-3': ['heading', 'heading3Description'],
+    'ginko.bullets': ['bulletList', 'bulletListDescription'],
+    'ginko.numbered': ['orderedList', 'orderedListDescription'],
+    'ginko.quote': ['blockquote', 'blockquoteDescription'],
+    'ginko.code': ['codeBlock', 'codeBlockDescription'],
+    'ginko.divider': ['divider', 'dividerDescription'],
+    'ginko.image': ['image', 'imageRecipeDescription'],
+    'ginko.table': ['table', 'tableDescription'],
+  }
+  const entry = keys[recipe.id]
+  if (!entry) return recipe
+  const label = text(entry[0]) + (recipe.id.startsWith('ginko.heading-') ? ` ${recipe.id.slice(-1)}` : '')
+  return { label, description: text(entry[1]) }
+}
+
+export function searchRecipes(
+  recipes: readonly AuthoringRecipeV1[],
+  query: string,
+  copy: (recipe: AuthoringRecipeV1) => { label: string; description?: string },
+) {
+  const normalize = (value: string) => value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().trim()
+  const search = normalize(query)
+  if (!search) return recipes
+  const tokens = search.split(/\s+/)
+  return recipes.map((recipe, index) => {
+    const display = copy(recipe)
+    const names = [display.label, recipe.label, ...(recipe.keywords ?? [])].map(normalize)
+    const searchable = [...names, normalize(recipe.id), normalize(display.description ?? '')].join(' ')
+    const rank = names.includes(search) ? 0 : names.some(name => name.startsWith(search)) ? 1 : 2
+    return { recipe, index, rank, matches: tokens.every(token => searchable.includes(token)) }
+  }).filter(item => item.matches).sort((a, b) => a.rank - b.rank || a.index - b.index).map(item => item.recipe)
 }

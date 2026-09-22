@@ -59,8 +59,9 @@ import {
   type EditorToolbarGroup,
 } from './ui/commands'
 import { createEditorOverlayController, editorOverlayKey } from './ui/context'
-import { writingRecipes, recipeSymbol, isImageRecipe } from './ui/writingRecipes'
+import { writingRecipes, recipeSymbol, isImageRecipe, recipeCopy, searchRecipes } from './ui/writingRecipes'
 import { runRecipeCommand } from './ui/recipe-command'
+import { SlashCommands, slashKey } from './ui/slash-command'
 
 defineOptions({ name: 'GinkoEditor' })
 
@@ -194,7 +195,7 @@ const editor = useEditor({
   content: { content: [{ type: 'paragraph' }], type: 'doc' },
   editable: !props.disabled,
   editorProps: { attributes: { 'aria-label': props.ariaLabel ?? 'Content' } },
-  extensions: createEditorExtensions({
+  extensions: [...createEditorExtensions({
     overlay: overlays,
     getMessages: () => props.messages,
     assetProvider: {
@@ -235,10 +236,11 @@ const editor = useEditor({
     placeholder: props.placeholder,
     showMarkdownMarkers: props.showMarkdownMarkers,
     videoOutput: props.videoOutput,
-  }),
+  }), SlashCommands.configure({ enabled: () => !applyingDocument && canMutateVisualContent() })],
+  onTransaction: ({ editor: instance }) => { syncSlashMenu(instance) },
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
-    if (transaction.docChanged && insertMenuOpen.value) closeInsertMenu(false)
+    if (transaction.docChanged && insertMenuOpen.value && insertMenuOrigin.value === 'button') closeInsertMenu(false)
     if (!isCurrentlyNormalizingTable(instance) && normalizeTableCells(instance)) return
     if (!applyingDocument && transaction.docChanged) scheduleVisualUpdate(instance)
   },
@@ -268,18 +270,11 @@ const actions = useEditorActions(editor, {
 })
 
 const filteredRecipes = computed(() => {
-  const query = insertQuery.value.trim().toLocaleLowerCase()
   const recipes = [
     ...(props.authoringKit?.recipes ?? []),
     ...writingRecipes.filter(recipe => props.enableImages || !isImageRecipe(recipe)),
   ]
-  if (!query) return recipes
-  return recipes.filter((recipe) =>
-    [recipe.id, recipe.label, recipe.description ?? '', ...(recipe.keywords ?? [])]
-      .join(' ')
-      .toLocaleLowerCase()
-      .includes(query),
-  )
+  return searchRecipes(recipes, insertQuery.value, recipe => recipeCopy(recipe, overlays.text))
 })
 
 watch(filteredRecipes, () => {
@@ -288,6 +283,20 @@ watch(filteredRecipes, () => {
 
 const activeRecipe = computed(() => filteredRecipes.value[insertIndex.value])
 watch([insertQuery, activeRecipe], () => { void nextTick(positionInsertMenu) })
+watch([insertMenuOpen, insertMenuOrigin, insertIndex, activeRecipe], () => {
+  const slashOpen = insertMenuOpen.value && insertMenuOrigin.value === 'slash'
+  editor.value?.setOptions({ editorProps: { attributes: {
+    'aria-label': props.ariaLabel ?? 'Content',
+    role: slashOpen ? 'combobox' : 'textbox',
+    'aria-multiline': 'true',
+    ...(slashOpen ? {
+      'aria-autocomplete': 'list',
+      'aria-expanded': 'true',
+      'aria-controls': insertMenuId,
+      ...(activeRecipe.value ? { 'aria-activedescendant': `${insertMenuId}-${insertIndex.value}` } : {}),
+    } : {}),
+  } } })
+})
 
 function positionInsertMenu() {
   const instance = editor.value
@@ -323,10 +332,18 @@ function dismissOutside(event: globalThis.PointerEvent) {
   if (!insertMenu.value?.contains(event.target) && !ownTrigger?.contains(event.target)) closeInsertMenu(false)
 }
 
-function canOpenSlashMenu(instance: TiptapEditor) {
-  const { selection } = instance.state
-  if (!selection.empty || selection.$from.parent.type.name !== 'paragraph') return false
-  return selection.$from.parent.textBetween(0, selection.$from.parentOffset).trim() === ''
+function syncSlashMenu(instance: TiptapEditor) {
+  if (insertMenuOpen.value && insertMenuOrigin.value === 'button') return
+  const range = slashKey.getState(instance.state)?.active
+  if (!range || !canMutateVisualContent() || instance.view.composing) {
+    if (insertMenuOpen.value) closeInsertMenu(false, false)
+    return
+  }
+  if (!insertMenuOpen.value) void openInsertMenu('slash')
+  insertSelection = instance.state.selection
+  if (insertQuery.value !== range.query) insertIndex.value = 0
+  insertQuery.value = range.query
+  void nextTick(positionInsertMenu)
 }
 
 async function openInsertMenu(origin: 'button' | 'slash') {
@@ -343,7 +360,7 @@ async function openInsertMenu(origin: 'button' | 'slash') {
   await nextTick()
   if (!insertMenuOpen.value || insertSelection !== openingSelection) return
   positionInsertMenu()
-  insertSearch.value?.focus()
+  if (origin === 'button') insertSearch.value?.focus()
 }
 
 function restoreInsertSelection(selection = insertSelection) {
@@ -353,13 +370,16 @@ function restoreInsertSelection(selection = insertSelection) {
   instance.view.focus()
 }
 
-function closeInsertMenu(restore = true) {
+function closeInsertMenu(restore = true, dismissSlash = true) {
   const selection = insertSelection
   insertMenuOpen.value = false
   overlays.release(insertOverlayOwner)
   insertQuery.value = ''
   insertError.value = null
   insertSelection = undefined
+  if (dismissSlash && editor.value && slashKey.getState(editor.value.state)?.active) {
+    editor.value.view.dispatch(editor.value.state.tr.setMeta(slashKey, 'dismiss'))
+  }
   if (restore) restoreInsertSelection(selection)
 }
 
@@ -404,11 +424,12 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
   const instance = editor.value
   if (!recipe || !instance || !insertSelection || insertBusy.value) return
   const selectionAtStart = insertSelection
+  const range = insertMenuOrigin.value === 'slash' ? slashKey.getState(instance.state)?.active : undefined
   if (selectionAtStart.$from.doc !== instance.state.doc) { closeInsertMenu(false); return }
   if (isImageRecipe(recipe)) {
     restoreInsertSelection()
     closeInsertMenu(false)
-    requestImage()
+    requestImage(range)
     return
   }
   insertBusy.value = true
@@ -422,11 +443,11 @@ async function insertRecipe(recipe: AuthoringRecipeV1 | undefined) {
         && insertMenuOpen.value
         && insertSelection === selectionAtStart
         && canMutateVisualContent(),
-    })
+    }, range)
     if (disposed) return
     if (result.ok) { closeInsertMenu(false); instance.view.focus(); return }
     if (!insertMenuOpen.value || insertSelection !== selectionAtStart) return
-    if (result.reason !== 'stale') insertError.value = 'This block cannot be inserted safely here.'
+    if (result.reason !== 'stale') insertError.value = overlays.text('insertFailed')
   } finally {
     insertBusy.value = false
   }
@@ -479,21 +500,7 @@ function handleEditorKeydown(event: BrowserKeyboardEvent) {
   if (handleActionShortcut(instance, event, actions.value, props.shortcuts)) return
   if (protectComponentBoundary(instance, event)) return
   if (!insertMenuOpen.value && handleBlockShortcut(instance, event, operationContext, props.shortcuts)) return
-  if (!insertMenuOpen.value) {
-    if (event.metaKey || event.ctrlKey || event.altKey || event.key !== '/' || !canOpenSlashMenu(instance)) return
-    event.preventDefault()
-    void openInsertMenu('slash')
-    return
-  }
-  if (handleInsertKeys(event)) return
-  if (insertMenuOrigin.value !== 'slash' || event.metaKey || event.ctrlKey || event.altKey) return
-  if (event.key === 'Backspace') {
-    event.preventDefault()
-    insertQuery.value = insertQuery.value.slice(0, -1)
-  } else if (event.key.length === 1) {
-    event.preventDefault()
-    insertQuery.value += event.key
-  }
+  if (insertMenuOpen.value) handleInsertKeys(event)
 }
 
 function handleInsertSearchKeydown(event: BrowserKeyboardEvent) {
@@ -740,7 +747,7 @@ function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSi
   if (!instance || !canMutateVisualContent(props.enableImages)) return false
   const payload = imagePayload(asset)
   if (!payload) return false
-  return instance.chain().command(({ tr }) => {
+  const inserted = instance.chain().command(({ tr }) => {
     closeHistory(tr)
     return true
   }).insertContentAt(
@@ -748,6 +755,8 @@ function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSi
     { type: 'image', attrs: { props: payload } },
     { updateSelection: false },
   ).run()
+  if (inserted) instance.view.dispatch(closeHistory(instance.state.tr).setMeta('addToHistory', false))
+  return inserted
 }
 
 function insertFileAsset(asset: Partial<AssetInfo>): boolean {
@@ -817,10 +826,12 @@ function createAssetRequest<T>(complete: (value: T) => boolean): EditorAssetRequ
   }
 }
 
-function requestImage() {
+function requestImage(range?: { from: number; to: number }) {
   if (!canMutateVisualContent(props.enableImages)) return
-  if (props.imageUpload || props.imagePicker) { editor.value?.commands.insertImageUpload(); return }
-  emit('request-image', createAssetRequest(insertImageAsset))
+  if (props.imageUpload || props.imagePicker) { editor.value?.commands.insertImageUpload(range); return }
+  emit('request-image', createAssetRequest(range
+    ? asset => insertUploadedImageAt(asset, range.from, range.to - range.from)
+    : insertImageAsset))
 }
 
 function requestFile() {
@@ -984,7 +995,10 @@ defineExpose({
         :style="insertPosition"
         @keydown="handleInsertSearchKeydown"
       >
-        <label class="ginko-editor__insert-search">
+        <label
+          v-if="insertMenuOrigin === 'button'"
+          class="ginko-editor__insert-search"
+        >
           <span aria-hidden="true">/</span>
           <span class="ginko-editor__sr-only">{{ actions.text('searchBlocks') }}</span>
           <input
@@ -1000,6 +1014,14 @@ defineExpose({
           >
         </label>
         <div
+          v-else
+          class="ginko-editor__insert-query"
+          aria-hidden="true"
+        >
+          <span>{{ actions.text('availableBlocks') }}</span>
+          <kbd>/{{ insertQuery }}</kbd>
+        </div>
+        <div
           :id="insertMenuId"
           class="ginko-editor__insert-results"
           role="listbox"
@@ -1013,6 +1035,8 @@ defineExpose({
             type="button"
             role="option"
             :aria-selected="index === insertIndex"
+            :disabled="insertBusy"
+            @mousedown.prevent
             @mouseenter="insertIndex = index"
             @click="insertRecipe(recipe)"
           >
@@ -1021,10 +1045,10 @@ defineExpose({
               aria-hidden="true"
             >{{ recipeSymbol(recipe) }}</span>
             <span class="ginko-editor__recipe-text">
-              <strong>{{ recipe.label }}</strong>
+              <strong>{{ recipeCopy(recipe, overlays.text).label }}</strong>
               <small>
                 {{
-                  recipe.description
+                  recipeCopy(recipe, overlays.text).description
                     || (recipe.keywords?.length
                       ? `/${recipe.keywords[0]}`
                       : `Insert ${recipe.label.toLocaleLowerCase()}`)
@@ -1117,6 +1141,8 @@ defineExpose({
       <div
         class="ginko-editor__surface-frame"
         @keydown.capture="handleEditorKeydown"
+        @compositionstart="closeInsertMenu(false, false)"
+        @compositionend="editor && syncSlashMenu(editor)"
         @dragstart.capture.prevent.stop
       >
         <EditorContent
@@ -1242,6 +1268,7 @@ defineExpose({
     width: min(620px, calc(100vw - 24px));
   }
   .ginko-editor__insert-menu--preview .ginko-editor__insert-search,
+  .ginko-editor__insert-menu--preview .ginko-editor__insert-query,
   .ginko-editor__insert-menu--preview .ginko-editor__insert-results,
   .ginko-editor__insert-menu--preview .ginko-editor__insert-help,
   .ginko-editor__insert-menu--preview .ginko-editor__insert-error {
@@ -1270,6 +1297,23 @@ defineExpose({
   margin: 0 .35rem .35rem;
   padding: .2rem .35rem .55rem;
   color: var(--ginko-muted-text);
+}
+
+.ginko-editor__insert-query {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .55rem .6rem;
+  color: var(--ginko-muted-text);
+  font-size: .75rem;
+  border-bottom: 1px solid var(--ginko-border);
+  margin-bottom: .35rem;
+}
+
+.ginko-editor__insert-query kbd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ginko-editor__insert-search input {

@@ -77,6 +77,31 @@ async function saved(wrapper: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('direct canvas editing', () => {
+  it('groups title typing into one undo step and starts a new group after refocus', async () => {
+    const wrapper = await setup('<notice heading="Before">\nBody\n</notice>', source())
+    const editor = wrapper.vm.editor!
+    let bodyEnd = 0
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'paragraph' && node.textContent === 'Body') bodyEnd = pos + node.nodeSize - 1
+    })
+    editor.commands.setTextSelection(bodyEnd)
+    editor.view.dispatch(editor.state.tr.insertText('!'))
+    const input = wrapper.get('input[aria-label="Notice Heading"]')
+    await input.trigger('focus')
+    for (const value of ['N', 'Ne', 'New']) await input.setValue(value)
+    await input.trigger('keydown', { key: 'z', ctrlKey: true })
+    expect((input.element as HTMLInputElement).value).toBe('Before')
+    expect(editor.getText().trim()).toBe('Body!')
+    await input.trigger('keydown', { key: 'z', ctrlKey: true, shiftKey: true })
+    expect((input.element as HTMLInputElement).value).toBe('New')
+    await input.trigger('blur')
+    await input.trigger('focus')
+    await input.setValue('Next')
+    await input.trigger('keydown', { key: 'z', ctrlKey: true })
+    expect((input.element as HTMLInputElement).value).toBe('New')
+    expect(editor.getText().trim()).toBe('Body!')
+  })
+
   it('edits a declared heading directly, preserving body and quoted values after reload', async () => {
     const wrapper = await setup('<notice heading="Before">\nBody\n</notice>', source())
     await wrapper.get('input[aria-label="Notice Heading"]').setValue('A "better" heading')
