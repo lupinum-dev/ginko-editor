@@ -12,12 +12,7 @@ const contentArchive = process.env.GINKO_CONTENT_TARBALL
   : null
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 
-if (!contentArchive) {
-  throw new Error(
-    'Set GINKO_CONTENT_TARBALL to the accepted Ginko Content archive '
-    + 'until a version with the CMS parser helpers is published.',
-  )
-}
+const packageInputs = [...(contentArchive ? [contentArchive] : []), archive]
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -161,7 +156,7 @@ async function verifyVueConsumer(consumer) {
   )
   run(
     'npm',
-    ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive],
+    ['install', '--ignore-scripts', '--no-audit', '--no-fund', ...packageInputs],
     consumer,
   )
   run('npm', ['run', 'typecheck'], consumer)
@@ -198,7 +193,7 @@ async function verifyNuxtConsumer(consumer) {
   )
   await writeEditorExample(consumer, 'app.vue')
   await write(join(consumer, 'tsconfig.json'), '{ "extends": "./.nuxt/tsconfig.json" }\n')
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', contentArchive, archive], consumer)
+  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', ...packageInputs], consumer)
   run('npm', ['run', 'prepare'], consumer)
   run('npm', ['run', 'typecheck'], consumer)
   run('npm', ['run', 'build'], consumer)

@@ -9,7 +9,7 @@ import { iconButton, type IconName } from './icons'
 import { inlinePopover } from './popover'
 import {
   applyTableOperation,
-  canChangeTable,
+  canApplyTableOperation,
   portableTable,
   selectedTableRect,
   selectTableRect,
@@ -314,7 +314,11 @@ export function tableView(
     headerHint.hidden = rect?.top !== 0
     controls.forEach(({ button, operation }) => {
       const next = operation()
-      button.disabled = !editor.isEditable || !next || !canChangeTable(node, next)
+      button.disabled = !editor.isEditable || !next || !canApplyTableOperation(editor, node, next)
+      if (next && button.disabled && editor.isEditable
+        && editor.extensionManager.extensions.some(extension => extension.name === 'ginkoCollaboration')) {
+        button.title = text('sharedTableLayout')
+      }
     })
     deleteTable.disabled = !editor.isEditable
     placeHandles()

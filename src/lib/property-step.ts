@@ -7,6 +7,8 @@ const variantStepType = 'ginkoSetComponentVariantV1'
 const propertyNodes = new Set(['element', 'inline-element', 'image', 'file', 'video'])
 const forbiddenKeys = new Set(['__proto__', 'prototype', 'constructor'])
 const registration = Symbol.for('@lupinum/ginko-editor/property-steps/v1')
+const attributeStepType = 'ginkoSetNodeAttributeV1'
+const attributeRegistration = Symbol.for('@lupinum/ginko-editor/attribute-step/v1')
 
 function cloneValue(value: unknown, depth = 0): JsonValue {
   if (depth > 32) throw new RangeError('Property value is too deeply nested.')
@@ -131,12 +133,58 @@ export class SetComponentVariantStep extends Step {
   }
 }
 
+/** Native AttrStep drops edits after insertion immediately before the node.
+ * This field step uses the same surviving-position rule as property changes.
+ */
+export class SetNodeAttributeStep extends Step {
+  readonly value: JsonValue
+  constructor(readonly pos: number, readonly key: string, value: JsonValue) {
+    super()
+    if (!Number.isSafeInteger(pos) || pos < 0 || !key || key === 'props' || forbiddenKeys.has(key)) {
+      throw new RangeError('Invalid node attribute step.')
+    }
+    this.value = cloneValue(value)
+  }
+  apply(doc: Node) {
+    if (this.pos >= doc.content.size) return StepResult.fail('Attribute position is outside the document.')
+    const node = doc.nodeAt(this.pos)
+    if (!node || node.isText || !Object.hasOwn(node.type.spec.attrs ?? {}, this.key)) return StepResult.fail('Unknown node attribute.')
+    const updated = node.type.create({ ...node.attrs, [this.key]: this.value }, null, node.marks)
+    return StepResult.fromReplace(doc, this.pos, this.pos + 1, new Slice(Fragment.from(updated), 0, node.isLeaf ? 0 : 1))
+  }
+  getMap() { return StepMap.empty }
+  invert(doc: Node) {
+    const node = doc.nodeAt(this.pos)
+    if (!node || !Object.hasOwn(node.attrs, this.key)) throw new RangeError('No node attribute to invert.')
+    return new SetNodeAttributeStep(this.pos, this.key, node.attrs[this.key])
+  }
+  map(mapping: Mappable) {
+    const pos = mapping.mapResult(this.pos, 1)
+    return pos.deleted ? null : new SetNodeAttributeStep(pos.pos, this.key, this.value)
+  }
+  merge(other: Step) {
+    return other instanceof SetNodeAttributeStep && other.pos === this.pos && other.key === this.key
+      ? new SetNodeAttributeStep(this.pos, this.key, other.value) : null
+  }
+  toJSON() { return { stepType: attributeStepType, pos: this.pos, key: this.key, value: this.value } }
+  static fromJSON(_schema: Schema, json: unknown) {
+    if (!json || typeof json !== 'object' || !('pos' in json) || !('key' in json) || !('value' in json)
+      || typeof json.pos !== 'number' || typeof json.key !== 'string') throw new RangeError('Invalid node attribute step.')
+    return new SetNodeAttributeStep(json.pos, json.key, cloneValue(json.value))
+  }
+}
+
 /** Both browser and backend schema creation install the same wire step. */
 export function registerPropertyStep() {
   // The registry belongs to ProseMirror, which can outlive a reloaded editor
   // module in Nuxt development. Wire changes require a new versioned ID.
-  if (Reflect.get(Step, registration) === true) return
-  Step.jsonID(stepType, SetNodePropertyStep)
-  Step.jsonID(variantStepType, SetComponentVariantStep)
-  Object.defineProperty(Step, registration, { value: true })
+  if (Reflect.get(Step, registration) !== true) {
+    Step.jsonID(stepType, SetNodePropertyStep)
+    Step.jsonID(variantStepType, SetComponentVariantStep)
+    Object.defineProperty(Step, registration, { value: true })
+  }
+  if (Reflect.get(Step, attributeRegistration) !== true) {
+    Step.jsonID(attributeStepType, SetNodeAttributeStep)
+    Object.defineProperty(Step, attributeRegistration, { value: true })
+  }
 }

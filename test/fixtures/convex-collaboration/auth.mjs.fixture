@@ -1,0 +1,14 @@
+import { createSign } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+
+export const config = JSON.parse(await readFile(new URL('./.test-config.json', import.meta.url), 'utf8'))
+const key = await readFile(new URL('./.test-private-key.pem', import.meta.url))
+export function token(subject) {
+  if (!['alice', 'bob', 'reader', 'outsider'].includes(subject)) throw new Error('Unknown synthetic test user.')
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'local-fixture' })).toString('base64url')
+  const now = Math.floor(Date.now() / 1000)
+  const payload = Buffer.from(JSON.stringify({ sub: subject, iss: config.issuer, aud: config.applicationID,
+    iat: now, exp: now + 8 * 60 * 60, name: subject })).toString('base64url')
+  const body = `${header}.${payload}`
+  return body + '.' + createSign('RSA-SHA256').update(body).sign(key).toString('base64url')
+}

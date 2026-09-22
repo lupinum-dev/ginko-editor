@@ -3,6 +3,7 @@ import type { EditorOverlayController } from '../../ui/context'
 import { TextSelection } from '@tiptap/pm/state'
 import type { NodeViewRendererProps } from '@tiptap/core'
 import type { NodeView } from '@tiptap/pm/view'
+import { createPropertyInput } from '../property-input'
 
 export function codeView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
@@ -10,6 +11,7 @@ export function codeView(
 ): NodeView {
   const text = overlay?.text ?? createEditorText()
   let node = initial
+  const propertyInput = createPropertyInput(editor, 'attrs')
   const dom = document.createElement('div')
   dom.className = 'ginko-code'
   const toolbar = document.createElement('div')
@@ -40,26 +42,26 @@ export function codeView(
   pre.append(contentDOM)
   toolbar.append(language, filename)
   dom.append(toolbar, pre)
-  function updateAttrs() {
+  function updateAttr(key: 'language' | 'filename', value: string) {
     const pos = getPos()
     if (pos === undefined || !editor.isEditable) return
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      language: language.value || null,
-      filename: filename.value || null,
-    }))
+    editor.view.dispatch(propertyInput.transaction(pos, key, value || null))
   }
-  language.addEventListener('change', updateAttrs)
-  filename.addEventListener('input', updateAttrs)
+  language.addEventListener('change', () => updateAttr('language', language.value))
+  filename.addEventListener('input', () => updateAttr('filename', filename.value))
+  toolbar.addEventListener('focusout', propertyInput.reset)
   toolbar.addEventListener('focusin', () => {
+    propertyInput.reset()
     const pos = getPos()
     if (pos !== undefined && editor.isEditable) {
       editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos + 1))))
     }
   })
   toolbar.addEventListener('keydown', event => {
+    if (event.isComposing) return
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
+      propertyInput.reset()
       if (event.shiftKey) editor.commands.redo()
       else editor.commands.undo()
     }

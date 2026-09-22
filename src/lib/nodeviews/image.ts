@@ -8,6 +8,7 @@ import { icon } from './icons'
 import { inlinePopover } from './popover'
 import { createEditorText, type EditorMessageKey } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
+import { createPropertyInput } from '../property-input'
 
 export type ImageActions = (props: JsonRecord) => { replace?: () => void; metadata?: () => void }
 
@@ -18,6 +19,7 @@ export function imageView(
 ): NodeView {
   const text = overlay?.text ?? createEditorText()
   let node = initial
+  const propertyInput = createPropertyInput(editor)
   const dom = document.createElement('figure')
   dom.className = 'ginko-image'
   const picture = document.createElement('div')
@@ -43,21 +45,22 @@ export function imageView(
   alt.addEventListener('input', () => {
     const pos = getPos()
     if (pos !== undefined && editor.isEditable) {
-      editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, {
-        ...node.attrs,
-        props: { ...node.attrs.props, alt: alt.value },
-      }))
+      editor.view.dispatch(propertyInput.transaction(pos, 'alt', alt.value))
     }
   })
   const handleUndo = (event: KeyboardEvent) => {
+    if (event.isComposing) return
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
+      propertyInput.reset()
       if (event.shiftKey) editor.commands.redo()
       else editor.commands.undo()
     }
   }
   settings.dom.addEventListener('keydown', handleUndo)
   settings.panel.addEventListener('keydown', handleUndo)
+  alt.addEventListener('focus', propertyInput.reset)
+  alt.addEventListener('blur', propertyInput.reset)
   const actionLabels: { button: HTMLButtonElement; label: Text; key: EditorMessageKey }[] = []
   function action(key: EditorMessageKey, symbol: 'settings' | 'copy' | 'trash', run: () => void) {
     const button = document.createElement('button')

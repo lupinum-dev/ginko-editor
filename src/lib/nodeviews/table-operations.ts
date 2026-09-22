@@ -3,6 +3,7 @@ import { closeHistory } from '@tiptap/pm/history'
 import { Fragment, type Node, type ResolvedPos } from '@tiptap/pm/model'
 import type { EditorState } from '@tiptap/pm/state'
 import { CellSelection, TableMap, type Rect } from '@tiptap/pm/tables'
+import { SetNodeAttributeStep } from '../property-step'
 
 export type TableAxis = 'row' | 'column'
 export type TableOperation =
@@ -86,6 +87,15 @@ function permitted(table: NonNullable<ReturnType<typeof portableTable>>, operati
 export function canChangeTable(table: Node, operation: TableOperation) {
   const shape = portableTable(table)
   return !!shape && permitted(shape, operation)
+}
+
+export function canApplyTableOperation(editor: Editor, table: Node, operation: TableOperation) {
+  if (!canChangeTable(table, operation)) return false
+  // ProseMirror cannot map an unconfirmed edit through a row/column move.
+  // A fixed column layout also lets simultaneous row inserts remain rectangular.
+  const shared = editor.extensionManager.extensions.some(extension => extension.name === 'ginkoCollaboration')
+  return !shared || (operation.type !== 'align' && operation.type !== 'header'
+    && operation.type !== 'move' && operation.axis === 'row')
 }
 
 /** A structural operation preserves existing node content, marks and cell attributes. */
@@ -208,15 +218,46 @@ export function selectTableRect(editor: Editor, tablePos: number, rect: Rect) {
 export function applyTableOperation(editor: Editor, tablePos: number, operation: TableOperation) {
   if (!editor.isEditable) return false
   const table = editor.state.doc.nodeAt(tablePos)
-  if (!table) return false
+  if (!table || !canApplyTableOperation(editor, table, operation)) return false
   const result = changeTable(table, operation)
   if (!result) return false
-  // Keep the table boundary stable for mapped controls anchored beside it.
-  const tr = closeHistory(editor.state.tr).replaceWith(
-    tablePos + 1,
-    tablePos + table.nodeSize - 1,
-    result.table.content,
-  )
+  const tr = closeHistory(editor.state.tr)
+  if (operation.type === 'align') {
+    const map = TableMap.get(table)
+    for (let row = 0; row < map.height; row++) {
+      for (let column = operation.from; column < operation.to; column++) {
+        const pos = tablePos + 1 + map.map[row * map.width + column]
+        if (tr.doc.nodeAt(pos)?.attrs.align !== operation.value) {
+          tr.step(new SetNodeAttributeStep(pos, 'align', operation.value))
+        }
+      }
+    }
+  } else if (operation.type !== 'header' && operation.type !== 'move') {
+    // Insert/delete only the affected rows or cells. Replacing the table body
+    // would discard another writer's pending text in every unchanged cell.
+    const replaceChildren = (pos: number, before: Node, after: Node) => {
+      let start = 0, end = before.childCount, nextEnd = after.childCount
+      while (start < end && start < nextEnd && before.child(start) === after.child(start)) start++
+      while (end > start && nextEnd > start && before.child(end - 1) === after.child(nextEnd - 1)) { end--; nextEnd-- }
+      let from = pos + 1, to = pos + 1
+      for (let index = 0; index < end; index++) {
+        to += before.child(index).nodeSize
+        if (index < start) from += before.child(index).nodeSize
+      }
+      tr.replaceWith(from, to, Fragment.fromArray(after.content.content.slice(start, nextEnd)))
+    }
+    if (operation.axis === 'row') replaceChildren(tablePos, table, result.table)
+    else {
+      let rowPos = tablePos + table.nodeSize - 1
+      for (let row = table.childCount - 1; row >= 0; row--) {
+        rowPos -= table.child(row).nodeSize
+        replaceChildren(rowPos, table.child(row), result.table.child(row))
+      }
+    }
+  } else {
+    // Moves are local-only until the protocol can preserve moved identities.
+    tr.replaceWith(tablePos + 1, tablePos + table.nodeSize - 1, result.table.content)
+  }
   const map = TableMap.get(result.table), { selection } = result
   tr.setSelection(
     CellSelection.create(
@@ -226,6 +267,7 @@ export function applyTableOperation(editor: Editor, tablePos: number, operation:
     ),
   )
   editor.view.dispatch(tr)
+  if (!editor.state.doc.nodeAt(tablePos)?.eq(result.table)) return false
   // Keep subsequent typing separate from a structural replacement of the table.
   editor.view.dispatch(closeHistory(editor.state.tr))
   editor.view.focus()

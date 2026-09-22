@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core'
-import { SetNodePropertyStep } from './property-step'
+import { SetNodePropertyStep, SetNodeAttributeStep } from './property-step'
 import type { JsonValue } from '../types'
 
 // ProseMirror history reserves -1 for its initial composition state.
@@ -9,7 +9,7 @@ let composition = -1
  * grouping metadata with negative IDs, separate from native composition IDs.
  * Empty position maps must stay empty so remote edits do not lose their target.
  */
-export function createPropertyInput(editor: Editor) {
+export function createPropertyInput(editor: Editor, target: 'props' | 'attrs' = 'props') {
   let last: { pos: number; key: string; time: number; composition: number } | undefined
   return {
     reset() { last = undefined },
@@ -18,7 +18,8 @@ export function createPropertyInput(editor: Editor) {
       const sameBurst = last?.pos === pos && last.key === key && time - last.time <= 500
       const id = sameBurst ? last!.composition : --composition
       last = { pos, key, time, composition: id }
-      return editor.state.tr.step(new SetNodePropertyStep(pos, key, value)).setMeta('composition', id)
+      return editor.state.tr.step(target === 'props' ? new SetNodePropertyStep(pos, key, value)
+        : new SetNodeAttributeStep(pos, key, value ?? null)).setMeta('composition', id)
     },
   }
 }

@@ -1,0 +1,6 @@
+import type { PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
+export const policy: PortableComponentPolicyV2 = { version: 2, components: { note: { kind: 'block',
+  props: { title: { types: ['string'], required: true, allowedValues: null },
+    tone: { types: ['string'], required: false, allowedValues: ['info', 'warning'] } },
+  slots: ['default'], allowedParents: null, allowedChildren: null, media: null,
+} } }

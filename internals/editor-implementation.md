@@ -39,7 +39,7 @@ Commit directly related tests and documentation with each behavior. Keep unpubli
 - [x] Restore reproducible Docs and packed-consumer candidate setup.
 - [x] Runtime-safe schema/conversion.
 - [x] Slash and component-property behavior.
-- [ ] Collaboration protocol/client and real local backend validation.
+- [x] Collaboration protocol/client and real local backend validation.
 - [ ] CMS integration.
 - [ ] Luis integration.
 - [ ] ChiliSkills integration.
@@ -62,6 +62,13 @@ GINKO_CONTENT_TARBALL=/Users/matthias/.codex/worktrees/ginko-editor-step1/conten
 
 These paths select inspected local candidates; they are not supported consumer install paths or evidence of publication. Runtime validation does not yet imply collaboration support.
 
+Later integration update: the root and Docs Content dependency now use the
+published `1.0.0-beta.9`. Its parser/policy work includes the required candidate
+changes and later fixes. All 306 Editor tests and packed Vue/Nuxt consumers
+passed against registry Content. `GINKO_CONTENT_TARBALL` is now optional for
+future candidate verification. The Docs authoring layer still needs its explicit
+local candidate; `0.4.0-rc.11` is not published.
+
 ### Authoring layer
 
 Slash queries are real paragraph text. A ProseMirror plugin follows the query through document changes. Insertion removes the query and adds its content in one transaction. Escape, cancelled image selection and stale asynchronous results preserve the original source. Built-in command search uses translated labels. Button insertion retains its search field.
@@ -69,3 +76,32 @@ Slash queries are real paragraph text. A ProseMirror plugin follows the query th
 Component property changes use a versioned, per-property step. A variant changes its tag and source syntax in one step. These operations preserve independent properties and body edits when mapped through other changes. Inputs outside the editor group each typing burst for Undo. Wire registration survives Nuxt module reloads.
 
 The complete local gate passed with 282 tests, lint, types, package build and Docs production build. Browser checks covered inline slash typing, insertion/Undo, Escape, a 390 px viewport, column resize by keyboard, image cancellation, and title Undo preserving a preceding body edit. Independent review findings were corrected and rechecked. Packed certification also exercises custom-step decoding in the runtime entry.
+
+### Collaboration layer
+
+The runtime validates versioned operations and produces a source checkpoint.
+The Vue session handles reactive heads, retries, operation rebasing, bounded
+pending changes, host-owned recovery, stale epochs, and flush acknowledgement.
+Property/code/image controls preserve independent edits. Shared table geometry
+and alignment remain fixed; body rows and cells can be edited. The server
+rejects unsupported table attributes and inconsistent column alignment.
+
+The full package gate passed against registry Content with 306 tests, types,
+lint, package build, and Docs production build. The final focused suite adds
+tests for remote recovery growth and refused media acknowledgements. The
+dependency audit is clean. Packed Vue/Nuxt consumers and the runtime import
+boundary passed. See `collaboration-verification.md` for the real backend and
+browser checks and the direct-log decision.
+
+Independent review found and helped resolve fractional positions, old
+subscription callbacks, stalled requests, metadata loss, recovery escaping and
+remote growth, publication epoch ambiguity, whole-table replacements, and media
+acknowledgement after a rejected transaction. Final focused review found no
+remaining concrete blocker. The refreshed packed fixture passed real Convex
+acceptance against registry Content and reopened Alice's offline filename with
+Bob's language change at version 4. Browser console warnings/errors were empty.
+
+CMS work is isolated at
+`/Users/matthias/.codex/worktrees/ginko-editor-shared/cms` on
+`feat/shared-editor`, based on the existing accepted `fix/parser-parity`
+integration. The supplied CMS checkout and its landing-page work are untouched.

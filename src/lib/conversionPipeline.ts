@@ -92,7 +92,7 @@ function splitIssues(issues: ConversionIssue[]) {
 
 export async function validateMarkdownForAuthoring(
   markdown: string,
-  authoringKit: AuthoringKitV1,
+  authoringKit: Pick<AuthoringKitV1, 'policy'>,
 ): Promise<ConversionIssue | undefined> {
   try {
     const sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
@@ -109,7 +109,7 @@ export async function validateMarkdownForAuthoring(
 
 function validateParsedDocumentForAuthoring(
   sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>,
-  authoringKit: AuthoringKitV1,
+  authoringKit: Pick<AuthoringKitV1, 'policy'>,
 ): ConversionIssue | undefined {
   const validation = validateStoredPortableMarkdownAst(
     projectMdcDocument(sourceDocument).body,
@@ -220,7 +220,7 @@ export async function prepareMarkdownForVisualEditing(
   markdown: string,
   options?: TiptapToMDCOptions,
   schema?: Schema,
-  authoringKit?: AuthoringKitV1,
+  authoringKit?: Pick<AuthoringKitV1, 'policy'>,
   context: 'document' | 'fragment' = 'document',
 ): Promise<ConversionResult<JSONContent>> {
   let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>

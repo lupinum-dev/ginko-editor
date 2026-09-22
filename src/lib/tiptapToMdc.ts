@@ -9,6 +9,7 @@ import { summarizeMdc, summarizeTableMdc } from './markdown'
 import type { MDCComment, MDCElement, MDCNode, MDCRoot, MDCText } from './mdcTypes'
 import { cleanSpanProps, normalizeProps } from './props'
 import { stripStyleNodes } from './stripStyleNodes'
+import { imageProperties } from './image-properties'
 
 export interface SyntaxHighlightTheme {
   dark?: string
@@ -531,33 +532,15 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
   const imageOutput = context.options.imageOutput ?? 'mdc'
 
   const imageProps: JsonRecord = {}
-  if (props.id) imageProps.id = props.id
-  if (props.filename) imageProps.filename = props.filename
-  if (isMeaningfulPropValue(src)) imageProps.src = src
-  const alt = props.alt || node.attrs?.alt
-  if (isMeaningfulPropValue(alt)) imageProps.alt = alt
-  if (isMeaningfulPropValue(props.title)) imageProps.title = props.title
-  const width = sanitizeNumberish(props.width)
-  if (width !== null) imageProps.width = width
-  const height = sanitizeNumberish(props.height)
-  if (height !== null) imageProps.height = height
-  if (isMeaningfulPropValue(props.fit)) imageProps.fit = props.fit
-  const quality = sanitizeNumberish(props.quality)
-  if (quality !== null) imageProps.quality = quality
-  if (isMeaningfulPropValue(props.format)) imageProps.format = props.format
-  const focalX = sanitizeNumberish(props.focalX)
-  if (focalX !== null) imageProps.focalX = focalX
-  const focalY = sanitizeNumberish(props.focalY)
-  if (focalY !== null) imageProps.focalY = focalY
-  const cropX = sanitizeNumberish(props.cropX)
-  if (cropX !== null) imageProps.cropX = cropX
-  const cropY = sanitizeNumberish(props.cropY)
-  if (cropY !== null) imageProps.cropY = cropY
-  const cropWidth = sanitizeNumberish(props.cropWidth)
-  if (cropWidth !== null) imageProps.cropWidth = cropWidth
-  const cropHeight = sanitizeNumberish(props.cropHeight)
-  if (cropHeight !== null) imageProps.cropHeight = cropHeight
-  if (isMeaningfulPropValue(props.class)) imageProps.class = props.class
+  for (const [key, kind] of Object.entries(imageProperties)) {
+    const value = key === 'src' ? src : key === 'alt' ? props.alt || node.attrs?.alt : props[key]
+    if (kind === 'number') {
+      const number = sanitizeNumberish(value)
+      if (number !== null) imageProps[key] = number
+    } else if (key === 'id' || key === 'filename' ? !!value : isMeaningfulPropValue(value)) {
+      imageProps[key] = value
+    }
+  }
 
   const transformKeys = [
     'fit',

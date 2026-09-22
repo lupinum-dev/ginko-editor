@@ -13,6 +13,7 @@ export default defineConfig({
         authoring: fileURLToPath(new URL('./src/authoring.ts', import.meta.url)),
         index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
         runtime: fileURLToPath(new URL('./src/runtime.ts', import.meta.url)),
+        collaboration: fileURLToPath(new URL('./src/collaboration.ts', import.meta.url)),
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`,
@@ -21,6 +22,7 @@ export default defineConfig({
     rolldownOptions: {
       external: (id) =>
         id === 'vue' ||
+        id === 'prosemirror-collab' ||
         id.startsWith('@tiptap/') ||
         id === '@lupinum/ginko-content' ||
         id.startsWith('@lupinum/ginko-content/'),

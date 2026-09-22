@@ -39,8 +39,8 @@ if (
   )
 ) {
   throw new Error(
-    'GINKO_CONTENT_CANDIDATE must point to the built, accepted Content candidate; '
-    + 'the registry beta does not yet contain the required parser contract.',
+    'The installed Content package must contain the required parser contract. '
+    + 'Install the committed dependency graph or select a built candidate with GINKO_CONTENT_CANDIDATE.',
   )
 }
 
@@ -54,7 +54,9 @@ mkdirSync(contentDestination, { recursive: true })
 for (const path of ['dist', 'package.json']) {
   cpSync(resolve(contentSource, path), resolve(contentDestination, path), { recursive: true })
 }
-symlinkSync(resolve(contentSource, 'node_modules'), resolve(contentDestination, 'node_modules'), 'dir')
+const contentDependencies = existsSync(resolve(contentSource, 'node_modules'))
+  ? resolve(contentSource, 'node_modules') : resolve(contentSource, '../..')
+symlinkSync(contentDependencies, resolve(contentDestination, 'node_modules'), 'dir')
 const candidateConfigPath = resolve(docsDestination, 'nuxt.config.ts')
 const candidateConfig = readFileSync(candidateConfigPath, 'utf8')
 const contentModuleSpecifier = '"@lupinum/ginko-content",'

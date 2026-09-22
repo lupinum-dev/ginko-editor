@@ -12,7 +12,7 @@ registerHooks({
 })
 
 const { createEditorSchema, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown,
-  SetNodePropertyStep, SetComponentVariantStep } =
+  SetNodePropertyStep, SetComponentVariantStep, SetNodeAttributeStep } =
   await import('@lupinum/ginko-editor/runtime')
 assert.equal(typeof document, 'undefined')
 const schema = createEditorSchema()
@@ -33,3 +33,7 @@ const edited = property.apply(component).doc
 assert.equal(edited.firstChild.attrs.props.title, 'After')
 const variant = Step.fromJSON(schema, new SetComponentVariantStep(0, 'warning', undefined).toJSON())
 assert.equal(variant.apply(edited).doc.firstChild.attrs.tag, 'warning')
+const code = schema.nodeFromJSON({ type: 'doc', content: [{ type: 'codeBlock', attrs: { language: 'ts', filename: 'before.ts' } }] })
+const attribute = Step.fromJSON(schema, new SetNodeAttributeStep(0, 'filename', 'after.ts').toJSON())
+assert.equal(attribute.apply(code).doc.firstChild.attrs.filename, 'after.ts')
+assert.equal(attribute.apply(code).doc.firstChild.attrs.language, 'ts')

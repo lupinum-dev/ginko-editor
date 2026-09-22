@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Step, Transform } from '@tiptap/pm/transform'
-import { createEditorSchema, SetNodePropertyStep, SetComponentVariantStep } from '../src/runtime'
+import { createEditorSchema, SetNodePropertyStep, SetComponentVariantStep, SetNodeAttributeStep } from '../src/runtime'
 
 const schema = createEditorSchema()
 function document() {
@@ -11,6 +11,18 @@ function document() {
 }
 
 describe('property steps', () => {
+  it('preserves independent code metadata and preceding inserted blocks', () => {
+    const doc = schema.node('doc', null, [schema.node('codeBlock', { language: 'js', filename: 'before.js' }, schema.text('const answer = 42'))])
+    const local = new SetNodeAttributeStep(0, 'filename', 'answer.ts')
+    const remote = new Transform(doc).step(new SetNodeAttributeStep(0, 'language', 'ts'))
+      .insert(0, schema.node('paragraph', null, schema.text('Before')))
+    remote.step(Step.fromJSON(schema, local.toJSON()).map(remote.mapping)!)
+    expect(remote.doc.lastChild?.attrs).toMatchObject({ language: 'ts', filename: 'answer.ts' })
+    remote.step(local.invert(doc).map(remote.mapping)!)
+    expect(remote.doc.lastChild?.attrs).toMatchObject({ language: 'ts', filename: 'before.js' })
+    expect(remote.doc.lastChild?.textContent).toBe('const answer = 42')
+  })
+
   it('keeps the wire registry usable when the editor module reloads', async () => {
     vi.resetModules()
     const reloaded = await import('../src/lib/property-step')

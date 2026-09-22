@@ -26,17 +26,18 @@ persistence, asset dialogs, and workflow state. Authenticated CMS acceptance and
 release certification remain separate gates in `plan.md`.
 
 Hosts must await the component's `flush()` method before closing an editor or
-replacing its document. A successful flush only updates `v-model`; the host must
-then await its own persistence path. Keep the editor mounted when flush returns
+replacing its document. In local mode a successful flush only updates `v-model`;
+the host must then await its own persistence path. With a collaboration session,
+flush also waits for accepted server operations. The host still owns publication.
+Keep the editor mounted when flush returns
 an error so the user can recover without losing the visual document. Asset
 pickers must complete the request-scoped callback from their event; stale
 callbacks safely return `false` after document, selection, mode, editability, or
 lifetime changes.
 
-Until Ginko Content publishes the accepted CMS parser helpers, local release
-verification needs its inspected candidate archive in `GINKO_CONTENT_TARBALL`.
-This is a release gate, not a supported install workaround. Do not publish
-Ginko Editor against the older registry package with the same prerelease version.
+The package uses the published Content parser contract from `1.0.0-beta.9`.
+Packed certification resolves that registry dependency by default. Set
+`GINKO_CONTENT_TARBALL` only when explicitly verifying a newer candidate archive.
 
 Use the local URL printed by the development server. Keep that session running
 while you work. Stop only processes you started. Keep temporary changes and

@@ -1,5 +1,16 @@
 # Ginko Editor experience and multiplayer research
 
+Implementation update, 2026-09-22: the bounded experiment below now has a
+working Vue session, a real local Convex proof, and host-owned restart recovery.
+It uses ProseMirror's existing merge algorithm with a direct, validated Convex
+operation log rather than the React-specific component client. See
+[the measured verification record](./collaboration-verification.md) and
+[the implementation ledger](./editor-implementation.md). The published Content
+`1.0.0-beta.9` passes the Editor suite and packed-consumer checks; the old
+beta.7 candidate requirement is removed. The following research records the
+starting evidence and alternatives. Its initial preference for Yjs when restart
+recovery is required is superseded for the bounded recovery needs now tested.
+
 Research date: 2026-09-22. Status: recommendation for implementation planning, not an accepted migration or a production collaboration certification.
 
 “Kinkou” is interpreted as Ginko; “Lewis” as the supplied `luis2` repository. This report covers the shared editor, Ginko Content, Ginko CMS, ChiliSkills, and Luis. No application behavior, dependencies, accounts, or remote systems were changed.

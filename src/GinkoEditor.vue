@@ -15,6 +15,11 @@ import {
 } from 'vue'
 
 import type { AuthoringKitV1, AuthoringRecipeV1 } from './authoring'
+import type { EditorCollaborationSession } from './collaboration'
+import type { CollaborationStatus } from './collaboration'
+import type { EditorMessageKey } from './ui/messages'
+import { SetNodePropertyStep, SetNodeAttributeStep } from './lib/property-step'
+import type { JsonRecord } from './types'
 import {
   createEditorExtensions,
   isCurrentlyNormalizingTable,
@@ -76,6 +81,7 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   assetProvider?: AssetProvider
   authoringKit?: AuthoringKitV1
+  collaboration?: EditorCollaborationSession
   codeBlockTheme?:
     | 'atom-dark'
     | 'dark'
@@ -109,6 +115,7 @@ const props = withDefaults(defineProps<{
   imageUpload: undefined,
   imageDropTarget: undefined,
   authoringKit: undefined,
+  collaboration: undefined,
   disabled: false,
   enableDebug: false,
   enableFiles: true,
@@ -134,7 +141,11 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const viewMode = ref<'raw' | 'visual'>('raw')
+const collaboration = props.collaboration
+const collaborationState = ref(collaboration?.state)
+const invalidBinding = ref(false)
+const stopCollaborationState = collaboration?.subscribe(state => { collaborationState.value = state })
+const viewMode = ref<'raw' | 'visual'>(collaboration ? 'visual' : 'raw')
 const rawContent = ref(props.modelValue)
 const conversionError = ref<ConversionErrorPayload | null>(null)
 const clipboardError = ref<string>()
@@ -143,7 +154,8 @@ const pendingImages = ref(0)
 const pendingCommands = ref(0)
 const imageUploadNotice = ref('')
 const hasPendingChanges = computed(() =>
-  hasPendingVisualChanges.value || pendingImages.value > 0 || pendingCommands.value > 0,
+  hasPendingVisualChanges.value || pendingImages.value > 0 || pendingCommands.value > 0
+    || (collaborationState.value?.pendingSteps ?? 0) > 0,
 )
 let pendingEcho: string | undefined
 let revision = 0
@@ -192,8 +204,8 @@ const resolvedAssetProvider = computed<AssetProvider>(() => props.assetProvider 
 })
 
 const editor = useEditor({
-  content: { content: [{ type: 'paragraph' }], type: 'doc' },
-  editable: !props.disabled,
+  content: collaboration?.initialDocument ?? { content: [{ type: 'paragraph' }], type: 'doc' },
+  editable: !props.disabled && (collaboration?.canEdit ?? true),
   editorProps: { attributes: { 'aria-label': props.ariaLabel ?? 'Content' } },
   extensions: [...createEditorExtensions({
     overlay: overlays,
@@ -236,7 +248,8 @@ const editor = useEditor({
     placeholder: props.placeholder,
     showMarkdownMarkers: props.showMarkdownMarkers,
     videoOutput: props.videoOutput,
-  }), SlashCommands.configure({ enabled: () => !applyingDocument && canMutateVisualContent() })],
+  }), SlashCommands.configure({ enabled: () => !applyingDocument && canMutateVisualContent() }),
+  ...(collaboration ? [collaboration.extension] : [])],
   onTransaction: ({ editor: instance }) => { syncSlashMenu(instance) },
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
@@ -543,6 +556,7 @@ function clearFailure(traceId: string) {
 }
 
 async function loadSource(value: string, options: { initial?: boolean; switchToVisual?: boolean } = {}) {
+  if (collaboration || invalidBinding.value) return false
   editor.value?.commands.clearImageUploads()
   clipboardError.value = undefined
   closeInsertMenu(false)
@@ -619,10 +633,10 @@ async function emitVisualDocument(
   return { emitted: true, ok: true }
 }
 
-async function flush(): Promise<EditorFlushResult> {
+async function flushLocal(): Promise<EditorFlushResult> {
   const currentEditor = editor.value
   if (currentEditor) await waitForEditorOperations(currentEditor)
-  if (viewMode.value === 'raw') return { emitted: false, ok: true }
+  if (viewMode.value === 'raw' && !collaboration) return { emitted: false, ok: true }
   if (pendingImages.value) {
     imageUploadNotice.value = overlays.text('finishImageUpload')
     return {
@@ -668,15 +682,34 @@ async function flush(): Promise<EditorFlushResult> {
   }
 
   if (pendingImages.value || pendingCommands.value) {
-    const result = await flush()
+    const result = await flushLocal()
     return result.ok ? { ok: true, emitted: emitted || result.emitted } : result
   }
   if (conversionError.value) return { error: conversionError.value, ok: false }
   return { emitted, ok: true }
 }
 
+async function flush(): Promise<EditorFlushResult> {
+  const result = await flushLocal()
+  if (!result.ok || !collaboration) return result
+  try {
+    let emitted = result.emitted
+    do {
+      await collaboration.flush()
+      const latest = await flushLocal()
+      if (!latest.ok) return latest
+      emitted ||= latest.emitted
+    } while (collaboration.state.pendingSteps || hasPendingVisualChanges.value)
+    return { ok: true, emitted }
+  } catch (error) {
+    return { ok: false, error: { code: 'collaboration_pending', phase: 'validate',
+      message: error instanceof Error ? error.message : overlays.text('sharedError'), recoverable: true,
+      traceId: 'collaboration', issues: [], timeline: [] } }
+  }
+}
+
 async function showSource() {
-  const result = await flush()
+  const result = await flushLocal()
   if (!result.ok || disposed) return
   overlays.close()
   closeInsertMenu(false)
@@ -685,10 +718,12 @@ async function showSource() {
 
 async function showVisual() {
   if (viewMode.value === 'visual') return
+  if (collaboration) { viewMode.value = 'visual'; return }
   await loadSource(rawContent.value, { switchToVisual: true })
 }
 
 function updateRaw(value: string) {
+  if (collaboration || invalidBinding.value) return
   cancelPendingUpdate()
   rawContent.value = value
   emitSource(value)
@@ -698,6 +733,8 @@ function canMutateVisualContent(featureEnabled = true) {
   return featureEnabled
     && !disposed
     && !props.disabled
+    && !invalidBinding.value
+    && (collaboration?.canEdit ?? true)
     && viewMode.value === 'visual'
     && editor.value?.isEditable === true
 }
@@ -738,8 +775,43 @@ function insertImageAsset(asset: Partial<AssetInfo>): boolean {
   const payload = imagePayload(asset)
   if (!payload) return false
   return instance.isActive('image')
-    ? instance.chain().focus().updateAttributes('image', { props: payload }).run()
+    ? replaceSelectedMedia('image', payload)
     : instance.chain().focus().setImage(payload).run()
+}
+
+function replaceMediaAt(type: 'image' | 'file' | 'video', pos: number, payload: JsonRecord): boolean {
+  const instance = editor.value
+  const node = instance?.state.doc.nodeAt(pos)
+  if (!instance || node?.type.name !== type || !canMutateVisualContent()) return false
+  const transaction = closeHistory(instance.state.tr)
+  for (const [key, value] of Object.entries(payload)) {
+    // Description/title belong to this placement. A picker may supply an
+    // explicit replacement, but missing asset metadata must not clear them.
+    if (type === 'image' && ['alt', 'title'].includes(key) && value === undefined) continue
+    if (node.attrs.props?.[key] !== value) transaction.step(new SetNodePropertyStep(pos, key, value))
+    if (type === 'video' && ['src', 'title'].includes(key) && node.attrs[key] !== (value ?? null)) {
+      transaction.step(new SetNodeAttributeStep(pos, key, value ?? null))
+    }
+  }
+  if (transaction.docChanged) {
+    instance.view.dispatch(transaction)
+    const expected = transaction.doc.nodeAt(pos)
+    if (!expected || !instance.state.doc.nodeAt(pos)?.eq(expected)) return false
+    instance.view.dispatch(closeHistory(instance.state.tr).setMeta('addToHistory', false))
+  }
+  return true
+}
+
+function replaceSelectedMedia(type: 'image' | 'file' | 'video', payload: JsonRecord): boolean {
+  const instance = editor.value
+  if (!instance) return false
+  let pos: number | undefined
+  const { from, to } = instance.state.selection
+  instance.state.doc.nodesBetween(from, to, (node, offset) => {
+    if (pos === undefined && node.type.name === type) pos = offset
+  })
+  if (pos === undefined && instance.state.doc.nodeAt(from)?.type.name === type) pos = from
+  return pos !== undefined && replaceMediaAt(type, pos, payload)
 }
 
 function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSize = 0): boolean {
@@ -747,6 +819,8 @@ function insertUploadedImageAt(asset: Partial<AssetInfo>, pos: number, replaceSi
   if (!instance || !canMutateVisualContent(props.enableImages)) return false
   const payload = imagePayload(asset)
   if (!payload) return false
+  const target = instance.state.doc.nodeAt(pos)
+  if (target?.type.name === 'image' && target.nodeSize === replaceSize) return replaceMediaAt('image', pos, payload)
   const inserted = instance.chain().command(({ tr }) => {
     closeHistory(tr)
     return true
@@ -773,7 +847,7 @@ function insertFileAsset(asset: Partial<AssetInfo>): boolean {
     type: asset.mimeType,
   }
   return instance.isActive('file')
-    ? instance.chain().focus().updateAttributes('file', { props: payload }).run()
+    ? replaceSelectedMedia('file', payload)
     : instance.chain().focus().setFile(payload).run()
 }
 
@@ -782,7 +856,7 @@ function insertVideo(value: VideoInfo): boolean {
   if (!instance || !value.src.trim() || !canMutateVisualContent(props.enableVideo)) return false
   const payload = { src: value.src.trim(), title: value.title?.trim() || undefined }
   return instance.isActive('video')
-    ? instance.chain().focus().updateAttributes('video', { props: payload, ...payload }).run()
+    ? replaceSelectedMedia('video', payload)
     : instance.chain().focus().setVideo(payload).run()
 }
 
@@ -847,6 +921,7 @@ function requestVideo() {
 watch(() => props.modelValue, (value, previous) => {
   if (value === previous) return
   if (consumeEcho(value)) return
+  if (collaboration) return
   void loadSource(value)
 })
 watch(hasPendingChanges, (pending) => emit('pending-change', pending), {
@@ -885,11 +960,24 @@ watch([
 ], () => {
   editor.value?.commands.clearImageUploads()
 }, { flush: 'sync' })
-watch(() => props.disabled, (disabled) => {
-  editor.value?.setEditable(!disabled)
-  if (disabled) closeInsertMenu(false)
+watch([() => props.disabled, collaborationState, invalidBinding], ([disabled]) => {
+  const editable = !disabled && !invalidBinding.value && (collaboration?.canEdit ?? true)
+  if (editor.value?.isEditable !== editable) editor.value?.setEditable(editable)
+  if (!editable) closeInsertMenu(false)
 }, { flush: 'sync' })
-watch(() => props.authoringKit, () => {
+watch(() => props.collaboration, value => {
+  if (value === collaboration) return
+  invalidBinding.value = true
+  collaboration?.close()
+})
+watch(() => props.authoringKit, (value, previous) => {
+  if (collaboration) {
+    if (JSON.stringify(value?.policy) !== JSON.stringify(previous?.policy)) {
+      invalidBinding.value = true
+      collaboration.close()
+    }
+    return
+  }
   void (async () => {
     const result = await flush()
     if (!result.ok) return
@@ -899,7 +987,8 @@ watch(() => props.authoringKit, () => {
 
 onMounted(() => {
   if (globalThis.ResizeObserver) menuResizeObserver = new globalThis.ResizeObserver(positionInsertMenu)
-  void loadSource(props.modelValue, { initial: true })
+  if (collaboration && editor.value) scheduleVisualUpdate(editor.value)
+  else void loadSource(props.modelValue, { initial: true })
   globalThis.document.addEventListener('pointerdown', dismissOutside)
   globalThis.addEventListener('resize', positionInsertMenu)
   globalThis.addEventListener('scroll', positionInsertMenu, true)
@@ -909,6 +998,7 @@ onBeforeUnmount(() => {
   globalThis.removeEventListener('resize', positionInsertMenu)
   globalThis.removeEventListener('scroll', positionInsertMenu, true)
   menuResizeObserver?.disconnect()
+  stopCollaborationState?.()
   disposed = true
   overlays.destroy()
   cancelPendingUpdate()
@@ -918,8 +1008,25 @@ onBeforeUnmount(() => {
 const statusLabel = computed(() => {
   if (conversionError.value) return overlays.text(viewMode.value === 'visual' ? 'changesNeedAttention' : 'sourceOnly')
   if (hasPendingVisualChanges.value) return overlays.text('convertingChanges')
+  const shared = collaborationState.value?.status
+  if (shared) {
+    const labels = { connecting: 'sharedConnecting', syncing: 'sharedSyncing', synced: 'sharedSynced',
+      offline: 'sharedOffline', error: 'sharedError', stale: 'sharedStale', closed: 'sharedClosed' } satisfies Record<CollaborationStatus, EditorMessageKey>
+    return overlays.text(labels[shared])
+  }
   return overlays.text(viewMode.value === 'visual' ? 'visualEditor' : 'markdownSource')
 })
+
+function downloadRecovery() {
+  const recovery = collaboration?.getRecovery()
+  if (!recovery) return
+  const url = globalThis.URL.createObjectURL(new globalThis.Blob([JSON.stringify(recovery, null, 2)], { type: 'application/json' }))
+  const anchor = globalThis.document.createElement('a')
+  anchor.href = url
+  anchor.download = 'ginko-editor-recovery.json'
+  anchor.click()
+  globalThis.URL.revokeObjectURL(url)
+}
 
 defineExpose({
   editor,
@@ -949,7 +1056,7 @@ defineExpose({
         :aria-controls="insertMenuId"
         :aria-expanded="insertMenuOpen"
         :aria-label="actions.text('insert')"
-        :disabled="disabled"
+        :disabled="disabled || invalidBinding || (collaboration && !collaboration.canEdit)"
         @click="insertMenuOpen ? closeInsertMenu() : openInsertMenu('button')"
       >
         <span aria-hidden="true">+</span>
@@ -981,6 +1088,34 @@ defineExpose({
         role="status"
       >{{ statusLabel }}</span>
     </div>
+    <slot
+      v-if="collaboration"
+      name="collaboration"
+      :state="collaborationState"
+      :session="collaboration"
+    >
+      <div
+        v-if="invalidBinding || collaborationState?.message"
+        class="ginko-editor__warning"
+        role="status"
+      >
+        <span>{{ invalidBinding ? actions.text('sharedRemount') : collaborationState?.message }}</span>
+        <button
+          v-if="collaborationState?.status === 'offline' || collaborationState?.status === 'error'"
+          type="button"
+          @click="collaboration.retry()"
+        >
+          {{ actions.text('sharedRetry') }}
+        </button>
+        <button
+          v-if="collaborationState?.pendingSteps"
+          type="button"
+          @click="downloadRecovery"
+        >
+          {{ actions.text('sharedRecovery') }}
+        </button>
+      </div>
+    </slot>
     <Teleport
       v-if="insertMenuOpen"
       :to="overlays.getContainer()!"
@@ -1156,6 +1291,7 @@ defineExpose({
       class="ginko-editor__source"
       :aria-label="`${ariaLabel ?? 'Content'} markdown source`"
       :disabled="disabled"
+      :readonly="!!collaboration || invalidBinding"
       :value="rawContent"
       spellcheck="false"
       @input="updateRaw(($event.target as HTMLTextAreaElement).value)"

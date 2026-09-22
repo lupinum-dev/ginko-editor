@@ -1,0 +1,114 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, shallowRef, type Ref, type ShallowRef } from 'vue'
+import { ConvexClient } from 'convex/browser'
+import { GinkoEditor, createAuthoringKit, type AuthoringKitV1 } from '@lupinum/ginko-editor'
+import { createEditorCollaboration, CollaborationConnectionError, type CollaborationTransport, type CollaborationState,
+  type EditorCollaborationSession, type CollaborationRecovery, type CollaborationHead } from '@lupinum/ginko-editor/collaboration'
+import { api } from '../convex/_generated/api'
+import type { Id } from '../convex/_generated/dataModel'
+import { policy } from '../shared/policy'
+
+const error = ref(''), loading = ref(true)
+const kit = shallowRef<AuthoringKitV1>()
+type Card = { name: string; session: EditorCollaborationSession; source: Ref<string>; state: ShallowRef<Readonly<CollaborationState>>;
+  paused: Ref<boolean>; pause: () => Promise<void>; resume: () => Promise<void>; close: () => Promise<void> }
+const cards = shallowRef<Card[]>([])
+
+async function clientFor(name: string) {
+  const response = await fetch(`/test-auth/${name}`)
+  if (!response.ok) throw new Error('Could not load the local test identity.')
+  const auth = await response.json()
+  const client = new ConvexClient(auth.url)
+  await new Promise<void>((resolve, reject) => client.setAuth(async () => auth.token,
+    authenticated => authenticated ? resolve() : reject(new Error('The local test identity was rejected.'))))
+  return client
+}
+
+async function participant(name: string, initialClient: ConvexClient, roomId: Id<'rooms'>): Promise<Card> {
+  let client = initialClient
+  const paused = ref(false)
+  const errors = new Set<(error: unknown) => void>()
+  async function request<T>(operation: () => Promise<T>): Promise<T> {
+    if (paused.value) throw new CollaborationConnectionError()
+    try { return await operation() } catch (failure) {
+      if (paused.value || !client.connectionState().isWebSocketConnected) throw new CollaborationConnectionError()
+      if (failure && typeof failure === 'object' && 'data' in failure && failure.data && typeof failure.data === 'object'
+        && 'message' in failure.data && typeof failure.data.message === 'string') throw new Error(failure.data.message)
+      throw new Error('The server could not accept this operation. Keep a recovery copy before reopening.')
+    }
+  }
+  const transport: CollaborationTransport = {
+    subscribe(onHead, onError) {
+      errors.add(onError)
+      let latest: CollaborationHead | undefined
+      const stopHead = client.onUpdate(api.rooms.currentHead, { roomId }, head => { latest = head; onHead(head) },
+        () => onError(new Error('This editing session no longer has access to the document.')))
+      const stopConnection = client.subscribeToConnectionState(state => {
+        if (!state.isWebSocketConnected) onError(new CollaborationConnectionError())
+        else if (latest) onHead(latest)
+      })
+      return () => { errors.delete(onError); stopHead(); stopConnection() }
+    },
+    pull: head => request(() => client.query(api.rooms.pull, { roomId, ...head })),
+    push: batch => request(() => client.mutation(api.rooms.push, { roomId, ...batch })),
+  }
+  const opened = await client.query(api.rooms.open, { roomId })
+  const recoveryKey = `ginko-local-verification/${roomId}/${name}`
+  const saved = sessionStorage.getItem(recoveryKey)
+  const recovery: CollaborationRecovery | undefined = saved ? JSON.parse(saved) : undefined
+  const session = createEditorCollaboration({ snapshot: opened.snapshot, clientId: opened.clientPrefix + crypto.randomUUID(), transport, recovery,
+    onRecovery: value => value ? sessionStorage.setItem(recoveryKey, JSON.stringify(value)) : sessionStorage.removeItem(recoveryKey) })
+  const state = shallowRef(session.state)
+  const stopState = session.subscribe(value => { state.value = value })
+  return { name, session, source: ref(''), state, paused,
+    async pause() {
+      paused.value = true
+      for (const notify of errors) notify(new CollaborationConnectionError())
+      await client.close()
+    },
+    async resume() { client = await clientFor(name); paused.value = false; session.retry() },
+    async close() { stopState(); session.close(); await client.close() },
+  }
+}
+
+onMounted(async () => {
+  try {
+    kit.value = await createAuthoringKit({ version: 1, policy,
+      implementation: { note: { componentName: 'Note', props: { title: { types: ['string'], required: true }, tone: { types: ['string'], required: false } }, slots: ['default'] } },
+      authoring: { note: { label: 'Note', props: { title: { label: 'Title', control: 'text' }, tone: { label: 'Tone', control: 'select' } }, canvas: { titleProp: 'title', tone: 'info' } } },
+      recipes: [{ id: 'note', label: 'Note', source: '<note title="Keep in mind" tone="info">\nAdd the important context.\n</note>' }],
+    })
+    const alice = await clientFor('alice'), bob = await clientFor('bob')
+    const savedRoom = sessionStorage.getItem('ginko-local-verification/room')
+    let roomId = savedRoom ? await alice.query(api.rooms.resolveRoom, { value: savedRoom }) : null
+    if (!roomId) {
+      roomId = await alice.mutation(api.rooms.create, { source: '# Shared draft\n\nStart writing together.\n\n<note title="Keep in mind" tone="info">\nA shared note with independent properties.\n</note>\n\n```ts [example.ts]\nconst answer = 42\n```' })
+      const identity = await bob.query(api.rooms.whoami, {})
+      if (!identity) throw new Error('Bob is not signed in.')
+      await alice.mutation(api.rooms.grant, { roomId, identity, role: 'editor' })
+      sessionStorage.setItem('ginko-local-verification/room', roomId)
+    }
+    cards.value = await Promise.all([participant('alice', alice, roomId), participant('bob', bob, roomId)])
+  } catch (failure) { error.value = failure instanceof Error ? failure.message : 'The local verification could not start.' }
+  finally { loading.value = false }
+})
+onBeforeUnmount(() => { for (const card of cards.value) void card.close() })
+</script>
+
+<template>
+  <main>
+    <header><p class="eyebrow">Ginko Editor · Local verification</p><h1>One document. Two writers.</h1>
+      <p>Both editors use the same local Convex backend and separate signed test identities.</p></header>
+    <p v-if="loading" role="status">Opening the shared document…</p>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <section class="writers">
+      <article v-for="card in cards" :key="card.name">
+        <div class="writer-heading"><h2>{{ card.name === 'alice' ? 'Alice' : 'Bob' }}</h2><span>Version {{ card.state.value.version }}</span>
+          <button v-if="!card.paused.value" @click="card.pause()">Pause {{ card.name }} connection</button>
+          <button v-else @click="card.resume()">Reconnect {{ card.name }}</button></div>
+        <GinkoEditor v-model="card.source.value" :collaboration="card.session" :authoring-kit="kit" :aria-label="`${card.name} shared editor`" />
+        <details><summary>Content checkpoint preview</summary><pre>{{ card.source.value }}</pre></details>
+      </article>
+    </section>
+  </main>
+</template>
