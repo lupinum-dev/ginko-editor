@@ -56,6 +56,34 @@ export interface CollaborationRecovery {
   document: string
 }
 
+/** Parse host-owned recovery storage without trusting its JSON shape. */
+export function parseCollaborationRecovery(source: string): CollaborationRecovery {
+  if (encoder.encode(source).byteLength > maxRecoveredBytes) throw new CollaborationError('limit', 'The editor recovery copy is too large.')
+  const value: unknown = JSON.parse(source)
+  if (!value || typeof value !== 'object' || !('format' in value) || value.format !== 1
+    || !('clientId' in value) || typeof value.clientId !== 'string'
+    || !('document' in value) || typeof value.document !== 'string'
+    || !('steps' in value) || !Array.isArray(value.steps) || !value.steps.every((step: unknown): step is string => typeof step === 'string')
+    || !('groups' in value) || !Array.isArray(value.groups) || !value.groups.every((group: unknown): group is number => typeof group === 'number')
+    || !('base' in value) || !value.base || typeof value.base !== 'object') {
+    throw new CollaborationError('invalid', 'Invalid editor recovery copy.')
+  }
+  const base = value.base
+  if (!('epoch' in base) || typeof base.epoch !== 'string'
+    || !('schemaRevision' in base) || typeof base.schemaRevision !== 'string'
+    || !('policyRevision' in base) || typeof base.policyRevision !== 'string'
+    || !('version' in base) || typeof base.version !== 'number'
+    || !('document' in base) || typeof base.document !== 'string') {
+    throw new CollaborationError('invalid', 'Invalid editor recovery base.')
+  }
+  // Session construction validates fences, limits, and base + steps against
+  // the stored document before attaching it to an editor.
+  return { format: 1, clientId: value.clientId, document: value.document,
+    steps: value.steps, groups: value.groups, base: { epoch: base.epoch,
+      schemaRevision: base.schemaRevision, policyRevision: base.policyRevision,
+      version: base.version, document: base.document } }
+}
+
 export interface EditorCollaborationOptions {
   clientId: string
   snapshot: CollaborationSnapshot

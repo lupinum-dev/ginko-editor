@@ -4,7 +4,7 @@ import { mount as mountVue } from '@vue/test-utils'
 import GinkoEditor from '../src/GinkoEditor.vue'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDocumentExtensions } from '../src/lib/config/documentConfig'
-import { createEditorCollaboration, CollaborationConnectionError, type CollaborationRecovery } from '../src/collaboration'
+import { createEditorCollaboration, parseCollaborationRecovery, CollaborationConnectionError, type CollaborationRecovery } from '../src/collaboration'
 import { applyCollaborationSteps, createCollaborationSnapshot, fenceMismatch, SetNodePropertyStep,
   type CollaborationHead, type CollaborationSnapshot, type CollaborationTransport, type CollaborationReply } from '../src/runtime'
 import type { PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
@@ -367,5 +367,19 @@ describe('collaborative editor lifecycle', () => {
     oldHead!({ ...backend.snapshot, epoch: 'obsolete-epoch' })
     expect(a.session.state.status).toBe('synced')
     expect(a.session.canEdit).toBe(true)
+  })
+})
+
+
+describe('host recovery parser', () => {
+  it('checks storage shape before returning a typed recovery copy', async () => {
+    const room = await server('Body.')
+    const copy: CollaborationRecovery = { format: 1, clientId: 'user/session', base: room.snapshot,
+      document: room.snapshot.document, steps: [], groups: [] }
+    expect(parseCollaborationRecovery(JSON.stringify(copy))).toEqual(copy)
+    for (const invalid of [null, [], {}, { ...copy, steps: [null] }, { ...copy, groups: ['1'] },
+      { ...copy, base: { ...copy.base, version: '0' } }]) {
+      expect(() => parseCollaborationRecovery(JSON.stringify(invalid))).toThrow(/recovery/)
+    }
   })
 })
