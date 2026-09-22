@@ -12,6 +12,7 @@ export default defineConfig({
       entry: {
         authoring: fileURLToPath(new URL('./src/authoring.ts', import.meta.url)),
         index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+        runtime: fileURLToPath(new URL('./src/runtime.ts', import.meta.url)),
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`,

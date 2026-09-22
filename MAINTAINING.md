@@ -15,6 +15,11 @@ TipTap runtime are peer dependencies. The package imports only the browser-safe
 import `@lupinum/ginko-editor/style.css` explicitly. Package certification builds isolated Vue and Nuxt applications
 from the generated archive; it does not use sibling aliases or source links.
 
+The `runtime` entry shares the canvas schema and Content conversion without Vue
+views or browser globals. Packed certification checks its transitive imports and
+round trips a document in Node. Keep schema-affecting definitions in the shared
+document configuration; attach browser node views in the editor configuration.
+
 The CMS integration consumes the shared Editor package. The Editor package owns
 conversion, TipTap schema, mode switching, and editor UI. The CMS owns
 persistence, asset dialogs, and workflow state. Authenticated CMS acceptance and

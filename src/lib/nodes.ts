@@ -4,7 +4,7 @@
  * Handles document structure: headings, paragraphs, lists, tables, etc.
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import type { JsonRecord } from '../types'
 import { editorDebug } from './debug'

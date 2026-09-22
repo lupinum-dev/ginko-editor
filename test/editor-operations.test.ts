@@ -19,6 +19,7 @@ import {
   type BlockReference,
 } from '../src/lib/editor-operations'
 import * as conversion from '../src/lib/conversionPipeline'
+import type { TiptapToMDCOptions } from '../src/lib/tiptapToMdc'
 import { actOnBlock, canActOnBlock } from '../src/lib/nodeviews/block-actions'
 
 beforeAll(() => {
@@ -76,7 +77,7 @@ async function kit() {
     restricted: { label: 'Restricted' },
   } })
 }
-async function setup(source: string, authoringKit?: AuthoringKitV1) {
+async function setup(source: string, authoringKit?: AuthoringKitV1, output?: TiptapToMDCOptions) {
   const editor = new Editor({
     element: document.body.appendChild(document.createElement('div')),
     content: '<p></p>',
@@ -90,10 +91,11 @@ async function setup(source: string, authoringKit?: AuthoringKitV1) {
       showMarkdownMarkers: false,
       videoOutput: 'mdc',
       getAuthoringKit: () => authoringKit,
+      getOutputOptions: () => output ?? {},
     }),
   })
   editors.push(editor)
-  const prepared = await prepareMarkdownForVisualEditing(source, undefined, editor.schema, authoringKit)
+  const prepared = await prepareMarkdownForVisualEditing(source, output, editor.schema, authoringKit)
   expect(prepared.ok, JSON.stringify(prepared.issues)).toBe(true)
   expect(applyTiptapDocToEditor(editor, prepared.value!).ok).toBe(true)
   return editor
@@ -123,6 +125,19 @@ function wrapDefaultSlot(editor: Editor, block: BlockReference) {
 }
 
 describe('validated editor operations', () => {
+  it('keeps host output rules for component settings actions with implicit context', async () => {
+    const editor = await setup('<note>\nKeep\n</note>\n\n![Photo](asset:photo)', await kit(), { imageOutput: 'markdown' })
+    const image = find(editor, block => block.node.type.name === 'image')
+    editor.view.dispatch(editor.state.tr.setNodeAttribute(image.pos, 'props', {
+      ...image.node.attrs.props, id: 'photo',
+    }))
+    const note = component(editor, 'note')
+    // Settings call this path without supplying another operation context.
+    expect(await actOnBlock(editor, note.node, note.pos, 'duplicate')).toBe(true)
+    expect(editor.getJSON().content?.filter(node => node.attrs?.tag === 'note')).toHaveLength(2)
+    expect(find(editor, block => block.node.type.name === 'image').node.attrs.props.id).toBe('photo')
+  })
+
   it('drains mixed-context operations with accurate pending counts, isolated by editor', async () => {
     const editor = await setup('First\n\nSecond'), other = await setup('Other')
     const convert = conversion.convertTiptapDocToMarkdown

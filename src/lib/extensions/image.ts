@@ -1,4 +1,4 @@
-import { imageView, type ImageActions } from '../nodeviews/image'
+import type { ImageActions } from '../nodeviews/image'
 import type { CommandProps } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 
@@ -104,10 +104,6 @@ export const Image = Node.create<ImageOptions>({
         tag: this.options.allowBase64 ? 'img[src]' : 'img[src]:not([src^="data:"])',
       },
     ]
-  },
-
-  addNodeView() {
-    return props => imageView(props, this.options.actions, this.options.overlay)
   },
 
   renderHTML({ node }) {

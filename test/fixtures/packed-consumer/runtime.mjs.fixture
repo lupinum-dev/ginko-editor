@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict'
+import { registerHooks } from 'node:module'
+
+// A Node import alone can hide accidental Vue dependencies. Reject UI imports
+// throughout the transitive graph so this entry stays usable by backend code.
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    assert.ok(!/^(vue(?:\/|$)|@vue\/|@tiptap\/vue-3|reka-ui)/.test(specifier),
+      `The document runtime imported UI code: ${specifier}`)
+    return nextResolve(specifier, context)
+  },
+})
+
+const { createEditorSchema, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown } =
+  await import('@lupinum/ginko-editor/runtime')
+assert.equal(typeof document, 'undefined')
+const schema = createEditorSchema()
+const prepared = await prepareMarkdownForVisualEditing('# Server checkpoint\n\nKeep **this**.', undefined, schema)
+assert.equal(prepared.ok, true, JSON.stringify(prepared.issues))
+const doc = schema.nodeFromJSON(prepared.value)
+doc.check()
+const serialized = await convertTiptapDocToMarkdown(doc.toJSON())
+assert.equal(serialized.ok, true, JSON.stringify(serialized.issues))
+const reopened = await prepareMarkdownForVisualEditing(serialized.value, undefined, schema)
+assert.deepEqual(reopened.value, prepared.value)

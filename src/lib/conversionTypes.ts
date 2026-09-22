@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 export type ConversionPhase =
   | 'parse_mdc'

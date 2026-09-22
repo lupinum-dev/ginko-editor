@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import { editorDebug } from './debug'
 import type { MDCElement, MDCNode, MDCText } from './mdcTypes'

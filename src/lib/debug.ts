@@ -1,5 +1,3 @@
-import { computed, shallowRef } from 'vue'
-
 let debugEnabled = false
 let debugSequence = 0
 
@@ -15,7 +13,7 @@ export interface EditorDebugEvent {
   timestamp: string
 }
 
-const debugEvents = shallowRef<EditorDebugEvent[]>([])
+let debugEvents: EditorDebugEvent[] = []
 
 export const editorDebug = {
   error: (...args: unknown[]) => {
@@ -39,11 +37,11 @@ export const editorDebug = {
 }
 
 export function clearEditorDebugEvents() {
-  debugEvents.value = []
+  debugEvents = []
 }
 
 export function getEditorDebugEvents() {
-  return computed(() => debugEvents.value)
+  return debugEvents
 }
 
 export function isDebugEnabled() {
@@ -60,7 +58,7 @@ export function pushEditorDebugEvent(event: Omit<EditorDebugEvent, 'id' | 'times
     id: `dbg_${debugSequence++}`,
     timestamp: new Date().toISOString(),
   }
-  debugEvents.value = [...debugEvents.value.slice(-(MAX_DEBUG_EVENTS - 1)), nextEvent]
+  debugEvents = [...debugEvents.slice(-(MAX_DEBUG_EVENTS - 1)), nextEvent]
   return nextEvent
 }
 

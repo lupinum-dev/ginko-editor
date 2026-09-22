@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Schema } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 import {
   parseMdcDocument,
   projectMdcDocument,

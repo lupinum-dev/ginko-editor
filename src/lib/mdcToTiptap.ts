@@ -7,7 +7,7 @@
  * - component-converters.ts: Custom components (binding, file, image, video)
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 import {
   classifyPortableMarkdownElement,
   type PortableComponentPolicy,

@@ -83,6 +83,15 @@ async function verifyDeclarations(consumer) {
     throw new Error('The authoring-only entry imports UI or framework runtime code.')
   }
   await readFile(join(packageRoot, 'dist', 'GinkoEditor.vue.d.ts'), 'utf8')
+  const runtimeEntry = manifest.exports?.['./runtime']
+  if (runtimeEntry?.import !== './dist/runtime.js' || runtimeEntry?.types !== './dist/runtime.d.ts') {
+    throw new Error('The packed runtime export is missing.')
+  }
+  await write(
+    join(consumer, 'verify-runtime.mjs'),
+    await readFile(new URL('../test/fixtures/packed-consumer/runtime.mjs.fixture', import.meta.url), 'utf8'),
+  )
+  run('node', ['verify-runtime.mjs'], consumer)
 }
 
 // The same source exercises default and host-owned controls in both frameworks.

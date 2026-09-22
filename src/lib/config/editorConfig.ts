@@ -5,39 +5,16 @@ import type { EditorOverlayController } from '../../ui/context'
 import type { ImageActions } from '../nodeviews/image'
 import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Table as TiptapTable } from '@tiptap/extension-table'
-import { TableCell as TiptapTableCell } from '@tiptap/extension-table-cell'
-import { TableHeader as TiptapTableHeader } from '@tiptap/extension-table-header'
-import { TableRow } from '@tiptap/extension-table-row'
-import StarterKit from '@tiptap/starter-kit'
 import { tableView } from '../nodeviews/table'
-
+import { componentView } from '../nodeviews/component'
+import { codeView } from '../nodeviews/code'
+import { imageView } from '../nodeviews/image'
+import { createDocumentExtensions } from './documentConfig'
 import type { AssetProvider, JsonRecord } from '../../types'
 import type { AuthoringKitV1 } from '../../authoring'
 import { editorDebug } from '../debug'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import {
-  Binding,
-  CodeBlock,
-  EditorDebug,
-  Element,
-  File,
-  Heading,
-  Image,
-  InlineElement,
-  MarkdownClipboard,
-  Slot,
-  SpanStyle,
-  Video,
-} from '../extensions'
-
-const TableCell = TiptapTableCell.extend({
-  content: 'paragraph+',
-})
-
-const TableHeader = TiptapTableHeader.extend({
-  content: 'paragraph+',
-})
+import { EditorDebug, MarkdownClipboard } from '../extensions'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -80,28 +57,24 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
   } = options
 
   return [
-    StarterKit.configure({
-      codeBlock: false,
-      heading: false,
-      underline: false,
-      link: {
-        HTMLAttributes: {
-          target: null,
-        },
-        openOnClick: false,
+    ...createDocumentExtensions({
+      getAuthoringKit: options.getAuthoringKit,
+      getOutputOptions: options.getOutputOptions,
+      showMarkdownMarkers,
+      codeBlockTheme,
+      resolveAsset,
+      nodeViews: {
+        table: props => tableView(props, options.overlay),
+        element: props => componentView(
+          props,
+          () => options.getAuthoringKit?.(),
+          () => options.getOutputOptions?.() ?? {},
+          options.overlay,
+        ),
+        codeBlock: props => codeView(props, options.overlay),
+        image: props => imageView(props, options.imageActions, options.overlay),
       },
     }),
-    Heading.configure({
-      levels: [1, 2, 3, 4, 5, 6],
-      showMarkers: showMarkdownMarkers,
-    }),
-    TiptapTable.extend({ addNodeView() { return props => tableView(props, options.overlay) } }).configure({
-      renderWrapper: true,
-      resizable: false,
-    }),
-    TableRow,
-    TableHeader,
-    TableCell,
     Placeholder.configure({
       emptyEditorClass: 'mdc-editor-empty',
       placeholder: placeholder || 'Start writing...',
@@ -119,17 +92,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       videoOutput: options.videoOutput,
     }),
     ...(enableDebug ? [EditorDebug] : []),
-    Element.configure({
-      getAuthoringKit: options.getAuthoringKit,
-      getOutputOptions: options.getOutputOptions,
-      overlay: options.overlay,
-    }),
-    Slot.configure({ getAuthoringKit: options.getAuthoringKit }),
-    InlineElement,
-    CodeBlock.configure({
-      theme: codeBlockTheme,
-      overlay: options.overlay,
-    }),
     ImageUpload.configure({
       overlay: options.overlay,
       getMessages: options.getMessages,
@@ -140,11 +102,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       insert: options.insertUploadedImage,
       onPendingChange: options.onImageUploadPending,
     }),
-    Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions, overlay: options.overlay }),
-    Video,
-    File.configure({ resolveSrc: resolveAsset }),
-    Binding,
-    SpanStyle,
   ]
 }
 

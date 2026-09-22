@@ -29,6 +29,10 @@
       "types": "./dist/authoring.d.ts",
       "import": "./dist/authoring.js"
     },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
     "./style.css": "./dist/style.css"
   },
   "main": "./dist/index.js",

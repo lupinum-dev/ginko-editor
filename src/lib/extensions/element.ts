@@ -1,4 +1,3 @@
-import { componentView } from '../nodeviews/component'
 import type { Content } from '@tiptap/core'
 import { InputRule, mergeAttributes, Node } from '@tiptap/core'
 
@@ -110,16 +109,6 @@ export const Element = Node.create<ElementOptions>({
 
   parseHTML() {
     return [{ tag: 'div[data-type="element"]' }]
-  },
-
-  addNodeView() {
-    return props =>
-      componentView(
-        props,
-        () => this.options.getAuthoringKit?.(),
-        () => this.options.getOutputOptions?.() ?? {},
-        this.options.overlay,
-      )
   },
 
   renderHTML({ HTMLAttributes }) {

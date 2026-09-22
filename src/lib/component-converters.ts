@@ -4,7 +4,7 @@
  * Handles custom components: binding, file, image, video, template, comment, etc.
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import type { JsonRecord } from '../types'
 import { EMOJI_REGEXP, getEmojiUnicode } from './emoji'

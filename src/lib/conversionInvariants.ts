@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import type { ConversionIssue, ConversionPhase } from './conversionTypes'
 
