@@ -53,7 +53,7 @@
   "scripts": {
     "check:dependencies": "node scripts/check-dependency-policy.mjs",
     "audit:all": "pnpm audit",
-    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/fix-declaration-imports.mjs",
     "docs:build": "node scripts/prepare-docs-candidates.mjs && pnpm --dir docs build",
     "dev": "pnpm build && pnpm docs:dev",
     "docs:dev": "node scripts/prepare-docs-candidates.mjs && pnpm --dir docs dev",

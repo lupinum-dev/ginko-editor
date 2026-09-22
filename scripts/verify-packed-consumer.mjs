@@ -87,6 +87,10 @@ async function verifyDeclarations(consumer) {
     await readFile(new URL('../test/fixtures/packed-consumer/runtime.mjs.fixture', import.meta.url), 'utf8'),
   )
   run('node', ['verify-runtime.mjs'], consumer)
+  await write(join(consumer, 'runtime-types.ts'),
+    await readFile(new URL('../test/fixtures/packed-consumer/runtime-types.ts.fixture', import.meta.url), 'utf8'))
+  run('npm', ['exec', '--', 'tsc', '--noEmit', '--skipLibCheck', '--strict', '--target', 'ESNext',
+    '--module', 'NodeNext', '--moduleResolution', 'NodeNext', 'runtime-types.ts'], consumer)
 }
 
 // The same source exercises default and host-owned controls in both frameworks.

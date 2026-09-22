@@ -17,7 +17,9 @@ from the generated archive; it does not use sibling aliases or source links.
 
 The `runtime` entry shares the canvas schema and Content conversion without Vue
 views or browser globals. Packed certification checks its transitive imports and
-round trips a document in Node. Keep schema-affecting definitions in the shared
+round trips a document in Node. It also checks the emitted runtime declarations
+with NodeNext resolution. The build gives emitted relative declaration imports
+their `.js` extensions so backend types remain complete. Keep schema-affecting definitions in the shared
 document configuration; attach browser node views in the editor configuration.
 
 The CMS integration consumes the shared Editor package. The Editor package owns
