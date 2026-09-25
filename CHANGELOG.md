@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Mark the collaboration API as experimental. It can change in a minor release.
+- Breaking: import protocol and transport types such as `CollaborationTransport`,
+  `CollaborationHead` and `CollaborationReply` from `@lupinum/ginko-editor/runtime`.
+  The collaboration entry no longer re-exports them. It now exports
+  `CollaborationError` and `CollaborationErrorCode`.
+- Add `protocolVersion` to collaboration heads. Clients send `1` with pull and
+  push requests. Backends with strict argument validation must accept this
+  optional field.
+- Give each offline, error and stale collaboration state a `code`. Retry network,
+  timeout and server-unavailable failures with jittered backoff, end the wait on
+  a new head or the browser `online` event, and time out requests after 15 seconds.
+- Add `discardPendingAndResync()` and `onDiscard` to continue after the server
+  rejects unsent changes. `flush()` rejects with `CollaborationError`.
+- Write `onRecovery` at most every 300 ms and immediately when the page is
+  hidden, on flush, discard and close. Set `recoveryDelayMs: 0` for the previous
+  behavior. Typing no longer serializes the whole document for each character.
+- Add `readCollaborationRecovery()` to convert a recovery copy from another schema
+  revision to Markdown, and a documented re-seed procedure for schema changes.
+- Validate attribute values, marks and link URLs on the collaboration server and
+  check seeded documents against the schema.
+- Add optional presence: remote carets, selections and collaborator lists through
+  a transport `presence` channel, with `.ginko-collab-*` styles.
+
 - Keep typed `{{ … }}` text and inline code verbatim. The editor no longer turns
   template braces into binding nodes, which Content does not define.
 - Keep `:name:` text verbatim. The editor no longer rewrites emoji shortcodes or
