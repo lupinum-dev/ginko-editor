@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Breaking:** install `@lupinum/ginko-content` in the host. It is now a peer
+  dependency (`>=1.0.0-beta.9 <2`), so the editor and the host renderer share
+  one parser. TipTap peers accept `^3.31.3`.
+- Keep Reka UI, Lucide and github-slugger external, which halves `dist/index.js`.
+- Ship source maps and NodeNext-safe declarations. The `/runtime` entry does not
+  require Vue.
+
 - Keep typed `{{ … }}` text and inline code verbatim. The editor no longer turns
   template braces into binding nodes, which Content does not define.
 - Keep `:name:` text verbatim. The editor no longer rewrites emoji shortcodes or
