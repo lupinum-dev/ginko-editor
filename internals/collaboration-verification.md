@@ -74,8 +74,18 @@ public API gains the required Vue lifecycle and validation boundaries.
   with Bob's JavaScript language change. Both reached version 4, showed saved
   status, and had no console warnings or errors.
 
+## Measured acceptance, 2026-09-25
+
+- The packed build from `feat/v1-collaboration` compiled the fixture functions,
+  including the presence table, its indexes and scheduled cleanup.
+- `node acceptance.mjs` passed, including the new presence checks: members read
+  account names instead of browser names, forged client IDs, outsiders and
+  versions ahead of the room were denied, and leaving removed the record.
+- The Vue fixture built with Vite. The two-writer browser check, including
+  remote carets, was not repeated in this run.
+
 These package checks establish local behavior. Separate host checks now verify
 CMS, Luis and ChiliSkills authorization, checkpoints and recovery; see the
 [implementation handoff](./editor-handoff.md). They do not establish a production
-deployment, production credentials, multiplayer cursor presence or load capacity.
+deployment, production credentials, cursor presence in a host application, or load capacity.
 The hosts bound operation history and require explicit recovery when it expires.
