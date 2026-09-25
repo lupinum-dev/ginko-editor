@@ -187,7 +187,7 @@ function mdcNodeToComark(node: MDCNode, options: StringifyMdcOptions): ComarkNod
     return [[null, {}, node.value ?? '']]
   }
 
-  const props = cleanMdcProps(node.props || {}, node.tag)
+  const props = cleanMdcProps(node.props || {})
 
   if (node.tag === 'video' && options.videoOutput === 'html') {
     return [
@@ -208,23 +208,12 @@ function mdcNodeToComark(node: MDCNode, options: StringifyMdcOptions): ComarkNod
   return [[node.tag, props, ...mdcNodesToComark(node.children || [], options)]]
 }
 
-function cleanMdcProps(rawProps: JsonRecord, tag?: string): Record<string, unknown> {
+function cleanMdcProps(rawProps: JsonRecord): Record<string, unknown> {
   const props: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(rawProps)) {
     if (value === undefined) continue
     if (key.startsWith('__mdc_')) continue
     props[key] = value
-  }
-  // Colon syntax writes number and boolean properties as text, and the parser
-  // reads them back as text. Angle syntax binds them with their type.
-  const syntax = props.$ as { syntax?: unknown } | undefined
-  if (
-    syntax?.syntax === 'colon'
-    && Object.entries(props).some(([key, value]) => key !== '$' && (typeof value === 'number' || typeof value === 'boolean'))
-  ) {
-    // A capital letter keeps names such as `figure` or `aside` from becoming native HTML.
-    const sourceName = tag && !tag.includes('-') ? tag.charAt(0).toUpperCase() + tag.slice(1) : tag
-    props.$ = { ...syntax, syntax: 'angle', ...(sourceName ? { sourceName } : {}) }
   }
   return props
 }

@@ -272,7 +272,7 @@ describe('json properties', () => {
     expect(wrapper.vm.getEditor()!.state.doc.firstChild?.attrs.props.depth).toBe(3)
     // Colon syntax would store the number as text, so the component uses a typed binding.
     const markdown = await saved(wrapper)
-    expect(markdown).toContain(':depth="3"')
+    expect(markdown).toContain('depth: 3')
     const kit = await createGinkoLayoutKit()
     const reopened = await setup(markdown!, kit)
     expect(reopened.vm.getEditor()!.state.doc.firstChild?.attrs.props.depth).toBe(3)

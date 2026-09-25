@@ -210,8 +210,9 @@ describe('typed properties in colon syntax', () => {
     const opened = await prepareMarkdownForVisualEditing(source, {}, schema, kit)
     expect(opened.ok).toBe(true)
     const saved = (await convertTiptapDocToMarkdown(opened.value!, {})).value!
-    expect(saved).toContain('<code-tree expandAll>')
-    expect(saved).toContain('<Toc title="Contents" :depth="2" />')
+    // Content writes typed values in a property block, so their JSON types survive.
+    expect(saved).toContain('expandAll: true')
+    expect(saved).toContain('depth: 2')
     expect(await validateMarkdownForAuthoring(saved, kit)).toBeUndefined()
     const reopened = await prepareMarkdownForVisualEditing(saved, {}, schema, kit)
     expect(reopened.value?.content?.[0]?.attrs?.props.expandAll).toBe(true)
