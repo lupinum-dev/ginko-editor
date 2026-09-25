@@ -1,5 +1,4 @@
 import type { JSONContent } from '@tiptap/core'
-import Slugger from 'github-slugger'
 
 import type { JsonRecord, JsonValue } from '../types'
 import type { MDCComment, MDCElement, MDCNode, MDCRoot, MDCText } from './mdcTypes'
@@ -15,7 +14,6 @@ export interface TiptapToMDCOptions {
 
 interface TiptapToMDCContext {
   options: TiptapToMDCOptions
-  slugs: Slugger
 }
 
 type TiptapToMDCMap = Record<
@@ -23,9 +21,6 @@ type TiptapToMDCMap = Record<
   (node: JSONContent, context: TiptapToMDCContext) => MDCNode | MDCNode[] | MDCRoot
 >
 
-const RE_SLUG_MULTI_DASH = /-+/g
-const RE_SLUG_TRIM_DASH = /^-|-$/g
-const RE_SLUG_LEADING_DIGIT = /^(\d)/
 const RE_TEXT_LEADING_SPACE = /^\s+/
 const RE_TEXT_TRAILING_SPACE = /\s+$/
 
@@ -240,7 +235,6 @@ export async function tiptapToMDC(
 function createMdcBodyFromTiptap(node: JSONContent, options?: TiptapToMDCOptions): MDCRoot {
   const context: TiptapToMDCContext = {
     options: options || {},
-    slugs: new Slugger(),
   }
 
   const nodeCopy = structuredClone(node)
@@ -453,15 +447,9 @@ function createFileElement(node: JSONContent, context: TiptapToMDCContext): MDCE
 function createHeadingElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
   const level = node.attrs?.level || 1
   const mdcNode = createElement(node, context, `h${level}`)
-  const content = getNodeContent(node) || ''
-
-  const slug = context.slugs
-    .slug(content)
-    .replace(RE_SLUG_MULTI_DASH, '-')
-    .replace(RE_SLUG_TRIM_DASH, '')
-    .replace(RE_SLUG_LEADING_DIGIT, '_$1')
-
-  mdcNode.props!.id = slug
+  const id = node.attrs?.id
+  if (typeof id === 'string' && id) mdcNode.props!.id = id
+  else delete mdcNode.props!.id
   return mdcNode
 }
 

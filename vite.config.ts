@@ -7,7 +7,6 @@ const externalPackages = [
   'prosemirror-collab',
   'reka-ui',
   '@lucide/vue',
-  'github-slugger',
   '@lupinum/ginko-content',
 ]
 

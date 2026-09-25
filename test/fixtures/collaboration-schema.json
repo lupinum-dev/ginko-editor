@@ -1,6 +1,6 @@
 {
   "schemaRevision": "ginko-editor-2",
-  "fingerprint": "4b159cd717020ffa22e2b52766e3ea359e28e26081560a0605df3a4ac9365125",
+  "fingerprint": "cd9f12a0800773066f9df610c627887eccfb6e28e879c3a3478b3f747c488492",
   "schema": {
     "topNode": "doc",
     "nodes": {
@@ -221,6 +221,9 @@
         "isolating": false,
         "whitespace": "normal",
         "attrs": {
+          "id": {
+            "default": null
+          },
           "level": {
             "default": 1
           }

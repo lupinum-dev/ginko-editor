@@ -22,7 +22,11 @@ export function createHeadingNode(
 ): JSONContent {
   const element = node as MDCElement
   const level = Number.parseInt(element.tag?.charAt(1) || '1', 10)
-  return createTipTapNodeFn(element, 'heading', { attrs: { level } })
+  // The adapter keeps `id` only when the author chose it; generated ids stay implicit.
+  const { id, ...props } = element.props ?? {}
+  const attrs: JsonRecord = { level }
+  if (typeof id === 'string' && id) attrs.id = id
+  return createTipTapNodeFn({ ...element, props }, 'heading', { attrs })
 }
 
 /**

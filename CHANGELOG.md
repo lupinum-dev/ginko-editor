@@ -4,6 +4,9 @@
 
 ### Breaking changes and migration
 
+- Requires Ginko Content `1.0.0-beta.10` or later. Content now escapes text
+  that looks like MDC syntax, keeps code verbatim, keeps bare domains as text,
+  and generates the heading ids that the editor uses.
 - **Breaking:** install `@lupinum/ginko-content` in the host. It is now a peer
   dependency (`>=1.0.0-beta.9 <2`), so the editor and the host renderer share
   one parser. TipTap peers accept `^3.31.3`.
@@ -37,6 +40,11 @@
 
 ### Changes
 
+- Headings keep the parser's generated ids implicitly and preserve custom
+  `{#id}` anchors. Documents with non-ASCII or nested headings now open in the
+  visual editor. `github-slugger` is no longer a dependency.
+- Typed links default to `https:`. Shared-editing validation uses Content's
+  `isSafePublicLinkUrl` rule and checks heading ids.
 - Split `GinkoEditor` into composables and a separate insert menu component.
   Component boundary protection is a ProseMirror plugin.
 - New inline `image-upload` or `image-picker` functions, new `asset-provider`

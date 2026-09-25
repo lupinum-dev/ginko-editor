@@ -1,4 +1,9 @@
-import { parseMdcDocument, serializeMdcDocument } from '@lupinum/ginko-content/cms-contract'
+import {
+  createHeadingIdGenerator,
+  headingSlugText,
+  parseMdcDocument,
+  serializeMdcDocument,
+} from '@lupinum/ginko-content/cms-contract'
 
 import type { JsonRecord, JsonValue } from '../types'
 import type { MDCNode, MDCRoot } from './mdcTypes'
@@ -60,10 +65,24 @@ export async function parseMdc(content: string, options: ParseMdcOptions = {}): 
 export function adaptMdcDocument(
   tree: Awaited<ReturnType<typeof parseMdcDocument>>,
 ): MDCRoot {
+  const nextHeadingId = createHeadingIdGenerator()
   return stripStyleNodes({
-    children: comarkNodesToMdc(tree.nodes),
+    children: comarkNodesToMdc(tree.nodes, nextHeadingId),
     type: 'root',
   })
+}
+
+const HEADING_TAG = /^h([1-6])$/
+
+/** Keep a heading id only when it differs from the id the parser generates. */
+function headingProps(tag: string, props: JsonRecord, children: ComarkNode[], nextHeadingId: HeadingIds): JsonRecord {
+  const level = HEADING_TAG.exec(tag)?.[1]
+  if (!level) return props
+  const generated = nextHeadingId(headingSlugText(children), Number(level))
+  if (props.id !== generated) return props
+  const rest = { ...props }
+  delete rest.id
+  return rest
 }
 
 /**
@@ -103,11 +122,13 @@ function emptyRoot(): MDCRoot {
   }
 }
 
-function comarkNodesToMdc(nodes: ComarkNode[]): MDCNode[] {
-  return nodes.flatMap((node) => comarkNodeToMdc(node))
+type HeadingIds = ReturnType<typeof createHeadingIdGenerator>
+
+function comarkNodesToMdc(nodes: ComarkNode[], nextHeadingId: HeadingIds): MDCNode[] {
+  return nodes.flatMap((node) => comarkNodeToMdc(node, nextHeadingId))
 }
 
-function comarkNodeToMdc(node: ComarkNode): MDCNode[] {
+function comarkNodeToMdc(node: ComarkNode, nextHeadingId: HeadingIds): MDCNode[] {
   if (typeof node === 'string') {
     return node ? [{ type: 'text', value: node }] : []
   }
@@ -118,11 +139,12 @@ function comarkNodeToMdc(node: ComarkNode): MDCNode[] {
   }
 
   if (TABLE_SECTION_TAGS.has(tag)) {
-    return comarkNodesToMdc(children)
+    return comarkNodesToMdc(children, nextHeadingId)
   }
 
-  const props = cleanComarkProps(rawProps)
-  const childNodes = comarkNodesToMdc(children)
+  // Heading ids are assigned in document order, before nested headings.
+  const props = headingProps(tag, cleanComarkProps(rawProps), children, nextHeadingId)
+  const childNodes = comarkNodesToMdc(children, nextHeadingId)
   return [
     {
       children: childNodes,

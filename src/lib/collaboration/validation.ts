@@ -1,6 +1,6 @@
 import type { Node, Schema } from '@tiptap/pm/model'
 import { AttrStep, Step, Transform } from '@tiptap/pm/transform'
-import { isSafePublicMarkdownUrl, type PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
+import { isSafePublicLinkUrl, type PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
 import type { Mark } from '@tiptap/pm/model'
 import { createEditorSchema } from '../config/documentConfig'
 import { convertTiptapDocToMarkdown, prepareMarkdownForVisualEditing, validateMarkdownForAuthoring } from '../conversionPipeline'
@@ -133,7 +133,7 @@ function invalidValue(message: string): never {
 function validateMark(mark: Mark) {
   const attrs = mark.attrs
   if (mark.type.name !== 'link') return
-  if (typeof attrs.href !== 'string' || attrs.href.length > 2048 || !isSafePublicMarkdownUrl(attrs.href, 'href')) {
+  if (typeof attrs.href !== 'string' || attrs.href.length > 2048 || !isSafePublicLinkUrl(attrs.href)) {
     invalidValue('A link must use a safe URL.')
   }
   if (![null, '_blank'].includes(attrs.target) || !optionalText(attrs.rel, 200, true)
@@ -148,6 +148,9 @@ function validateAttributeValues(node: Node) {
   switch (node.type.name) {
     case 'heading':
       if (!Number.isSafeInteger(attrs.level) || attrs.level < 1 || attrs.level > 6) invalidValue('A heading level must be a whole number from 1 to 6.')
+      if (attrs.id !== null && (typeof attrs.id !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(attrs.id))) {
+        invalidValue('A heading id must contain only letters, digits, hyphens, and underscores.')
+      }
       break
     case 'orderedList': {
       const start = typeof attrs.start === 'string' && /^\d{1,9}$/.test(attrs.start) ? Number(attrs.start) : attrs.start

@@ -1,9 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import TiptapHeading from '@tiptap/extension-heading'
 import type { ResolvedPos } from '@tiptap/pm/model'
-import { Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state'
-
-const headingDebugPluginKey = new PluginKey('headingDebug')
+import { TextSelection, type EditorState } from '@tiptap/pm/state'
 
 export interface HeadingOptions {
   levels: number[]
@@ -31,17 +29,16 @@ export const Heading = TiptapHeading.extend<HeadingOptions>({
     }
   },
 
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: headingDebugPluginKey,
-        props: {
-          handleKeyDown() {
-            return false
-          },
-        },
-      }),
-    ]
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      /** A custom anchor id. Null when the parser's generated id applies. */
+      id: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-ginko-heading-id'),
+        renderHTML: attributes => attributes.id ? { 'data-ginko-heading-id': attributes.id } : {},
+      },
+    }
   },
 })
 
