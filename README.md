@@ -18,16 +18,32 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 
 ## Requirements
 
-- Node.js 22.18 or later, Node.js 24.11 or later, or Node.js 26 or later.
-- pnpm 11 for repository development.
-- Vue 3.5.40 or later and TipTap 3.31.3 in the consuming application.
-- The Ginko Content version declared in the package manifest for the shared CMS contract.
+- A bundler that resolves package `exports`, such as Vite or Nuxt, on Node.js 22.18 or later.
+- Vue 3.5.40 or later and TipTap 3.31.3 or a later 3.x version in the application.
+  The root entry needs `vue` and `@tiptap/vue-3`.
+- `@lupinum/ginko-content` 1.0.0-beta.9 or a later 1.x version. It is a peer
+  dependency and supplies the shared CMS contract.
+
+Repository development has separate requirements. Read [MAINTAINING.md](MAINTAINING.md).
 
 ## Installation
 
 ```bash
-pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm @tiptap/vue-3
+pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm @tiptap/vue-3 vue
 ```
+
+Import `@lupinum/ginko-editor/style.css` one time in the application. The
+JavaScript entries do not import CSS.
+
+The `@lupinum/ginko-editor/runtime` entry converts and validates documents
+without Vue views or browser globals. Server code needs only these packages:
+
+```bash
+pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm
+```
+
+The runtime entry does not import Vue. A package manager can still install Vue
+because other packages declare it as a peer dependency.
 
 ## Quick start
 

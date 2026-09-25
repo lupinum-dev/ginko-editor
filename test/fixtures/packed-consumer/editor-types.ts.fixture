@@ -1,0 +1,23 @@
+import type { EditorActions, EditorToolbarGroup, GinkoEditor } from '@lupinum/ginko-editor'
+
+type IsAny<T> = 0 extends (1 & T) ? true : false
+type Typed<T extends false> = T
+
+// NodeNext hosts must see the same toolbar slot contract as bundler hosts.
+// An unresolved Vue declaration becomes `any` when library checks are skipped.
+export type EditorIsTyped = Typed<IsAny<typeof GinkoEditor>>
+type ToolbarSlot = NonNullable<InstanceType<typeof GinkoEditor>['$slots']['toolbar']>
+type ToolbarSlotProps = Parameters<ToolbarSlot>[0]
+export type SlotPropsAreTyped = Typed<IsAny<ToolbarSlotProps>>
+export type SlotActionsAreTyped = Typed<IsAny<ToolbarSlotProps['actions']>>
+
+export function readActions(props: ToolbarSlotProps): EditorActions {
+  return props.actions
+}
+
+export const toolbar: EditorToolbarGroup[] = [[{ kind: 'mark', mark: 'bold' }, { kind: 'undo' }]]
+
+declare const props: ToolbarSlotProps
+// @ts-expect-error The slot passes an action registry, not a toolbar group.
+const invalid: EditorToolbarGroup[] = props.actions
+void invalid

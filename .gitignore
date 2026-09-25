@@ -12,3 +12,5 @@ docs/.candidate
 .env*
 !.env.example
 .DS_Store
+.jevkit/
+.review-runs/

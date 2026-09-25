@@ -21,13 +21,27 @@ async function fix(directory) {
       ts.forEachChild(node, visit)
     }
     visit(parsed)
-    let result = source
-    for (const literal of candidates.sort((a, b) => b.getStart(parsed) - a.getStart(parsed))) {
-      if (!literal.text.startsWith('.') || extname(literal.text)) continue
+    const edits = []
+    for (const literal of candidates) {
+      // Vue declarations are emitted as `Name.vue.d.ts`; NodeNext needs `Name.vue.js`.
+      if (!literal.text.startsWith('.') || !['', '.vue'].includes(extname(literal.text))) continue
       // Only rewrite emitted modules, never directory aliases or external paths.
       try { await access(resolve(dirname(path), `${literal.text}.d.ts`)) } catch { continue }
       const end = literal.getEnd() - 1
-      result = result.slice(0, end) + '.js' + result.slice(end)
+      edits.push({ start: end, end, text: '.js' })
+    }
+    // Declarations must not keep style side effects. Hosts import the extracted
+    // `@lupinum/ginko-editor/style.css` export, and the source CSS is not emitted.
+    for (const statement of parsed.statements) {
+      if (!ts.isImportDeclaration(statement) || statement.importClause) continue
+      if (!ts.isStringLiteral(statement.moduleSpecifier)) continue
+      if (!statement.moduleSpecifier.text.endsWith('.css')) continue
+      const end = statement.getEnd()
+      edits.push({ start: statement.getStart(parsed), end: source[end] === '\n' ? end + 1 : end, text: '' })
+    }
+    let result = source
+    for (const edit of edits.sort((a, b) => b.start - a.start)) {
+      result = result.slice(0, edit.start) + edit.text + result.slice(edit.end)
     }
     if (result !== source) await writeFile(path, result)
   }

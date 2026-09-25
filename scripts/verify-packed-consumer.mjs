@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -13,6 +14,8 @@ const contentArchive = process.env.GINKO_CONTENT_TARBALL
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 
 const packageInputs = [...(contentArchive ? [contentArchive] : []), archive]
+// Content is a peer. Hosts install it; a candidate archive replaces the registry version.
+const contentPeer = { '@lupinum/ginko-content': '1.0.0-beta.9' }
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -89,8 +92,37 @@ async function verifyDeclarations(consumer) {
   run('node', ['verify-runtime.mjs'], consumer)
   await write(join(consumer, 'runtime-types.ts'),
     await readFile(new URL('../test/fixtures/packed-consumer/runtime-types.ts.fixture', import.meta.url), 'utf8'))
-  run('npm', ['exec', '--', 'tsc', '--noEmit', '--skipLibCheck', '--strict', '--target', 'ESNext',
-    '--module', 'NodeNext', '--moduleResolution', 'NodeNext', 'runtime-types.ts'], consumer)
+  await write(join(consumer, 'editor-types.ts'),
+    await readFile(new URL('../test/fixtures/packed-consumer/editor-types.ts.fixture', import.meta.url), 'utf8'))
+  for (const file of ['runtime-types.ts', 'editor-types.ts']) {
+    run('npm', ['exec', '--', 'tsc', '--noEmit', '--skipLibCheck', '--strict', '--target', 'ESNext',
+      '--module', 'NodeNext', '--moduleResolution', 'NodeNext', file], consumer)
+  }
+}
+
+// A backend installs only the document runtime peers. Other packages declare
+// Vue as a peer, so legacy peer resolution keeps npm from adding it. The
+// runtime entry must then load and round trip a document without Vue.
+async function verifyNodeRuntimeConsumer(consumer) {
+  await write(
+    join(consumer, 'package.json'),
+    `${JSON.stringify({
+      private: true,
+      type: 'module',
+      dependencies: { ...contentPeer, '@tiptap/core': '3.31.3', '@tiptap/pm': '3.31.3' },
+    }, null, 2)}\n`,
+  )
+  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--legacy-peer-deps', ...packageInputs], consumer)
+  for (const name of ['vue', '@tiptap/vue-3']) {
+    if (existsSync(join(consumer, 'node_modules', name))) {
+      throw new Error(`The runtime consumer unexpectedly installed ${name}.`)
+    }
+  }
+  await write(
+    join(consumer, 'verify-runtime.mjs'),
+    await readFile(new URL('../test/fixtures/packed-consumer/runtime.mjs.fixture', import.meta.url), 'utf8'),
+  )
+  run('node', ['verify-runtime.mjs'], consumer)
 }
 
 // The same source exercises default and host-owned controls in both frameworks.
@@ -110,11 +142,11 @@ async function verifyVueConsumer(consumer) {
       type: 'module',
       scripts: { build: 'vite build', typecheck: 'vue-tsc --noEmit' },
       dependencies: {
+        ...contentPeer,
         '@tiptap/core': '3.31.3',
         '@tiptap/pm': '3.31.3',
         '@tiptap/vue-3': '3.31.3',
         vue: '3.5.42',
-        'reka-ui': '2.10.1',
       },
       devDependencies: {
         '@types/node': '26.1.1',
@@ -181,12 +213,12 @@ async function verifyNuxtConsumer(consumer) {
       type: 'module',
       scripts: { build: 'nuxt build', prepare: 'nuxt prepare', typecheck: 'nuxt typecheck' },
       dependencies: {
+        ...contentPeer,
         '@tiptap/core': '3.31.3',
         '@tiptap/pm': '3.31.3',
         '@tiptap/vue-3': '3.31.3',
         nuxt: '4.5.2',
         vue: '3.5.42',
-        'reka-ui': '2.10.1',
       },
       devDependencies: { typescript: '5.9.3', 'vue-tsc': '3.3.7' },
     }, null, 2)}\n`,
@@ -212,8 +244,9 @@ async function verifyNuxtConsumer(consumer) {
 try {
   await verifyVueConsumer(join(root, 'vue'))
   await verifyNuxtConsumer(join(root, 'nuxt'))
+  await verifyNodeRuntimeConsumer(join(root, 'node-runtime'))
 } finally {
   await rm(root, { recursive: true, force: true })
 }
 
-console.log(`Verified packed Vue and Nuxt consumers for ${pkg.name}@${pkg.version}.`)
+console.log(`Verified packed Vue, Nuxt, and Node runtime consumers for ${pkg.name}@${pkg.version}.`)

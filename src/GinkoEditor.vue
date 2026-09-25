@@ -12,6 +12,7 @@ import {
   ref,
   useId,
   watch,
+  type ComputedRef,
 } from 'vue'
 
 import type { AuthoringKitV1, AuthoringRecipeV1 } from './authoring'
@@ -55,6 +56,7 @@ import {
   handleActionShortcut,
   hasCustomActionShortcut,
   matchesShortcut,
+  type EditorActions,
   type EditorMessages,
   type EditorShortcuts,
   type EditorToolbarGroup,
@@ -263,7 +265,7 @@ const operationContext: EditorOperationContext = {
   getOutputOptions: () => outputOptions.value,
   canMutate: () => canMutateVisualContent(),
 }
-const actions = useEditorActions(editor, {
+const actions: ComputedRef<EditorActions> = useEditorActions(editor, {
   enabled: () => canMutateVisualContent(),
   messages: () => props.messages,
   shortcuts: () => props.shortcuts,

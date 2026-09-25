@@ -2,23 +2,29 @@
 
 ## Setup and daily work
 
+Use Node.js 22.18 or later in the 22 line, 24.11 or later in the 24 line, or 26
+or later. The package itself supports consumers on Node.js 22.18 or later.
+
 ```bash
 corepack enable pnpm
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The root publishes one Vue package. Vite builds the browser-safe ESM entry and
-extracts `dist/style.css`. `vue-tsc` emits the public declarations. Vue and the
-TipTap runtime are peer dependencies. The package imports only the browser-safe
-`@lupinum/ginko-content/cms-contract` entry and keeps it external. Consumers must
+The root publishes one Vue package. Vite builds the browser-safe ESM entries with
+source maps and extracts `dist/style.css`. `vue-tsc` emits the public
+declarations; the build removes the source CSS import from them. Vue, the TipTap
+runtime, and Ginko Content are peer dependencies. Vue and `@tiptap/vue-3` are
+optional peers because only the root entry needs them. The build keeps all
+dependencies and peers external so hosts share one copy. The package imports only
+the browser-safe `@lupinum/ginko-content/cms-contract` entry. Consumers must
 import `@lupinum/ginko-editor/style.css` explicitly. Package certification builds isolated Vue and Nuxt applications
 from the generated archive; it does not use sibling aliases or source links.
 
 The `runtime` entry shares the canvas schema and Content conversion without Vue
 views or browser globals. Packed certification checks its transitive imports and
-round trips a document in Node. It also checks the emitted runtime declarations
-with NodeNext resolution. The build gives emitted relative declaration imports
+round trips a document in Node, also in a consumer without Vue. It also checks
+the emitted runtime and toolbar slot declarations with NodeNext resolution. The build gives emitted relative declaration imports
 their `.js` extensions so backend types remain complete. Keep schema-affecting definitions in the shared
 document configuration; attach browser node views in the editor configuration.
 
@@ -37,8 +43,9 @@ pickers must complete the request-scoped callback from their event; stale
 callbacks safely return `false` after document, selection, mode, editability, or
 lifetime changes.
 
-The package uses the published Content parser contract from `1.0.0-beta.9`.
-Packed certification resolves that registry dependency by default. Set
+The package requires the published Content parser contract from `1.0.0-beta.9`
+or a later 1.x version as a peer. Development and tests use the exact version in
+`devDependencies`. Packed consumers install that registry version as their peer. Set
 `GINKO_CONTENT_TARBALL` only when explicitly verifying a newer candidate archive.
 
 Use the local URL printed by the development server. Keep that session running
@@ -58,7 +65,8 @@ security authority. Prepare the evidence before asking.
 |---|---|
 | `pnpm dev` | A usable local development target. Inspect its real browser behavior. |
 | `pnpm build` | The primary production output. |
-| `pnpm verify` | The complete local handoff gate defined in package scripts. |
+| `pnpm verify` | The library handoff gate: dependency policy, lint, type checks, tests, and build. |
+| `pnpm verify:docs` | The library and the public documentation site build. It needs the local Docs candidate. |
 | `pnpm audit:all` | Dependency audit for the full workspace. |
 | `pnpm docs:build` | The public documentation site builds. |
 | `pnpm release:verify` | Certified tarballs install and work in isolated consumers. |
@@ -66,7 +74,9 @@ security authority. Prepare the evidence before asking.
 For documentation changes, explore navigation, search, and one documented example
 on desktop and a narrow screen. A successful docs build alone does not prove the
 packed package works. Release verification installs the tarball independently.
-Linux CI repeats certification in its own environment; npm provenance and public
+Linux CI repeats certification in its own environment. It installs only the
+library package for the required gate. The docs build job does not block while
+the Docs candidate migration in `internals/migrations.md` is active; npm provenance and public
 release records are checked by the protected release workflow.
 
 Routine version pull requests may be independently reviewed and merged by agents.
@@ -92,7 +102,7 @@ Use Renovate for routine updates. Review release notes and lockfile changes. Do 
 
 ## Documentation change
 
-Follow [docs/WRITING.md](docs/WRITING.md). Run `pnpm docs:build`. Verify links, mobile navigation, search, analytics, and feedback on the deployed preview.
+Follow [docs/WRITING.md](docs/WRITING.md). Run `pnpm verify:docs`. Verify links, mobile navigation, search, analytics, and feedback on the deployed preview.
 
 Vercel uses `docs/` as the Root Directory. Enable source files outside the Root
 Directory because the documentation build needs this workspace package. Keep
