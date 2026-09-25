@@ -4,10 +4,10 @@ import { mount as mountVue } from '@vue/test-utils'
 import GinkoEditor from '../src/GinkoEditor.vue'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDocumentExtensions } from '../src/lib/config/documentConfig'
-import { createEditorCollaboration, parseCollaborationRecovery, CollaborationConnectionError, type CollaborationRecovery } from '../src/collaboration'
-import { applyCollaborationSteps, createCollaborationSnapshot, fenceMismatch, SetNodePropertyStep,
-  type CollaborationHead, type CollaborationSnapshot, type CollaborationTransport, type CollaborationReply } from '../src/runtime'
-import type { PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
+import { createEditorCollaboration, parseCollaborationRecovery, readCollaborationRecovery, CollaborationConnectionError, CollaborationError,
+  type CollaborationRecovery, type EditorCollaborationOptions } from '../src/collaboration'
+import { SetNodePropertyStep, type CollaborationHead, type CollaborationSnapshot, type CollaborationTransport } from '../src/runtime'
+import { server } from './collaboration-server'
 import { applyTableOperation } from '../src/lib/nodeviews/table-operations'
 import { TableMap } from '@tiptap/pm/tables'
 import { Plugin } from '@tiptap/pm/state'
@@ -19,79 +19,19 @@ beforeAll(() => {
 const editors: Editor[] = []
 const wrappers: ReturnType<typeof mountVue<typeof GinkoEditor>>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); editors.splice(0).forEach(editor => editor.destroy()) })
-const policy: PortableComponentPolicyV2 = { version: 2, components: {
-  note: { kind: 'block', props: {
-    title: { types: ['string'], required: true, allowedValues: null },
-    tone: { types: ['string'], required: false, allowedValues: ['info', 'warning'] },
-  }, slots: ['default'], allowedParents: null, allowedChildren: null, media: null },
-} }
 
-async function server(source = '<note title="Original">\nBody.\n</note>') {
-  const content = { epoch: 'epoch-1', policyRevision: 'notes-1', policy }
-  let checkpoint = await createCollaborationSnapshot(source, content)
-  const entries: { step: string; clientId: string }[] = []
-  const subscribers = new Set<(head: CollaborationHead) => void>()
-  let tail = Promise.resolve()
-  let pullLimit = 128
-  function read(head: CollaborationHead): CollaborationReply {
-    const mismatch = fenceMismatch(head, checkpoint.snapshot)
-    if (mismatch) return { status: 'stale', head: checkpoint.snapshot, reason: mismatch }
-    const rows = entries.slice(head.version, head.version + pullLimit)
-    return { status: 'ok', update: { ...checkpoint.snapshot, fromVersion: head.version,
-      version: head.version + rows.length, steps: rows.map(row => row.step), clientIds: rows.map(row => row.clientId) } }
-  }
-  return {
-    get snapshot() { return checkpoint.snapshot },
-    get markdown() { return checkpoint.markdown },
-    set pullLimit(value: number) { pullLimit = value },
-    async replace() {
-      checkpoint = await createCollaborationSnapshot('Replaced.', { ...content, epoch: 'epoch-2' })
-      entries.splice(0)
-      for (const notify of subscribers) notify(checkpoint.snapshot)
-    },
-    client() {
-      const connection = { online: true, deny: false, loseAcknowledgement: false }
-      function connected() {
-        if (!connection.online) throw new CollaborationConnectionError()
-        if (connection.deny) throw new Error('Access denied.')
-      }
-      const transport: CollaborationTransport = {
-        subscribe(onHead) { subscribers.add(onHead); onHead(checkpoint.snapshot); return () => { subscribers.delete(onHead) } },
-        async pull(head) { connected(); return read(head) },
-        async push(batch) {
-          connected()
-          const result = tail.then(async () => {
-            connected()
-            if (!fenceMismatch(batch, checkpoint.snapshot) && batch.version === checkpoint.snapshot.version) {
-              checkpoint = await applyCollaborationSteps(checkpoint.snapshot, batch, content)
-              entries.push(...batch.steps.map(step => ({ step, clientId: batch.clientId })))
-              for (const notify of subscribers) notify(checkpoint.snapshot)
-            }
-            if (connection.loseAcknowledgement) {
-              connection.loseAcknowledgement = false
-              throw new CollaborationConnectionError('The acknowledgement was lost.')
-            }
-            return read(batch)
-          })
-          tail = result.then(() => {}, () => {})
-          return result
-        },
-      }
-      return { connection, transport }
-    },
-  }
-}
-
-async function mount(snapshot: CollaborationSnapshot, transport: CollaborationTransport, clientId: string, recovery?: CollaborationRecovery) {
+async function mount(snapshot: CollaborationSnapshot, transport: CollaborationTransport, clientId: string, recovery?: CollaborationRecovery,
+  extra: Partial<EditorCollaborationOptions> = {}) {
   let saved: CollaborationRecovery | null = null
   const session = createEditorCollaboration({ snapshot, transport, clientId, recovery,
-    onRecovery: value => { saved = structuredClone(value) } })
+    onRecovery: value => { saved = structuredClone(value) }, ...extra })
   const editor = new Editor({ element: document.createElement('div'), content: session.initialDocument,
     extensions: [...createDocumentExtensions(), session.extension] })
   editors.push(editor)
   await vi.waitFor(() => expect(editor.isInitialized).toBe(true))
   await session.flush()
-  return { editor, session, get recovery() { return saved } }
+  // Recovery writes are throttled; reading the host copy first writes pending changes.
+  return { editor, session, get recovery() { session.flushRecovery(); return saved } }
 }
 
 describe('collaborative editor lifecycle', () => {
@@ -381,5 +321,249 @@ describe('host recovery parser', () => {
       { ...copy, base: { ...copy.base, version: '0' } }]) {
       expect(() => parseCollaborationRecovery(JSON.stringify(invalid))).toThrow(/recovery/)
     }
+  })
+})
+
+function bare(options: EditorCollaborationOptions) {
+  const session = createEditorCollaboration(options)
+  const editor = new Editor({ element: document.createElement('div'), content: session.initialDocument,
+    extensions: [...createDocumentExtensions(), session.extension] })
+  editors.push(editor)
+  return { session, editor }
+}
+
+describe('collaboration failure handling', () => {
+  it('reports a rejected push with a code and discards the pending changes on request', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    let reject = true
+    const discarded: CollaborationRecovery[] = []
+    const transport: CollaborationTransport = { ...client.transport, push(batch) {
+      if (reject) return Promise.reject(new CollaborationError('content', 'The document is outside the host content policy.'))
+      return client.transport.push(batch)
+    } }
+    const a = await mount(backend.snapshot, transport, 'alice/session', undefined, { onDiscard: value => { discarded.push(value) } })
+    a.editor.commands.insertContent('Refused ')
+    await vi.waitFor(() => expect(a.session.state).toMatchObject({ status: 'error', code: 'rejected' }))
+    const failure = await a.session.flush().catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(CollaborationError)
+    expect(failure).toMatchObject({ code: 'content' })
+    expect(a.session.canEdit).toBe(false)
+    reject = false
+    const removed = a.session.discardPendingAndResync()
+    expect(removed?.document).toContain('Refused Body.')
+    expect(discarded).toHaveLength(1)
+    expect(a.editor.getText()).toBe('Body.')
+    await a.session.flush()
+    expect(a.session.state).toMatchObject({ status: 'synced', pendingSteps: 0 })
+    expect(a.recovery).toBeNull()
+    a.editor.commands.insertContentAt(1, 'Accepted ')
+    await a.session.flush()
+    expect(backend.markdown.trim()).toBe('Accepted Body.')
+  })
+
+  it('keeps pending changes when the host cannot store the discarded copy', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    const a = await mount(backend.snapshot, client.transport, 'alice/session', undefined, { onDiscard: () => { throw new Error('Storage full') } })
+    client.connection.online = false
+    a.editor.commands.insertContent('Keep ')
+    expect(() => a.session.discardPendingAndResync()).toThrow(/Storage full/)
+    expect(a.editor.getText()).toBe('Keep Body.')
+    expect(a.session.getRecovery()?.steps).toHaveLength(1)
+  })
+
+  it('treats a discarded batch that the server accepted late as ordinary history', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    const a = await mount(backend.snapshot, client.transport, 'alice/session')
+    const b = await mount(backend.snapshot, backend.client().transport, 'bob/session')
+    client.connection.loseAcknowledgement = true
+    a.editor.commands.insertContent('Late ')
+    await vi.waitFor(() => expect(a.session.state.status).toBe('offline'))
+    expect(a.session.discardPendingAndResync()).not.toBeNull()
+    await a.session.flush()
+    await b.session.flush()
+    await vi.waitFor(() => expect(a.editor.getJSON()).toEqual(b.editor.getJSON()))
+    expect(a.editor.getText()).toBe('Late Body.')
+    a.editor.commands.insertContentAt(1, 'Next ')
+    await a.session.flush()
+    expect(backend.markdown.trim()).toBe('Next Late Body.')
+  })
+
+  it.each([
+    ['HTTP 503', Object.assign(new Error('Service unavailable'), { status: 503 }), 'offline', 'unavailable'],
+    ['fetch failure', new TypeError('Failed to fetch'), 'offline', 'unavailable'],
+    ['unavailable code', new CollaborationError('unavailable', 'Try again later.'), 'offline', 'unavailable'],
+    ['HTTP 403', Object.assign(new Error('Forbidden'), { status: 403 }), 'error', 'forbidden'],
+    ['host forbidden code', Object.assign(new Error('Not a member'), { data: { code: 'forbidden', message: 'Not a member' } }), 'error', 'forbidden'],
+    ['policy code', new CollaborationError('policy', 'Policy changed.'), 'stale', 'policy_mismatch'],
+  ] as const)('classifies %s', async (_name, error, status, code) => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    let failing = true
+    const transport: CollaborationTransport = { ...client.transport,
+      pull: head => failing ? Promise.reject(error) : client.transport.pull(head) }
+    const a = await mount(backend.snapshot, client.transport, 'alice/session')
+    const { session, editor } = bare({ snapshot: backend.snapshot, clientId: 'bob/session', transport, backoff: { initialMs: 5, maxMs: 10 } })
+    await vi.waitFor(() => expect(session.state).toMatchObject({ status, code }))
+    failing = false
+    if (status === 'offline') {
+      a.editor.commands.insertContent('Remote ')
+      await a.session.flush()
+      await vi.waitFor(() => expect(editor.getText()).toBe('Remote Body.'))
+      expect(session.state.code).toBeUndefined()
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 30))
+      expect(session.state.status).toBe(status)
+    }
+  })
+
+  it('times out a hung request and retries automatically with jittered backoff', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    let hang = true
+    const transport: CollaborationTransport = { ...client.transport,
+      pull: head => hang ? new Promise(() => {}) : client.transport.pull(head) }
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    try {
+      const { session, editor } = bare({ snapshot: backend.snapshot, clientId: 'alice/session', transport,
+        requestTimeoutMs: 20, backoff: { initialMs: 10, maxMs: 40 } })
+      await vi.waitFor(() => expect(session.state).toMatchObject({ status: 'offline', code: 'timeout' }))
+      expect(random).toHaveBeenCalled()
+      hang = false
+      editor.commands.insertContent('After ')
+      await session.flush(2000)
+      expect(backend.markdown.trim()).toBe('After Body.')
+    } finally {
+      random.mockRestore()
+    }
+  })
+
+  it('cuts a long retry wait short on a new head and on the browser online event', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    const a = await mount(backend.snapshot, client.transport, 'alice/session', undefined, { backoff: { initialMs: 60_000, maxMs: 60_000 } })
+    const random = vi.spyOn(Math, 'random').mockReturnValue(1)
+    try {
+      client.connection.online = false
+      a.editor.commands.insertContent('Queued ')
+      await vi.waitFor(() => expect(a.session.state.status).toBe('offline'))
+      client.connection.online = true
+      window.dispatchEvent(new Event('online'))
+      await a.session.flush(1000)
+      expect(backend.markdown).toContain('Queued')
+      client.connection.online = false
+      a.editor.commands.insertContent('Again ')
+      await vi.waitFor(() => expect(a.session.state.status).toBe('offline'))
+      client.connection.online = true
+      const b = await mount(backend.snapshot, backend.client().transport, 'bob/session')
+      b.editor.commands.insertContent('Bob ')
+      await b.session.flush()
+      await a.session.flush(1000)
+      expect(backend.markdown).toContain('Again')
+    } finally {
+      random.mockRestore()
+    }
+  })
+
+  it('sends the protocol version and stops on a newer server protocol', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    const seen: unknown[] = []
+    let newer = false
+    const transport: CollaborationTransport = { ...client.transport,
+      async pull(head) {
+        seen.push(head.protocolVersion)
+        const reply = await client.transport.pull(head)
+        return newer && reply.status === 'ok' ? { ...reply, update: { ...reply.update, protocolVersion: 2 as never } } : reply
+      },
+    }
+    const a = await mount(backend.snapshot, transport, 'alice/session')
+    expect(seen).toContain(1)
+    newer = true
+    a.editor.commands.insertContent('X')
+    await vi.waitFor(() => expect(a.session.state).toMatchObject({ status: 'stale', code: 'schema_mismatch' }))
+  })
+})
+
+describe('recovery writes', () => {
+  it('throttles recovery writes and writes immediately when the page is hidden', async () => {
+    const backend = await server('Body.')
+    const client = backend.client()
+    const writes: (CollaborationRecovery | null)[] = []
+    const { session, editor } = bare({ snapshot: backend.snapshot, clientId: 'alice/session', transport: client.transport,
+      recoveryDelayMs: 200, onRecovery: value => { writes.push(value) } })
+    await session.flush()
+    expect(writes).toEqual([])
+    client.connection.online = false
+    for (const letter of 'typing') editor.commands.insertContent(letter)
+    expect(writes).toEqual([])
+    await vi.waitFor(() => expect(writes).toHaveLength(1), { timeout: 1000 })
+    expect(writes[0]?.document).toContain('typing')
+    editor.commands.insertContent('!')
+    window.dispatchEvent(new Event('pagehide'))
+    expect(writes).toHaveLength(2)
+    expect(writes[1]?.document).toContain('typing!')
+    editor.commands.insertContent('?')
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    Reflect.deleteProperty(document, 'visibilityState')
+    expect(writes.at(-1)?.document).toContain('typing!?')
+    client.connection.online = true
+    session.retry()
+    await session.flush()
+    expect(writes.at(-1)).toBeNull()
+  })
+
+  it('writes synchronously with a zero delay and skips remote-only changes', async () => {
+    const backend = await server('Body.')
+    let writes = 0
+    const a = await mount(backend.snapshot, backend.client().transport, 'alice/session', undefined,
+      { recoveryDelayMs: 0, onRecovery: () => { writes++ } })
+    const b = await mount(backend.snapshot, backend.client().transport, 'bob/session')
+    b.editor.commands.insertContent('Remote ')
+    await b.session.flush()
+    await vi.waitFor(() => expect(a.editor.getText()).toBe('Remote Body.'))
+    expect(writes).toBe(0)
+    a.editor.commands.insertContent('L')
+    expect(writes).toBe(1)
+  })
+
+  it('does not serialize the whole document for each typed character', async () => {
+    const backend = await server('Body.\n\n' + 'Long paragraph text. '.repeat(400))
+    const client = backend.client()
+    const a = await mount(backend.snapshot, client.transport, 'alice/session', undefined, { recoveryDelayMs: 10_000 })
+    client.connection.online = false
+    const prototype = Object.getPrototypeOf(a.editor.state.doc) as { toJSON: () => unknown }
+    const original = prototype.toJSON
+    let documents = 0
+    prototype.toJSON = function (this: { type: { name: string } }) {
+      if (this.type.name === 'doc') documents++
+      return original.call(this)
+    }
+    try {
+      for (let index = 0; index < 50; index++) a.editor.commands.insertContent('x')
+    } finally {
+      prototype.toJSON = original
+    }
+    expect(a.editor.getText()).toContain('x'.repeat(50))
+    expect(documents).toBeLessThanOrEqual(3)
+  })
+})
+
+describe('recovery from another schema revision', () => {
+  it('converts an old pending document to Markdown and reports unreadable copies', async () => {
+    const backend = await server('Body.')
+    const current: CollaborationRecovery = { format: 1, clientId: 'user/session', base: backend.snapshot,
+      document: backend.snapshot.document, steps: [], groups: [] }
+    expect(await readCollaborationRecovery(JSON.stringify(current))).toMatchObject({ status: 'current' })
+    const old = { ...current, base: { ...current.base, schemaRevision: 'ginko-editor-1' },
+      document: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Offline draft.' }] }] }) }
+    expect(await readCollaborationRecovery(JSON.stringify(old))).toMatchObject({ status: 'converted', schemaRevision: 'ginko-editor-1',
+      markdown: expect.stringContaining('Offline draft.') })
+    const binding = { ...old, document: JSON.stringify({ type: 'doc', content: [{ type: 'binding', attrs: { value: 'x' } }] }) }
+    expect(await readCollaborationRecovery(JSON.stringify(binding))).toMatchObject({ status: 'unreadable', reason: 'content' })
+    expect(await readCollaborationRecovery('{')).toMatchObject({ status: 'unreadable', reason: 'format' })
   })
 })
