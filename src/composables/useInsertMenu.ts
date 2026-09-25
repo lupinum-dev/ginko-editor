@@ -14,11 +14,13 @@ import {
 } from 'vue'
 
 import type { AuthoringKit, AuthoringRecipe } from '../authoring'
+import { addContainerItem, containerAt } from '../lib/container-items'
 import type { EditorOperationContext } from '../lib/editor-operations'
 import type { EditorOverlayController } from '../ui/context'
 import { runRecipeCommand } from '../ui/recipe-command'
+import { groupMatches, rankRecipes, type RecipeGroup, type RecipeMatch } from '../ui/recipe-search'
 import { slashKey } from '../ui/slash-command'
-import { isImageRecipe, recipeCopy, searchRecipes, writingRecipes } from '../ui/writingRecipes'
+import { isImageRecipe, recipeCopy, writingRecipes } from '../ui/writingRecipes'
 
 type BrowserElement = InstanceType<typeof globalThis.HTMLElement>
 type BrowserKeyboardEvent = InstanceType<typeof globalThis.KeyboardEvent>
@@ -42,6 +44,16 @@ export interface InsertMenuOptions {
   requestImage: (range?: { from: number; to: number }) => void
 }
 
+/** The most recent recipes that one editor keeps in memory. */
+const recentLimit = 5
+
+/** An action for the container that holds the selection, for example "Add tab". */
+interface ContextAction {
+  recipe: AuthoringRecipe
+  container: number
+  after: number
+}
+
 /** The block menu opened by the Insert button or by typing `/` in a paragraph. */
 export function useInsertMenu(options: InsertMenuOptions) {
   const { editor, overlays } = options
@@ -55,18 +67,45 @@ export function useInsertMenu(options: InsertMenuOptions) {
   const busy = ref(false)
   const position = ref({ left: '8px', top: '48px', maxHeight: '420px' })
   const container = shallowRef<BrowserElement>()
+  const recent = shallowRef<readonly AuthoringRecipe[]>([])
+  const contextAction = shallowRef<ContextAction>()
   let selection: Selection | undefined
   let resizeObserver: InstanceType<typeof globalThis.ResizeObserver> | undefined
 
   const menuElement = () => options.menu.value?.root
 
-  const recipes = computed(() => {
-    const all = [
-      ...(options.kit.value?.recipes ?? []),
-      ...writingRecipes.filter(recipe => options.enableImages() || !isImageRecipe(recipe)),
-    ]
-    return searchRecipes(all, query.value, recipe => recipeCopy(recipe, overlays.text))
+  const available = computed(() => [
+    ...(options.kit.value?.recipes ?? []),
+    ...writingRecipes.filter(recipe => options.enableImages() || !isImageRecipe(recipe)),
+  ])
+  const copy = (recipe: AuthoringRecipe) => recipeCopy(recipe, overlays.text)
+  /** Menu groups in display order. Context actions come first, then recent recipes. */
+  const groups = computed<RecipeGroup[]>(() => {
+    const searching = !!query.value.trim()
+    const action = contextAction.value
+    const pinned: RecipeGroup[] = []
+    if (action) {
+      const [match] = rankRecipes([action.recipe], query.value, copy)
+      pinned.push({ key: 'context', label: overlays.text('groupContext'), matches: match ? [match] : [] })
+    }
+    const all = available.value
+    let rest: readonly AuthoringRecipe[] = all
+    if (!searching) {
+      const recentMatches = recent.value.filter(recipe => all.includes(recipe))
+      if (recentMatches.length) {
+        pinned.push({
+          key: 'recent',
+          label: overlays.text('groupRecent'),
+          matches: rankRecipes(recentMatches, '', copy),
+        })
+        rest = all.filter(recipe => !recentMatches.includes(recipe))
+      }
+    }
+    return groupMatches(rankRecipes(rest, query.value, copy), overlays.text, { query: searching, pinned })
   })
+  /** Options in keyboard order. */
+  const entries = computed<RecipeMatch[]>(() => groups.value.flatMap(group => group.matches))
+  const recipes = computed(() => entries.value.map(entry => entry.recipe))
   const activeRecipe = computed(() => recipes.value[activeIndex.value])
 
   watch(recipes, () => {
@@ -148,6 +187,7 @@ export function useInsertMenu(options: InsertMenuOptions) {
     error.value = null
     container.value = overlays.getContainer()
     overlays.open(owner, () => close(false))
+    readContext()
     open.value = true
     const opening = selection
     await nextTick()
@@ -163,9 +203,35 @@ export function useInsertMenu(options: InsertMenuOptions) {
     instance.view.focus()
   }
 
+  /** Offer an add action when the selection is inside a container item. */
+  function readContext() {
+    const instance = editor.value
+    const kit = options.kit.value
+    const found = instance && selection && kit ? containerAt(instance.state.doc, selection.from, kit) : undefined
+    if (!found) {
+      contextAction.value = undefined
+      return
+    }
+    const { layout, item } = found
+    const containerLabel = kit?.authoring[layout.node.attrs.tag]?.label ?? layout.node.attrs.tag
+    contextAction.value = {
+      container: layout.pos,
+      after: item.index,
+      recipe: {
+        id: 'ginko.context.add-item',
+        label: layout.config.addLabel ?? overlays.text('addItem'),
+        description: containerLabel,
+        group: 'context',
+        icon: 'plus',
+        source: '',
+      },
+    }
+  }
+
   function close(restore = true, dismissSlash = true) {
     const previous = selection
     open.value = false
+    contextAction.value = undefined
     overlays.release(owner)
     query.value = ''
     error.value = null
@@ -182,11 +248,25 @@ export function useInsertMenu(options: InsertMenuOptions) {
     else void show('button')
   }
 
+  function reveal() {
+    void nextTick(() => menuElement()?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }))
+  }
+
   function move(offset: number) {
     const count = recipes.value.length
     if (!count) return
     activeIndex.value = (activeIndex.value + offset + count) % count
-    void nextTick(() => menuElement()?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }))
+    reveal()
+  }
+
+  function moveTo(index: number) {
+    if (!recipes.value.length) return
+    activeIndex.value = Math.max(0, Math.min(recipes.value.length - 1, index))
+    reveal()
+  }
+
+  function remember(recipe: AuthoringRecipe) {
+    recent.value = [recipe, ...recent.value.filter(entry => entry !== recipe)].slice(0, recentLimit)
   }
 
   async function insert(recipe: AuthoringRecipe | undefined) {
@@ -196,25 +276,35 @@ export function useInsertMenu(options: InsertMenuOptions) {
     const range = origin.value === 'slash' ? slashKey.getState(instance.state)?.active : undefined
     if (selectionAtStart.$from.doc !== instance.state.doc) { close(false); return }
     if (isImageRecipe(recipe)) {
+      remember(recipe)
       restoreSelection()
       close(false)
       options.requestImage(range)
       return
     }
+    const action = contextAction.value?.recipe === recipe ? contextAction.value : undefined
     busy.value = true
     error.value = null
     try {
       restoreSelection(selectionAtStart)
-      const result = await runRecipeCommand(instance, recipe, {
+      const context = {
         ...options.operationContext,
         canMutate: () =>
           !options.isDisposed()
           && open.value
           && selection === selectionAtStart
           && options.canMutate(),
-      }, range)
+      }
+      const result = action
+        ? await addContainerItem(instance, action.container, { after: action.after, replaceRange: range }, context)
+        : await runRecipeCommand(instance, recipe, context, range)
       if (options.isDisposed()) return
-      if (result.ok) { close(false); instance.view.focus(); return }
+      if (result.ok) {
+        if (!action) remember(recipe)
+        close(false)
+        instance.view.focus()
+        return
+      }
       if (!open.value || selection !== selectionAtStart) return
       if (result.reason !== 'stale') error.value = overlays.text('insertFailed')
     } finally {
@@ -226,8 +316,26 @@ export function useInsertMenu(options: InsertMenuOptions) {
   function handleKeys(event: BrowserKeyboardEvent) {
     if (event.isComposing) return false
     if (event.key === 'Tab') {
+      const preview = menuElement()?.querySelector<BrowserElement>('.ginko-editor__recipe-preview')
+      if (preview?.contains(globalThis.document.activeElement)) {
+        // Return from the preview to the place where the writer types.
+        event.preventDefault()
+        if (origin.value === 'slash') editor.value?.view.focus()
+        else options.menu.value?.search?.focus()
+        return true
+      }
+      if (preview && !event.shiftKey) {
+        event.preventDefault()
+        preview.focus()
+        return true
+      }
       close(false)
       return false
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      moveTo(event.key === 'Home' ? 0 : recipes.value.length - 1)
+      return true
     }
     if (event.key === 'Escape') {
       event.preventDefault()
@@ -268,6 +376,8 @@ export function useInsertMenu(options: InsertMenuOptions) {
     activeIndex,
     activeRecipe,
     recipes,
+    groups,
+    entries,
     error,
     busy,
     position,

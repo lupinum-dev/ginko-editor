@@ -1,6 +1,7 @@
 import './ui/tokens.css'
 import './ui/editor.css'
 import './ui/canvas.css'
+import './ui/items.css'
 import './ui/image-picker.css'
 import './ui/collaboration.css'
 
@@ -20,7 +21,15 @@ export type {
 } from './ui/commands'
 export { defaultMessages } from './ui/messages'
 export type { EditorMessageKey, EditorMessageParams } from './ui/messages'
-export { composeAuthoringKits, createAuthoringKit, parseAuthoringSource } from './authoring'
+export {
+  composeAuthoringKits,
+  createAuthoringKit,
+  createGinkoLayoutKit,
+  ginkoLayoutComponentNames,
+  ginkoLayoutComponentPolicy,
+  ginkoLayoutKitSource,
+  parseAuthoringSource,
+} from './authoring'
 export type {
   AuthoringControl,
   AuthoringKit,
@@ -28,6 +37,8 @@ export type {
   AuthoringRecipe,
   ComponentAuthoringField,
   ComponentAuthoringMetadata,
+  ComponentCanvasItems,
+  ComponentItemsPresentation,
   ComponentImplementationMetadata,
   ComponentImplementationProp,
   ImplementationPropType,

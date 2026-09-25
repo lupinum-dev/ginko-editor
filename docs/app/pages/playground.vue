@@ -33,9 +33,18 @@ const welcomeDocument =
   '</info>\n\n' +
   '## From an idea to a clear page\n\n' +
   '- Write naturally, with Markdown shortcuts.\n' +
-  '- Add a callout, columns, or a learning objective.\n' +
+  '- Add tabs, steps, a callout, columns, or a learning objective.\n' +
   '- See the actual components in the live preview.\n\n' +
-  '> The best tool gets out of the way of your next thought.\n\n'
+  '> The best tool gets out of the way of your next thought.\n\n' +
+  '## Try a layout block\n\n' +
+  '::tabs\n' +
+  ':::tab{label="Write"}\n' +
+  'Select a tab to edit its content. Select **+** to add a tab.\n' +
+  ':::\n\n' +
+  ':::tab{label="Review"}\n' +
+  'Double-click a tab name to rename it.\n' +
+  ':::\n' +
+  '::\n'
 
 const editor = ref<GinkoEditorHandle>()
 const workspace = ref<globalThis.HTMLElement>()

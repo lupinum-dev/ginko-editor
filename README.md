@@ -99,7 +99,26 @@ reload the document.
 
 Type `/` on a new paragraph or use **Insert** to search writing blocks. Native
 Markdown blocks work without an authoring kit; host kits add component recipes.
-Recipes can include a short `description` and search `keywords`.
+Recipes can include a short `description`, search `keywords`, a menu `group`,
+and a Lucide `icon` name. The menu groups results, shows recent blocks first, and
+offers "Add tab" or "Add item" when the caret is inside a container.
+
+### Built-in layout blocks
+
+The editor includes a layout kit with the Ginko Docs components: callouts, tabs,
+accordions, steps, cards, timelines, columns, code groups, figures, quizzes, and
+more. Its policy is the Ginko Docs policy, so the documents render on a Docs site.
+Compose it with your own kit:
+
+```ts
+import { composeAuthoringKits, ginkoLayoutKitSource } from '@lupinum/ginko-editor/authoring'
+
+const kit = await composeAuthoringKits(ginkoLayoutKitSource, hostKitSource)
+```
+
+`createGinkoLayoutKit()` returns the layout kit alone. See
+[Layout blocks](docs/content/docs/1.getting-started/4.layout-blocks.md) for what
+each block can edit.
 
 The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its source
 with Ginko Content and their own components. The menu handles selection, focus,
@@ -229,6 +248,31 @@ drag or arrow keys. Imported custom pairs and layouts with other column counts
 remain unchanged until explicitly edited. Presets require unique pairs and
 increasing finite ratios between zero and one.
 
+`items` describes the repeated children of a container:
+
+```ts
+tabs: {
+  label: 'Tabs',
+  canvas: {
+    items: {
+      childTag: 'tab', labelProp: 'label', presentation: 'tabs', addLabel: 'Add tab',
+      template: '::tab{label="New tab"}\nWrite the tab content here.\n::',
+    },
+  },
+}
+```
+
+Set `childTag` for component items, or `childNode: 'codeBlock'` or
+`childNode: 'heading'` for code blocks and heading sections. `presentation` is
+`tabs`, `accordion`, `stack`, `grid`, `steps`, or `timeline`. `columnsProp` names
+a container property with the grid column count. The template must contain
+exactly one item. Adding, removing, and renaming items are single undoable
+changes that pass the Content policy. The selected tab and collapsed accordion
+items are view state and never enter the document.
+
+A `json` control edits a property whose policy allows `json`. The field accepts
+JSON text and applies it only when it is valid.
+
 Tables expose row, column, and alignment menus beside the active table. The first
 row is the Markdown header; another row can be promoted to that position.
 Merged cells and arbitrary header placement are outside the Markdown table
@@ -248,7 +292,8 @@ rules override them. Dark fallbacks apply below a `.dark` ancestor or with
 `data-ginko-theme="dark"` or `"auto"`.
 
 - [Customize the editor](docs/content/docs/1.getting-started/2.customize.md): Vue, Nuxt, toolbar actions, messages, shortcuts, and overlays.
-- [Component coverage](docs/content/docs/1.getting-started/4.component-coverage.md): current Docs tags, named slots, and source-mode limits.
+- [Layout blocks](docs/content/docs/1.getting-started/4.layout-blocks.md): the built-in layout kit and what each block can edit.
+- [Component coverage](docs/content/docs/1.getting-started/5.component-coverage.md): current Docs tags, named slots, and source-mode limits.
 
 ## Documentation
 
@@ -265,19 +310,14 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Maintain
 
 ### Local documentation playground
 
-The playground temporarily needs accepted local Content and Docs candidates
-because their required contracts are not published yet. Build both candidates,
-then start the playground with explicit absolute paths:
+Build the package, then start the documentation site with the playground:
 
 ```bash
-GINKO_CONTENT_CANDIDATE=/absolute/path/to/ginko-content/packages/content \
-GINKO_DOCS_CANDIDATE=/absolute/path/to/ginko-docs/layer \
-pnpm docs:dev
+pnpm dev
 ```
 
-The preparation script validates both inputs and creates only ignored files in
-`docs/.candidate`. Remove this setup after the matching package releases are
-published, as tracked in `internals/migrations.md`.
+The site uses the published Ginko Docs layer and the Content version of this
+workspace, so the playground and the Editor share one parser.
 
 ## Support and security
 

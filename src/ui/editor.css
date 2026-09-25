@@ -226,6 +226,47 @@
     font: 500 16px/1 ui-sans-serif, system-ui, sans-serif;
   }
 
+  .ginko-editor__recipe-symbol svg {
+    width: 17px;
+    height: 17px;
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__insert-group + .ginko-editor__insert-group {
+    margin-top: .25rem;
+  }
+
+  .ginko-editor__insert-group-label {
+    padding: .45rem .5rem .2rem;
+    color: var(--ginko-muted-foreground);
+    font: 600 .66rem/1.4 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+  }
+
+  .ginko-editor__recipe-match {
+    background: transparent;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-decoration-color: color-mix(in srgb, var(--ginko-tone-info) 70%, transparent);
+    text-underline-offset: 2px;
+  }
+
+  .ginko-editor__insert-empty p {
+    margin: 0;
+  }
+
+  .ginko-editor__insert-empty .ginko-editor__insert-hint {
+    margin-top: .25rem;
+    font-size: .75rem;
+  }
+
+  .ginko-editor__recipe-preview:focus-visible {
+    outline: 2px solid var(--ginko-ring);
+    outline-offset: -2px;
+  }
+
   .ginko-editor__recipe-text {
     display: grid;
     gap: .1rem;

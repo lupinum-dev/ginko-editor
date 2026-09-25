@@ -12,6 +12,9 @@ import type { AuthoringKit } from '../../authoring'
 import { SetNodePropertyStep } from '../property-step'
 import { createPropertyInput } from '../property-input'
 import { handleHistoryKeydown, observeNodeViewRefresh } from './lifecycle'
+import { containerControls } from './items'
+import { containerItemsKey, isItemCollapsed, toggleContainerItem } from '../extensions/container-items'
+import { itemsConfig } from '../container-items'
 
 export function componentView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
@@ -44,11 +47,17 @@ export function componentView(
   divider.tabIndex = 0
   const symbol = document.createElement('span')
   symbol.className = 'ginko-block__symbol'
-  header.append(label, symbol, title)
+  const collapse = document.createElement('button')
+  collapse.type = 'button'
+  collapse.className = 'ginko-icon-button ginko-block__collapse'
+  collapse.append(icon('chevron'))
+  collapse.hidden = true
+  header.append(collapse, label, symbol, title)
   const body = document.createElement('div')
   body.className = 'ginko-block__body'
   body.append(contentDOM, divider)
-  dom.append(header, body)
+  const items = containerControls(editor, () => node, () => position(), getKit, text, contentDOM)
+  dom.append(header, items.strip, body, items.footer)
   let dragging: { pointerId: number; ratio: number } | undefined
   let destroyed = false
   let previousKit = getKit()
@@ -65,6 +74,23 @@ export function componentView(
       && preset.values.every((value, i) => (children[i].node.attrs.props[config.sizeProp]
         ?? getKit()?.implementation[config.childTag]?.props[config.sizeProp]?.default) === value)) ?? -1
   }
+  /** The accordion that contains this item, if any. View state only. */
+  const inAccordion = () => {
+    const pos = position()
+    if (pos === undefined) return false
+    const resolved = editor.state.doc.resolve(pos)
+    for (let depth = resolved.depth; depth > 0; depth--) {
+      const parent = resolved.node(depth)
+      if (parent.type.name === 'slot') continue
+      const config = itemsConfig(getKit(), parent.attrs.tag)
+      return config?.presentation === 'accordion' && config.childTag === node.attrs.tag
+    }
+    return false
+  }
+  collapse.addEventListener('click', () => {
+    const pos = position()
+    if (pos !== undefined) editor.view.dispatch(toggleContainerItem(editor.state.tr, pos))
+  })
   const parentColumns = () => {
     const pos = position()
     return pos === undefined ? undefined : parentColumnConfig(editor.state.doc, pos, getKit())
@@ -248,8 +274,27 @@ export function componentView(
       divider.title = text('resizeColumnsHint', { label: config.presets[selected]?.label ?? text('customWidths') })
 
     }
+    const accordionItem = inAccordion()
+    const pos = position()
+    const collapsed = accordionItem && pos !== undefined && isItemCollapsed(editor.state, pos)
+    collapse.hidden = !accordionItem
+    collapse.setAttribute('aria-expanded', String(!collapsed))
+    collapse.setAttribute('aria-controls', contentDOM.id || '')
+    const itemName = titleValue || meta?.label || node.attrs.tag
+    collapse.setAttribute('aria-label', text(collapsed ? 'expandItem' : 'collapseItem', { label: itemName }))
+    collapse.title = collapse.getAttribute('aria-label') ?? ''
+    dom.dataset.items = itemsConfig(getKit(), node.attrs.tag)?.presentation ?? ''
+    items.render()
     settings.render()
   }
+  let itemsState = containerItemsKey.getState(editor.state)
+  const followItems = () => {
+    const next = containerItemsKey.getState(editor.state)
+    if (next === itemsState) return
+    itemsState = next
+    refresh.refresh(true)
+  }
+  editor.on('transaction', followItems)
   const cancelDragOnChange = ({ transaction }: { transaction: { docChanged: boolean } }) => {
     if (transaction.docChanged && dragging) cancelDrag()
   }
@@ -267,9 +312,12 @@ export function componentView(
     },
     stopEvent(event) {
       return event.target instanceof globalThis.Node
-        && (header.contains(event.target) || divider.contains(event.target) || settings.contains(event.target))
+        && (header.contains(event.target) || divider.contains(event.target) || settings.contains(event.target)
+          || items.contains(event.target))
     },
     ignoreMutation(mutation) {
+      // Container controls set view attributes on the content element itself.
+      if (mutation.type === 'attributes' && mutation.target === contentDOM) return true
       return mutation.type !== 'selection' && !contentDOM.contains(mutation.target)
     },
     destroy() {
@@ -277,6 +325,7 @@ export function componentView(
       cancelDrag()
       settings.destroy()
       editor.off('transaction', cancelDragOnChange)
+      editor.off('transaction', followItems)
       refresh.destroy()
     },
   }

@@ -320,7 +320,9 @@
   :is(.ginko-editor,
   .ginko-node-popover-content) .ginko-editor__fields input:not([type='checkbox']),
   :is(.ginko-editor,
-  .ginko-node-popover-content) .ginko-editor__fields select {
+  .ginko-node-popover-content) .ginko-editor__fields select,
+  :is(.ginko-editor,
+  .ginko-node-popover-content) .ginko-editor__fields textarea {
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
@@ -330,6 +332,15 @@
     background: var(--ginko-background);
     color: inherit;
     font: inherit;
+  }
+
+  :is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields textarea {
+    resize: vertical;
+    font: .75rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  :is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields textarea[aria-invalid='true'] {
+    border-color: var(--ginko-destructive);
   }
 
   :is(.ginko-editor, .ginko-node-popover-content) .ginko-editor__fields input[type='checkbox'] {
