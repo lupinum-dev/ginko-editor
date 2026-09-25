@@ -112,6 +112,8 @@ The package must exist before npm can bind a trusted publisher. Download the exa
 
 ## Normal release
 
+The publish workflow stops if a peer range in the retained tarball does not resolve on the npm registry. Publish Content before an Editor release that needs a new Content version.
+
 Update `CHANGELOG.md` with `pnpm release:prepare` in a focused pull request. Merge after `pnpm release:verify` and CI pass. Dispatch `publish.yml` from current `main` with the reviewed package version. The workflow derives every other value from exact successful `main` CI. It requests npm approval only when publication is required and repairs the tag or GitHub release separately.
 
 ## Rollback
