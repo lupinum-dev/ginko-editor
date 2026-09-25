@@ -1,5 +1,27 @@
 # Ginko Editor implementation handoff
 
+## 1.0 readiness status — 2026-09-26
+
+Local branches only; nothing is pushed or published.
+
+| Repository | Branch | State |
+| --- | --- | --- |
+| Ginko Content | `fix/mdc-roundtrip-contract` | Lossless MDC serialization (text, code, headings, typed, quoted and multi-line props, URLs), parser-aligned heading ids, portable link rules, stable `cms-contract` exports. `pnpm verify` passes. Release as `1.0.0-beta.10`. |
+| Ginko Editor | `feat/v1-readiness` | Package shape, API refactor, layout kit and container editing, grouped block menu, collaboration hardening and presence, save-path property test. `pnpm verify`, packed consumers, and audit pass against the Content candidate. |
+
+Release order:
+
+1. Review and merge the Content branch, then publish Content `1.0.0-beta.10` through its release workflow.
+2. Remove the Content candidate migration in `internals/migrations.md` and run `pnpm release:verify`.
+3. Merge `feat/v1-readiness` (it contains the unmerged `fix/runtime-declarations` work) and publish the Editor. The publish workflow refuses unpublished peers.
+4. Update Ginko CMS: reconcile `feat/shared-editor` and `codex/cms-experience-editor-integration`, adopt the narrowed editor handle and `runtime` type imports, and validate stored bodies with Content's policy on save.
+
+Known limits: named component slots such as card titles are preserved but have
+no dedicated editor; the figure recipe uses a URL property, not the image
+picker; block-menu recents are kept only in memory; the Docs policy accepts any
+string for `card.to`, so its renderer must check links.
+
+
 Research and implementation completed locally on 2026-09-22. The shared editor
 now has a Vue multiplayer path through Convex, safer slash insertion, independent
 component-property operations, and verified integrations in CMS, Luis and
