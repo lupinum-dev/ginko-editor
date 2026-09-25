@@ -16,6 +16,7 @@ const paths = {
   alignCenter: 'M4 5h16M7 10h10M4 15h16M7 20h10',
   alignRight: 'M4 5h16M10 10h10M4 15h16M10 20h10',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
+  chevron: 'm6 9 6 6 6-6',
   info: 'M12 8h.01M12 11v6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
   warning: 'm12 3 10 18H2L12 3ZM12 9v5M12 17h.01',
   check: 'm6 12 4 4 8-8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',

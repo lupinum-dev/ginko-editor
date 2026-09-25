@@ -14,6 +14,7 @@ import type { AuthoringKit } from '../../authoring'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { MarkdownClipboard } from '../extensions'
 import { ComponentBoundary } from '../extensions/component-boundary'
+import { ContainerItems } from '../extensions/container-items'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -93,5 +94,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions = 
       onPendingChange: options.onImageUploadPending,
     }),
     ComponentBoundary,
+    ContainerItems.configure({ getAuthoringKit: options.getAuthoringKit }),
   ]
 }
