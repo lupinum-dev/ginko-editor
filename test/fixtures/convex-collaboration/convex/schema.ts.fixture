@@ -10,4 +10,10 @@ export default defineSchema({
     .index('by_room_identity', ['roomId', 'identity']),
   steps: defineTable({ roomId: v.id('rooms'), epoch: v.string(), version: v.number(), clientId: v.string(), steps: v.array(v.string()) })
     .index('by_room_epoch_version', ['roomId', 'epoch', 'version']),
+  // Ephemeral cursor records. They never become part of the document or its history.
+  presence: defineTable({ roomId: v.id('rooms'), clientId: v.string(), memberId: v.id('members'), name: v.string(),
+    color: v.optional(v.string()), epoch: v.string(), version: v.number(),
+    selection: v.union(v.null(), v.object({ anchor: v.number(), head: v.number() })), updatedAt: v.number(), expiresAt: v.number() })
+    .index('by_room_expiry', ['roomId', 'expiresAt'])
+    .index('by_room_client', ['roomId', 'clientId']),
 })

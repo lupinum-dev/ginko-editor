@@ -68,6 +68,21 @@ try {
   assert.equal(content.version, current.snapshot.version)
   assert.match(content.markdown, /Alice title/)
 
+  // Presence records are short-lived, use the account name, and stay inside the room's access rules.
+  const cursorClient = a.clientPrefix + randomUUID()
+  const cursor = { protocolVersion: 1, clientId: cursorClient, user: { name: 'Forged name' }, epoch: current.snapshot.epoch,
+    version: current.snapshot.version, selection: { anchor: 1, head: 3 }, updatedAt: 0 }
+  await alice.mutation(api.rooms.publishPresence, { roomId, update: cursor })
+  const peers = await bob.query(api.rooms.presence, { roomId })
+  assert.equal(peers.length, 1)
+  assert.equal(peers[0].user.name, 'alice')
+  assert.ok(peers[0].updatedAt > 0)
+  await assert.rejects(() => bob.mutation(api.rooms.publishPresence, { roomId, update: cursor }))
+  await assert.rejects(() => outsider.query(api.rooms.presence, { roomId }))
+  await assert.rejects(() => alice.mutation(api.rooms.publishPresence, { roomId, update: { ...cursor, version: current.snapshot.version + 5 } }))
+  await alice.mutation(api.rooms.leavePresence, { roomId, clientId: cursorClient })
+  assert.equal((await bob.query(api.rooms.presence, { roomId })).length, 0)
+
   const valid = wire(current, roomId, new SetNodePropertyStep(0, 'title', 'Later'))
   await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, version: current.snapshot.version + 10 }))
   await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, steps: [] }))
@@ -106,7 +121,7 @@ try {
   const pruned = await alice.query(api.rooms.pull, { roomId: imageRoom, ...head(imageOpen.snapshot) })
   assert.equal(pruned.status, 'stale'); assert.equal(pruned.reason, 'history')
   assert.match((await alice.query(api.rooms.content, { roomId: imageRoom })).markdown, /Kept/)
-  console.log('Verified local Convex JWT authentication, live subscriptions, concurrent updates, policy/schema limits, checkpoints, publication, revocation, replacement and pruned-history recovery.')
+  console.log('Verified local Convex JWT authentication, live subscriptions, concurrent updates, policy/schema limits, presence, checkpoints, publication, revocation, replacement and pruned-history recovery.')
 } finally {
   for (const unsubscribe of unsubscribers) unsubscribe()
   await live.close()
