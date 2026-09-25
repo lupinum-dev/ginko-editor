@@ -1,5 +1,7 @@
+import './ui/tokens.css'
 import './ui/editor.css'
 import './ui/canvas.css'
+import './ui/image-picker.css'
 
 export { default as GinkoEditor } from './GinkoEditor.vue'
 export { default as GinkoToolbar } from './ui/GinkoToolbar.vue'
