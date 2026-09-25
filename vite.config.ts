@@ -2,6 +2,15 @@ import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
+const externalPackages = [
+  'vue',
+  'prosemirror-collab',
+  'reka-ui',
+  '@lucide/vue',
+  'github-slugger',
+  '@lupinum/ginko-content',
+]
+
 export default defineConfig({
   plugins: [vue()],
   test: {
@@ -19,13 +28,12 @@ export default defineConfig({
       fileName: (_format, entryName) => `${entryName}.js`,
       cssFileName: 'style',
     },
+    sourcemap: true,
     rolldownOptions: {
+      // Keep every declared dependency and peer external so hosts share one copy.
       external: (id) =>
-        id === 'vue' ||
-        id === 'prosemirror-collab' ||
-        id.startsWith('@tiptap/') ||
-        id === '@lupinum/ginko-content' ||
-        id.startsWith('@lupinum/ginko-content/'),
+        externalPackages.some((name) => id === name || id.startsWith(`${name}/`)) ||
+        id.startsWith('@tiptap/'),
     },
   },
 })
