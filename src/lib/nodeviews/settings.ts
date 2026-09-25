@@ -14,6 +14,8 @@ import { SetComponentVariantStep } from '../property-step'
 import { createPropertyInput } from '../property-input'
 import { createStalenessGuard, handleHistoryKeydown } from './lifecycle'
 
+let nextListId = 0
+
 export function blockSettings(
   editor: Editor,
   getNode: () => Node,
@@ -38,7 +40,7 @@ export function blockSettings(
   const actions = document.createElement('div')
   actions.className = 'ginko-editor__block-actions'
   panel.append(heading, fields, error, actions)
-  const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>()
+  const inputs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>()
   let signature = ''
   const variantRequests = createStalenessGuard()
   let previousEditable = editor.isEditable, previousKit = getKit()
@@ -171,10 +173,36 @@ export function blockSettings(
         if (!field || name === metadata?.canvas?.titleProp) continue
         const label = document.createElement('label'), caption = document.createElement('span')
         caption.textContent = field.label
-        const input = document.createElement(field.control === 'select' ? 'select' : 'input')
+        const input = document.createElement(
+          field.control === 'select' ? 'select' : field.control === 'json' ? 'textarea' : 'input',
+        )
         input.setAttribute('aria-label', field.label)
         const values = kit?.policy.components[node.attrs.tag]?.props[name]?.allowedValues ?? []
-        if (input instanceof HTMLSelectElement) {
+        const isRequired = kit?.policy.components[node.attrs.tag]?.props[name]?.required === true
+        if (input instanceof HTMLTextAreaElement) {
+          input.rows = 4
+          input.spellcheck = false
+          input.className = 'ginko-editor__json'
+          input.addEventListener('input', () => {
+            const source = input.value.trim()
+            if (!source) {
+              if (isRequired) report(text('valueRequired'))
+              else updateProperty(name, undefined)
+              input.setAttribute('aria-invalid', String(isRequired))
+              return
+            }
+            let value: JsonValue
+            try {
+              value = JSON.parse(source) as JsonValue
+            } catch {
+              input.setAttribute('aria-invalid', 'true')
+              report(text('invalidJson'))
+              return
+            }
+            input.setAttribute('aria-invalid', 'false')
+            updateProperty(name, value)
+          })
+        } else if (input instanceof HTMLSelectElement) {
           const option = document.createElement('option')
           option.value = ''
           option.textContent = text('defaultValue')
@@ -192,6 +220,20 @@ export function blockSettings(
         } else {
           input.type = field.control === 'toggle' ? 'checkbox' : 'text'
           if (field.control === 'number') input.inputMode = 'decimal'
+          const suggestions = field.control === 'text'
+            ? kit?.implementation[node.attrs.tag]?.props[name]?.options?.filter(value => typeof value === 'string')
+            : undefined
+          if (suggestions?.length) {
+            const list = document.createElement('datalist')
+            list.id = `ginko-suggestions-${++nextListId}`
+            suggestions.forEach(value => {
+              const option = document.createElement('option')
+              option.value = String(value)
+              list.append(option)
+            })
+            input.setAttribute('list', list.id)
+            label.append(list)
+          }
           input.addEventListener(field.control === 'toggle' ? 'change' : 'input', () => {
             if (field.control === 'toggle') {
               updateProperty(name, input.checked)
@@ -230,7 +272,10 @@ export function blockSettings(
           ? String(value)
           : input instanceof HTMLSelectElement
             ? JSON.stringify(value) ?? ''
-            : String(value ?? '')
+            : input instanceof HTMLTextAreaElement
+              ? value === undefined ? '' : JSON.stringify(value, null, 2)
+              : String(value ?? '')
+        if (input instanceof HTMLTextAreaElement) input.removeAttribute('aria-invalid')
       }
     }
     const pos = getPos()
