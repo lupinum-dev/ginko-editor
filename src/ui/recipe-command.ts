@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core'
-import type { Transaction } from '@tiptap/pm/state'
+import { Selection, type Transaction } from '@tiptap/pm/state'
 import type { AuthoringRecipe } from '../authoring'
 import {
   commitEditorTransaction,
@@ -78,12 +78,18 @@ export function runRecipeCommand(
         if (!current()) return { ok: false, reason: 'stale' }
         if (!prepared.ok || !prepared.value) return { ok: false, reason: 'invalid-content' }
 
+        const insertAt = replaceRange?.from ?? editor.state.selection.from
         const accepted = editor.chain().command(({ tr }) => {
           tr.setMeta('preventDispatch', true)
           if (replaceRange) tr.delete(replaceRange.from, replaceRange.to)
           transaction = tr
           return true
-        }).insertContent(prepared.value.content ?? []).run()
+        }).insertContent(prepared.value.content ?? []).command(({ tr }) => {
+          // Continue writing in the first text of the new block, as in its first tab or item.
+          const start = Selection.findFrom(tr.doc.resolve(Math.min(insertAt, tr.doc.content.size)), 1, true)
+          if (start) tr.setSelection(start)
+          return true
+        }).run()
 
         if (!accepted) return { ok: false, reason: 'unavailable' }
 

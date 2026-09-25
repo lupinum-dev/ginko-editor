@@ -74,9 +74,10 @@ export function useInsertMenu(options: InsertMenuOptions) {
 
   const menuElement = () => options.menu.value?.root
 
+  // Native writing blocks come first within a group; kit recipes follow in kit order.
   const available = computed(() => [
-    ...(options.kit.value?.recipes ?? []),
     ...writingRecipes.filter(recipe => options.enableImages() || !isImageRecipe(recipe)),
+    ...(options.kit.value?.recipes ?? []),
   ])
   const copy = (recipe: AuthoringRecipe) => recipeCopy(recipe, overlays.text)
   /** Menu groups in display order. Context actions come first, then recent recipes. */

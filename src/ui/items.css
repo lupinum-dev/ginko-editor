@@ -24,7 +24,8 @@
     gap: .15rem;
     min-width: 0;
     overflow-x: auto;
-    scrollbar-width: thin;
+    overflow-y: hidden;
+    scrollbar-width: none;
   }
 
   .ginko-editor .ginko-items__tab {
