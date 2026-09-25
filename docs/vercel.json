@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nuxtjs",
-  "buildCommand": "pnpm --dir .. docs:build",
+  "buildCommand": "pnpm --dir .. build && pnpm --dir .. docs:build",
   "git": {
     "deploymentEnabled": {
       "**": false,

@@ -65,8 +65,7 @@ security authority. Prepare the evidence before asking.
 |---|---|
 | `pnpm dev` | A usable local development target. Inspect its real browser behavior. |
 | `pnpm build` | The primary production output. |
-| `pnpm verify` | The library handoff gate: dependency policy, lint, type checks, tests, and build. |
-| `pnpm verify:docs` | The library and the public documentation site build. It needs the local Docs candidate. |
+| `pnpm verify` | The handoff gate: dependency policy, lint, type checks, tests, the library build, and the documentation site build. |
 | `pnpm audit:all` | Dependency audit for the full workspace. |
 | `pnpm docs:build` | The public documentation site builds. |
 | `pnpm release:verify` | Certified tarballs install and work in isolated consumers. |
@@ -74,10 +73,9 @@ security authority. Prepare the evidence before asking.
 For documentation changes, explore navigation, search, and one documented example
 on desktop and a narrow screen. A successful docs build alone does not prove the
 packed package works. Release verification installs the tarball independently.
-Linux CI repeats certification in its own environment. It installs only the
-library package for the required gate. The docs build job does not block while
-the Docs candidate migration in `internals/migrations.md` is active; npm provenance and public
-release records are checked by the protected release workflow.
+Linux CI repeats certification in its own environment, including the
+documentation build. npm provenance and public release records are checked by
+the protected release workflow.
 
 Routine version pull requests may be independently reviewed and merged by agents.
 Keep the final protected npm approval with the maintainer. Retry the retained
@@ -102,7 +100,7 @@ Use Renovate for routine updates. Review release notes and lockfile changes. Do 
 
 ## Documentation change
 
-Follow [docs/WRITING.md](docs/WRITING.md). Run `pnpm verify:docs`. Verify links, mobile navigation, search, analytics, and feedback on the deployed preview.
+Follow [docs/WRITING.md](docs/WRITING.md). Run `pnpm verify`. Verify links, mobile navigation, search, analytics, and feedback on the deployed preview.
 
 Vercel uses `docs/` as the Root Directory. Enable source files outside the Root
 Directory because the documentation build needs this workspace package. Keep

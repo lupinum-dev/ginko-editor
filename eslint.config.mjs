@@ -8,7 +8,6 @@ export default [
       'dist/**',
       'release-artifacts/**',
       '.preview-artifacts/**',
-      'docs/.candidate/**',
       'docs/.nuxt/**',
       'docs/.output/**',
     ],

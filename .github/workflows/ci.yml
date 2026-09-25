@@ -28,10 +28,8 @@ jobs:
       - run: corepack enable pnpm && corepack prepare pnpm@11.21.0 --activate
       - if: github.event.schedule == '23 4 * * *'
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # The library gate installs only the package. The docs workspace needs
-      # the local Docs candidate (internals/migrations.md) and runs in `docs`.
       - if: github.event.schedule != '23 4 * * *'
-        run: pnpm install --frozen-lockfile --filter @lupinum/ginko-editor
+        run: pnpm install --frozen-lockfile
       # The action check imports `yaml`, so it must run after installation.
       - run: node scripts/verify-action-shas.mjs
       - if: github.event.schedule == '23 4 * * *'
@@ -45,20 +43,3 @@ jobs:
           path: release-artifacts
           if-no-files-found: error
           retention-days: 90
-
-  docs:
-    name: Docs build (not required)
-    if: github.event.schedule != '23 4 * * *'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    # Remove when the Docs candidate migration in internals/migrations.md ends.
-    # Until then CI has no Docs candidate, so this job reports without blocking.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with: { persist-credentials: false }
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with: { node-version: 24.18.0, package-manager-cache: false }
-      - run: corepack enable pnpm && corepack prepare pnpm@11.21.0 --activate
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm verify:docs
