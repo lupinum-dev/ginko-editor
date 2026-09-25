@@ -64,11 +64,20 @@ should not replay older editor emissions as intentional replacements.
 Before closing the editor or replacing its document, await the exposed `flush()`
 method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
 result means conversion failed or an image operation is unfinished: keep the editor
-open so the user can correct the document, finish the image operation, or remove it. A failed flush blocks switching to Markdown, which
+open so the user can correct the document, finish the image operation, or remove it. The `error` is a
+`ConversionErrorPayload`, or `{ code, message }` with code `image_upload_pending`,
+`collaboration_pending`, or `not_ready`. A failed flush blocks switching to Markdown, which
 would otherwise replace pending visual edits with older source. `flush()` emits
 the latest converted source but does
 not persist it; the host still owns and must await its save operation.
 The editor does not import Nuxt, the CMS, Convex, or an application router.
+
+The component handle, from a template ref, has the type `GinkoEditorHandle`:
+`flush()`, `hasPendingChanges()`, `removeSelectedMedia()`, `focus(position?)`, and
+`getEditor()`. `getEditor()` returns the TipTap editor as an unstable escape hatch.
+All props are reactive except `collaboration`, which the editor reads once when it
+mounts. New inline callbacks and equal authoring kits do not cancel uploads or
+reload the document.
 
 ## Writing and component previews
 
@@ -93,8 +102,9 @@ of the configuration.
 ## Images: upload and browse
 
 Provide one callback to enable an upload placeholder for **Add image**, `/image`,
-and **Replace image**. The editor accepts one non-empty image file up to 10 MB
-per placeholder, from the file chooser or drag and drop. Add `image-picker` to
+and **Replace image**. The editor accepts one non-empty image file per placeholder,
+up to 10 MB by default, from the file chooser or drag and drop. Set
+`image-max-bytes` to change the limit. Add `image-picker` to
 show **Browse images** in the same placeholder. A picker can also run without
 an upload callback. Drop a file directly
 onto the editor to see its preview and confirm **Add image**. Drop onto an
@@ -216,7 +226,10 @@ through `GinkoToolbar` slots, or render your toolbar with the editor
 `#toolbar="{ actions }"` slot. The same actions expose labels, active and disabled
 states, and guarded `run()` operations. `messages`, `shortcuts`, and
 `overlay-container` configure each editor independently. Compiled styles use
-shadcn semantic color tokens and work without Tailwind.
+public `--ginko-*` tokens with shadcn semantic variables as fallbacks, and work
+without Tailwind. All styles are in the `ginko` cascade layer, so unlayered host
+rules override them. Dark fallbacks apply below a `.dark` ancestor or with
+`data-ginko-theme="dark"` or `"auto"`.
 
 - [Customize the editor](docs/content/docs/1.getting-started/2.customize.md): Vue, Nuxt, toolbar actions, messages, shortcuts, and overlays.
 - [Component coverage](docs/content/docs/1.getting-started/4.component-coverage.md): current Docs tags, named slots, and source-mode limits.
