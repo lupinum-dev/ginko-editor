@@ -9,15 +9,8 @@ import type { JsonRecord, JsonValue } from '../types'
 import type { MDCNode, MDCRoot } from './mdcTypes'
 import { stripStyleNodes } from './stripStyleNodes'
 
-export interface ParseMdcOptions {
-  strict?: boolean
-  onError?: (error: unknown) => void
-}
-
 export interface StringifyMdcOptions {
   videoOutput?: 'html' | 'mdc'
-  strict?: boolean
-  onError?: (error: unknown) => void
 }
 
 type ComarkElementNode = [string, Record<string, unknown>, ...ComarkNode[]]
@@ -25,41 +18,6 @@ type ComarkCommentNode = [null, Record<string, unknown>, string]
 type ComarkNode = string | ComarkElementNode | ComarkCommentNode
 
 const TABLE_SECTION_TAGS = new Set(['thead', 'tbody', 'tfoot'])
-
-/**
- * Parse MDC-compatible markdown to the Studio's current MDC object tree.
- *
- * Comark is the only markdown parser used here. The object tree is a local
- * adapter for the existing TipTap converters, not a separate parsing model.
- */
-export async function parseMdc(content: string, options: ParseMdcOptions = {}): Promise<MDCRoot> {
-  if (!content || !content.trim()) {
-    return emptyRoot()
-  }
-
-  try {
-
-    const tree = await parseMdcDocument(content, { autoClose: options.strict === false })
-    const cleaned = adaptMdcDocument(tree)
-    return cleaned
-  } catch (error) {
-    options.onError?.(error)
-    if (options.strict !== false) {
-      throw error instanceof Error ? error : new Error(String(error))
-    }
-    return {
-      children: [
-        {
-          children: [{ type: 'text', value: content }],
-          props: {},
-          tag: 'p',
-          type: 'element',
-        },
-      ],
-      type: 'root',
-    }
-  }
-}
 
 /** Adapt one canonical parse result to the editor's lossless conversion tree. */
 export function adaptMdcDocument(
@@ -95,31 +53,15 @@ export async function stringifyMdc(
   if (!ast || !ast.children?.length) {
     return ''
   }
-
-  try {
-    const cleaned = stripStyleNodes(ast)
-    const tree = {
-      frontmatter: {},
-      meta: {},
-      nodes: mdcNodesToComark(cleaned.children || [], options),
-    }
-    const markdown = await serializeMdcDocument(tree)
-    if (!markdown.trim()) return ''
-    return markdown.endsWith('\n') ? markdown : `${markdown}\n`
-  } catch (error) {
-    options.onError?.(error)
-    if (options.strict !== false) {
-      throw error instanceof Error ? error : new Error(String(error))
-    }
-    return ''
-  }
-}
-
-function emptyRoot(): MDCRoot {
-  return {
-    children: [],
-    type: 'root',
-  }
+  // Serializer errors reach the caller. An empty document is never a fallback.
+  const cleaned = stripStyleNodes(ast)
+  const markdown = await serializeMdcDocument({
+    frontmatter: {},
+    meta: {},
+    nodes: mdcNodesToComark(cleaned.children || [], options),
+  })
+  if (!markdown.trim()) return ''
+  return markdown.endsWith('\n') ? markdown : `${markdown}\n`
 }
 
 type HeadingIds = ReturnType<typeof createHeadingIdGenerator>

@@ -409,10 +409,7 @@ export async function convertTiptapDocToMarkdown(
   logPhase(trace, 'stringify_mdc')
   let markdown: string
   try {
-    markdown = await stringifyMdc(ast, {
-      strict: true,
-      videoOutput: options?.videoOutput,
-    })
+    markdown = await stringifyMdc(ast, { videoOutput: options?.videoOutput })
   } catch (error) {
     const issue = buildIssue(
       'stringify_mdc',
