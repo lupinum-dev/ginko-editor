@@ -1,4 +1,7 @@
-import type { JSONContent } from '@tiptap/core'
+// @vitest-environment jsdom
+import { Editor, type JSONContent } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
+import { createDocumentExtensions } from '../src/lib/config/documentConfig.js'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -76,5 +79,18 @@ describe('syntax-like text fidelity', () => {
     const { doc } = await saveAndReopen(paragraph([{ text, type: 'text' }]))
     expect(textOf(doc)).toBe(text)
     expect(JSON.stringify(doc)).not.toMatch(/inline-element|"element"|"link"/)
+  })
+})
+
+describe('heading anchors while editing', () => {
+  it('does not copy a custom id when a heading splits', async () => {
+    const opened = await prepareMarkdownForVisualEditing('## Hello world {#custom}\n')
+    const editor = new Editor({ content: opened.value!, extensions: createDocumentExtensions() })
+    const split = 1 + 'Hello '.length
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, split)))
+    editor.commands.splitBlock()
+    const saved = await convertTiptapDocToMarkdown(editor.getJSON())
+    expect(saved.value?.match(/\{#custom\}/g)).toHaveLength(1)
+    editor.destroy()
   })
 })

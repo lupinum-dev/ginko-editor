@@ -267,6 +267,10 @@ export function blockSettings(
       const value = name === '$variant' ? node.attrs.tag : node.attrs.props[name]
       const effective = value ?? kit?.implementation[node.attrs.tag]?.props[name]?.default
       if (input instanceof HTMLInputElement && input.type === 'checkbox') input.checked = effective === true
+      else if (input instanceof HTMLTextAreaElement && document.activeElement === input && sameJson(input.value, value)) {
+        // Keep the author's formatting and caret while the typed JSON matches the stored value.
+        continue
+      }
       else if (changed || document.activeElement !== input || name === '$variant') {
         input.value = name === '$variant'
           ? String(value)
@@ -296,4 +300,9 @@ export function blockSettings(
       popover.destroy()
     },
   }
+}
+
+function sameJson(source: string, value: unknown) {
+  if (!source.trim()) return value === undefined
+  try { return JSON.stringify(JSON.parse(source)) === JSON.stringify(value) } catch { return false }
 }

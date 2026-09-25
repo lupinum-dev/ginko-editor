@@ -126,6 +126,17 @@ describe('tabs container', () => {
     expect(tabNames(wrapper)).toEqual(['First', 'Second'])
   })
 
+  it('treats an unchanged rename as no edit', async () => {
+    const wrapper = await setup(tabs)
+    await wrapper.findAll('[role="tab"]')[1].trigger('keydown', { key: 'F2' })
+    const input = wrapper.get<HTMLInputElement>('.ginko-items__rename')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(tabNames(wrapper)).toEqual(['First', 'Second'])
+    expect(wrapper.text()).not.toContain('cannot be applied')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
   it('confirms before it removes a tab with content and keeps the last tab', async () => {
     const wrapper = await setup(tabs)
     const remove = () => wrapper.findAll('.ginko-items__remove')

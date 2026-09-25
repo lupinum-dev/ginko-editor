@@ -137,7 +137,20 @@ export function containerControls(
     focusIndex = index
     signature = ''
     const current = layout()
-    if (value !== undefined && current) void run(() => renameContainerItem(editor, current.pos, index, value))
+    const item = current?.items[index]
+    // Leaving the name unchanged is not an edit.
+    if (value !== undefined && current && item && value !== itemName(item, current)) {
+      void run(async () => {
+        // A concurrent edit makes the validated change stale. Rebuild it from the new document.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const latest = layout()
+          if (!latest) return { ok: false, reason: 'unavailable' }
+          const result = await renameContainerItem(editor, latest.pos, index, value)
+          if (result.ok || result.reason !== 'stale') return result
+        }
+        return { ok: false, reason: 'invalid-content' }
+      })
+    }
     render()
   }
 
