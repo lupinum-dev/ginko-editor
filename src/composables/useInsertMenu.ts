@@ -7,7 +7,7 @@ import {
   onMounted,
   ref,
   shallowRef,
-  useId,
+ 
   watch,
   type Ref,
   type ShallowRef,
@@ -55,10 +55,13 @@ interface ContextAction {
 }
 
 /** The block menu opened by the Insert button or by typing `/` in a paragraph. */
+/** Ids must stay unique across separate Vue apps on one page. */
+let insertMenuCount = 0
+
 export function useInsertMenu(options: InsertMenuOptions) {
   const { editor, overlays } = options
   const owner = {}
-  const id = useId()
+  const id = `ginko-insert-${++insertMenuCount}`
   const open = ref(false)
   const origin = ref<'button' | 'slash'>('button')
   const query = ref('')
@@ -87,7 +90,7 @@ export function useInsertMenu(options: InsertMenuOptions) {
     const pinned: RecipeGroup[] = []
     if (action) {
       const [match] = rankRecipes([action.recipe], query.value, copy)
-      pinned.push({ key: 'context', label: overlays.text('groupContext'), matches: match ? [match] : [] })
+      pinned.push({ key: '__ginko-context', label: overlays.text('groupContext'), matches: match ? [match] : [] })
     }
     const all = available.value
     let rest: readonly AuthoringRecipe[] = all
@@ -95,7 +98,7 @@ export function useInsertMenu(options: InsertMenuOptions) {
       const recentMatches = recent.value.filter(recipe => all.includes(recipe))
       if (recentMatches.length) {
         pinned.push({
-          key: 'recent',
+          key: '__ginko-recent',
           label: overlays.text('groupRecent'),
           matches: rankRecipes(recentMatches, '', copy),
         })
@@ -121,14 +124,15 @@ export function useInsertMenu(options: InsertMenuOptions) {
   /** Attributes that make the canvas a combobox while the slash menu is open. */
   const editorAttributes = computed<Record<string, string>>(() => {
     const slashOpen = open.value && origin.value === 'slash'
-    if (!slashOpen) return { role: 'textbox' }
-    return {
+    if (!slashOpen) return { role: 'textbox', 'aria-multiline': 'true' }
+    const attributes: Record<string, string> = {
       role: 'combobox',
       'aria-autocomplete': 'list',
       'aria-expanded': 'true',
       'aria-controls': id,
-      ...(activeRecipe.value ? { 'aria-activedescendant': `${id}-${activeIndex.value}` } : {}),
     }
+    if (activeRecipe.value) attributes['aria-activedescendant'] = `${id}-${activeIndex.value}`
+    return attributes
   })
 
   function place() {

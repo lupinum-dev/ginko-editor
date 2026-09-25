@@ -69,6 +69,7 @@ export const defaultMessages = {
   searchBlocks: 'Search blocks',
   noBlocks: 'No matching blocks.',
   noBlocksHint: 'Try a different word. Press Escape to keep your text.',
+  blockResults: '{count} blocks available',
   groupRecent: 'Recent',
   groupContext: 'In this block',
   groupText: 'Text',

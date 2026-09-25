@@ -568,3 +568,27 @@ describe('recovery from another schema revision', () => {
     expect(await readCollaborationRecovery('{')).toMatchObject({ status: 'unreadable', reason: 'format' })
   })
 })
+
+it('keeps the retry wait while the writer continues offline', async () => {
+  const backend = await server('Body.')
+  const client = backend.client()
+  let pulls = 0
+  const transport = { ...client.transport, pull: (head: Parameters<typeof client.transport.pull>[0]) => { pulls += 1; return client.transport.pull(head) } }
+  const session = createEditorCollaboration({ snapshot: backend.snapshot, transport, clientId: 'a/offline', backoff: { initialMs: 60_000, maxMs: 60_000 } })
+  const editor = new Editor({ element: document.createElement('div'), content: session.initialDocument, extensions: [...createDocumentExtensions(), session.extension] })
+  await vi.waitFor(() => expect(editor.isInitialized).toBe(true))
+  await session.flush()
+  const random = vi.spyOn(Math, 'random').mockReturnValue(1)
+  client.connection.online = false
+  editor.commands.insertContent('x')
+  await vi.waitFor(() => expect(session.state.status).toBe('offline'))
+  const before = pulls
+  for (let index = 0; index < 5; index += 1) {
+    editor.commands.insertContent('y')
+    await new Promise(resolve => setTimeout(resolve, 60))
+  }
+  expect(pulls - before).toBe(0)
+  expect(session.state.status).toBe('offline')
+  random.mockRestore()
+  editor.destroy()
+})

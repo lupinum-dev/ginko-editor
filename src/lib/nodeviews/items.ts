@@ -233,6 +233,8 @@ export function containerControls(
           const removeButton = document.createElement('button')
           removeButton.type = 'button'
           removeButton.tabIndex = -1
+          // Delete and Backspace on the tab remove it; a tablist owns only tabs.
+          removeButton.setAttribute('aria-hidden', 'true')
           removeButton.className = 'ginko-items__remove'
           removeButton.dataset.confirm = String(confirm)
           const removeLabel = text(confirm ? 'confirmRemoveItem' : 'removeItem', { label: name })

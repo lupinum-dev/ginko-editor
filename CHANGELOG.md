@@ -8,9 +8,9 @@
   that looks like MDC syntax, keeps code verbatim, keeps bare domains as text,
   and generates the heading ids that the editor uses.
 - **Breaking:** install `@lupinum/ginko-content` in the host. It is now a peer
-  dependency (`>=1.0.0-beta.9 <2`), so the editor and the host renderer share
+  dependency (`>=1.0.0-beta.10 <2`), so the editor and the host renderer share
   one parser. TipTap peers accept `^3.31.3`.
-- Keep Reka UI, Lucide and github-slugger external, which halves `dist/index.js`.
+- Keep Reka UI and Lucide external, which halves `dist/index.js`.
 - Ship source maps and NodeNext-safe declarations. The `/runtime` entry does not
   require Vue.
 - The component handle now exposes only `GinkoEditorHandle`: `flush()`,

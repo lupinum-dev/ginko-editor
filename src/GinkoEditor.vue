@@ -203,7 +203,6 @@ watch(editor, (instance, _, cleanup) => {
 
 const editorAttributes = computed(() => ({
   'aria-label': label.value,
-  'aria-multiline': 'true',
   ...insertMenu.editorAttributes.value,
 }))
 watch([editor, editorAttributes], ([instance, attributes]) => {

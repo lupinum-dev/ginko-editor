@@ -421,9 +421,14 @@ export class EditorCollaborationSession {
 
   private attach(editor: Editor) {
     if (this.instance || this.current.status === 'closed') throw new Error('A collaboration session can only mount once.')
+    const confirmed = decodeCollaborationDocument(this.initial.document, editor.schema)
+    if (!editor.state.doc.eq(confirmed)) {
+      const error = new CollaborationError('content', 'The editor must start from the session document.')
+      this.fail(error)
+      throw error
+    }
     this.instance = editor
-    this.confirmed = decodeCollaborationDocument(this.initial.document, editor.schema)
-    if (!editor.state.doc.eq(this.confirmed)) throw new CollaborationError('content', 'The editor must start from the session document.')
+    this.confirmed = confirmed
     const recovery = this.options.recovery
     if (recovery?.steps.length && !this.restored) {
       this.restored = true
@@ -485,8 +490,13 @@ export class EditorCollaborationSession {
     if (!this.instance || this.restoring || this.current.status === 'closed') return
     this.queueRecovery()
     if (['error', 'stale'].includes(this.current.status)) { this.setState(this.current.status, this.current.message, this.current.code); return }
-    if (this.current.status === 'offline') this.setState('offline', this.current.message, this.current.code)
-    else this.setState('syncing', this.current.message, this.current.code === 'limit' ? 'limit' : undefined)
+    if (this.current.status === 'offline') {
+      // Keep the retry wait. A new head or the browser `online` event ends it early.
+      this.setState('offline', this.current.message, this.current.code)
+      if (!this.timer) this.schedule(40)
+      return
+    }
+    this.setState('syncing', this.current.message, this.current.code === 'limit' ? 'limit' : undefined)
     this.schedule(40)
   }
 

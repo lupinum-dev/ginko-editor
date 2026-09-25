@@ -167,16 +167,22 @@ defineExpose({ root, search })
             >↵</span>
           </button>
         </div>
-        <div
-          v-if="entries.length === 0"
-          class="ginko-editor__insert-empty"
-        >
-          <p>{{ text('noBlocks') }}</p>
-          <p class="ginko-editor__insert-hint">
-            {{ text('noBlocksHint') }}
-          </p>
-        </div>
       </div>
+      <div
+        v-if="entries.length === 0"
+        class="ginko-editor__insert-empty"
+      >
+        <p>{{ text('noBlocks') }}</p>
+        <p class="ginko-editor__insert-hint">
+          {{ text('noBlocksHint') }}
+        </p>
+      </div>
+      <p
+        class="ginko-editor__sr-only"
+        aria-live="polite"
+      >
+        {{ text('blockResults', { count: entries.length }) }}
+      </p>
       <div
         v-if="showsPreview && activeRecipe"
         class="ginko-editor__recipe-preview"

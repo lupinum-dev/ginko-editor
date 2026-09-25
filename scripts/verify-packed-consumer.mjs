@@ -14,7 +14,7 @@ const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 
 const packageInputs = [...(contentArchive ? [contentArchive] : []), archive]
 // Content is a peer. Hosts install it; a candidate archive replaces the registry version.
-const contentPeer = { '@lupinum/ginko-content': '1.0.0-beta.9' }
+const contentPeer = { '@lupinum/ginko-content': '1.0.0-beta.10' }
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
