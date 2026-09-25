@@ -1116,7 +1116,7 @@ packages:
       vue: '>=3.0.1'
 
   '@lupinum/ginko-content@file:internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz':
-    resolution: {integrity: sha512-H876G5QphHGM2PSq5npdXgGyKwtKQEguIJqFvFSrr/eGIBoYV9ulR5uXHF3VgLd1j6Zc2u7Q5kc84GU5CVIlSg==, tarball: file:internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz}
+    resolution: {integrity: sha512-+02As7KcfWZJzqEPNs4t9NMciPwsc/YU8iKLdjU9zVwQTsKSYe1qJiLX12m8XLieYzlAwUz+kqNGGBVhuJd7lQ==, tarball: file:internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz}
     version: 1.0.0-beta.10
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
     hasBin: true
