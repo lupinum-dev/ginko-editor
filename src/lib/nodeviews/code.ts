@@ -4,6 +4,7 @@ import { TextSelection } from '@tiptap/pm/state'
 import type { NodeViewRendererProps } from '@tiptap/core'
 import type { NodeView } from '@tiptap/pm/view'
 import { createPropertyInput } from '../property-input'
+import { handleHistoryKeydown, observeNodeViewRefresh } from './lifecycle'
 
 export function codeView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
@@ -59,24 +60,21 @@ export function codeView(
   })
   toolbar.addEventListener('keydown', event => {
     if (event.isComposing) return
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-      event.preventDefault()
-      propertyInput.reset()
-      if (event.shiftKey) editor.commands.redo()
-      else editor.commands.undo()
-    }
+    handleHistoryKeydown(editor, event, propertyInput.reset)
     if (event.key === 'Escape' || (event.key === 'Enter' && event.target === filename)) {
       event.preventDefault()
       editor.view.focus()
     }
   })
-  function render() {
+  function relabel() {
     language.setAttribute('aria-label', text('codeLanguage'))
     language.options[0].textContent = text('plainText')
     const shell = Array.from(language.options).find(option => option.value === 'bash')
     if (shell) shell.textContent = text('shellLanguage')
     filename.placeholder = text('optionalFileName')
     filename.setAttribute('aria-label', text('codeFileName'))
+  }
+  function render() {
     language.disabled = filename.disabled = !editor.isEditable
     if (node.attrs.language && !Array.from(language.options).some(option => option.value === node.attrs.language)) {
       const option = document.createElement('option')
@@ -86,14 +84,14 @@ export function codeView(
     language.value = node.attrs.language ?? ''
     if (filename.value !== (node.attrs.filename ?? '')) filename.value = node.attrs.filename ?? ''
   }
-  editor.on('update', render)
-  editor.on('transaction', render)
-  render()
+  // The node, editability, and messages are the only inputs.
+  const refresh = observeNodeViewRefresh({ editor, overlay, render, relabel })
+  refresh.refresh(true)
   return { dom, contentDOM,
     update(next) {
       if (next.type !== node.type) return false
       node = next
-      render()
+      refresh.refresh(true)
       return true
     },
     stopEvent(event) {
@@ -103,8 +101,7 @@ export function codeView(
       return mutation.type !== 'selection' && !contentDOM.contains(mutation.target)
     },
     destroy() {
-      editor.off('transaction', render)
-      editor.off('update', render)
+      refresh.destroy()
     },
   }
 }

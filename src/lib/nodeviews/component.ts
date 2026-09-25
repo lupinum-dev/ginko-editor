@@ -11,6 +11,7 @@ import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import type { AuthoringKit } from '../../authoring'
 import { SetNodePropertyStep } from '../property-step'
 import { createPropertyInput } from '../property-input'
+import { handleHistoryKeydown, observeNodeViewRefresh } from './lifecycle'
 
 export function componentView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
@@ -116,12 +117,7 @@ export function componentView(
   })
   title.addEventListener('keydown', event => {
     if (event.isComposing) return
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-      event.preventDefault()
-      titleInput.reset()
-      if (event.shiftKey) editor.commands.redo()
-      else editor.commands.undo()
-    }
+    handleHistoryKeydown(editor, event, titleInput.reset)
     if (event.key === 'Enter' || event.key === 'Escape') {
       event.preventDefault()
       editor.view.focus()
@@ -183,6 +179,10 @@ export function componentView(
   })
   divider.addEventListener('pointercancel', cancelDrag)
   divider.addEventListener('lostpointercapture', cancelDrag)
+  function relabel() {
+    title.placeholder = text('addTitle')
+    divider.setAttribute('aria-label', text('columnWidths'))
+  }
   function render() {
     if ((!editor.isEditable || getKit() !== previousKit) && dragging) cancelDrag()
     previousKit = getKit()
@@ -235,8 +235,6 @@ export function componentView(
       label: meta?.label ?? node.attrs.tag,
       field: prop ? meta?.props?.[prop]?.label ?? prop : text('title'),
     }))
-    title.placeholder = text('addTitle')
-    divider.setAttribute('aria-label', text('columnWidths'))
     if (title.value !== titleValue) title.value = titleValue
     dom.dataset.columns = String(isPair)
     const selected = presetIndex()
@@ -252,22 +250,19 @@ export function componentView(
     }
     settings.render()
   }
-  const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+  const cancelDragOnChange = ({ transaction }: { transaction: { docChanged: boolean } }) => {
     if (transaction.docChanged && dragging) cancelDrag()
-    render()
   }
-  const onUpdate = ({ transaction }: { transaction: { docChanged: boolean } }) => {
-    if (!transaction.docChanged) render()
-  }
-  editor.on('transaction', onTransaction)
-  editor.on('update', onUpdate)
-  render()
+  editor.on('transaction', cancelDragOnChange)
+  // Column labels read the parent component, so a change elsewhere can matter.
+  const refresh = observeNodeViewRefresh({ editor, overlay, render, relabel, onDocumentChange: true })
+  refresh.refresh(true)
   return {
     dom, contentDOM,
     update(next) {
       if (next.type !== node.type) return false
       node = next
-      render()
+      refresh.refresh(true)
       return true
     },
     stopEvent(event) {
@@ -281,8 +276,8 @@ export function componentView(
       destroyed = true
       cancelDrag()
       settings.destroy()
-      editor.off('transaction', onTransaction)
-      editor.off('update', onUpdate)
+      editor.off('transaction', cancelDragOnChange)
+      refresh.destroy()
     },
   }
 }

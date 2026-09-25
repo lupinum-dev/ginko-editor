@@ -9,6 +9,7 @@ import { inlinePopover } from './popover'
 import { createEditorText, type EditorMessageKey } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import { createPropertyInput } from '../property-input'
+import { handleHistoryKeydown, observeNodeViewRefresh } from './lifecycle'
 
 export type ImageActions = (props: JsonRecord) => { replace?: () => void; metadata?: () => void }
 
@@ -48,15 +49,7 @@ export function imageView(
       editor.view.dispatch(propertyInput.transaction(pos, 'alt', alt.value))
     }
   })
-  const handleUndo = (event: KeyboardEvent) => {
-    if (event.isComposing) return
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-      event.preventDefault()
-      propertyInput.reset()
-      if (event.shiftKey) editor.commands.redo()
-      else editor.commands.undo()
-    }
-  }
+  const handleUndo = (event: KeyboardEvent) => { handleHistoryKeydown(editor, event, propertyInput.reset) }
   settings.dom.addEventListener('keydown', handleUndo)
   settings.panel.addEventListener('keydown', handleUndo)
   alt.addEventListener('focus', propertyInput.reset)
@@ -100,7 +93,7 @@ export function imageView(
       }
     } else picture.replaceChildren(next)
   }
-  function render() {
+  function relabel() {
     settings.setLabel(text('imageSettings'))
     altText.textContent = text('imageDescription')
     alt.setAttribute('aria-label', text('imageDescription'))
@@ -108,6 +101,8 @@ export function imageView(
       label.data = text(key)
       button.setAttribute('aria-label', text(key))
     })
+  }
+  function render() {
     paint()
     alt.value = typeof node.attrs.props.alt === 'string' ? node.attrs.props.alt : ''
     settings.dom.hidden = !editor.isEditable
@@ -116,15 +111,15 @@ export function imageView(
     replace.hidden = !actions?.replace
     metadata.hidden = !actions?.metadata
   }
-  render()
-  editor.on('transaction', render)
-  editor.on('update', render)
+  // Asset URLs and image actions change through an explicit refresh transaction.
+  const refresh = observeNodeViewRefresh({ editor, overlay, render, relabel })
+  refresh.refresh(true)
   return {
     dom,
     update(next) {
       if (next.type !== node.type) return false
       node = next
-      render()
+      refresh.refresh(true)
       return true
     },
     stopEvent(event) {
@@ -133,8 +128,7 @@ export function imageView(
     ignoreMutation: () => true,
     destroy() {
       settings.destroy()
-      editor.off('transaction', render)
-      editor.off('update', render)
+      refresh.destroy()
     },
   }
 }
