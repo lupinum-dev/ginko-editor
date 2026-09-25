@@ -161,6 +161,7 @@ describe('tabs container', () => {
     await flushPromises()
     expect(tabNames(wrapper)).toEqual(['First', 'Second'])
     expect(wrapper.text()).toContain('This change cannot be applied safely here.')
+    expect((wrapper.get('[data-items="tabs"] > .ginko-items__footer').element as HTMLElement).hidden).toBe(false)
   })
 
   it('keeps the selected tab out of the document and collaboration steps', async () => {

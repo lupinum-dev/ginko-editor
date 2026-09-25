@@ -76,8 +76,15 @@ export function containerControls(
       : text('codeBlock')
     return text('untitledItem', { label: childLabel, number: item.index + 1 })
   }
+  let failure = ''
   const report = (result: BlockOperationResult) => {
-    status.textContent = result.ok || result.reason === 'stale' ? '' : text('itemChangeFailed')
+    failure = result.ok || result.reason === 'stale' ? '' : text('itemChangeFailed')
+    render()
+  }
+  /** One status line for a failed change or a pending removal. */
+  function paintStatus(current: ContainerLayout | undefined) {
+    const item = pendingRemove === undefined || !current ? undefined : current.items[pendingRemove]
+    status.textContent = item ? text('confirmRemoveItem', { label: itemName(item, current!) }) : failure
     status.hidden = !status.textContent
   }
   async function run(action: () => Promise<BlockOperationResult>) {
@@ -245,11 +252,6 @@ export function containerControls(
     contentDOM.setAttribute('role', 'tabpanel')
     const activeTab = tablist.querySelector(`[data-index="${active}"]`)
     if (activeTab) contentDOM.setAttribute('aria-labelledby', activeTab.id)
-    const confirmMessage = pendingRemove === undefined
-      ? ''
-      : text('confirmRemoveItem', { label: itemName(current.items[pendingRemove], current) })
-    status.textContent = confirmMessage || status.textContent
-    status.hidden = !status.textContent
   }
 
   function render() {
@@ -258,6 +260,7 @@ export function containerControls(
     if (!current) {
       strip.hidden = true
       footer.hidden = true
+      failure = ''
       return
     }
     const config = current.config
@@ -270,7 +273,6 @@ export function containerControls(
       button.disabled = !editor.isEditable
     }
     strip.hidden = !isTabs
-    footer.hidden = isTabs ? !status.textContent : !editor.isEditable && !status.textContent
     footerAdd.hidden = isTabs || !editor.isEditable
     if (config.columnsProp) {
       const value = node.attrs.props?.[config.columnsProp]
@@ -283,6 +285,8 @@ export function containerControls(
       contentDOM.removeAttribute('role')
       contentDOM.removeAttribute('aria-labelledby')
     }
+    paintStatus(current)
+    footer.hidden = !status.textContent && (isTabs || !editor.isEditable)
   }
 
   return {
