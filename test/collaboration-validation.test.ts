@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Transform } from '@tiptap/pm/transform'
+import { AttrStep, Transform, type Step } from '@tiptap/pm/transform'
 import {
   applyCollaborationSteps, createCollaborationSnapshot, decodeCollaborationDocument, decodeCollaborationSteps,
-  SetNodePropertyStep, SetNodeAttributeStep, collaborationLimits, type CollaborationSnapshot, type CollaborationSteps,
+  SetNodePropertyStep, SetNodeAttributeStep, SetComponentVariantStep, collaborationLimits, collaborationProtocolVersion,
+  type CollaborationSnapshot, type CollaborationSteps,
 } from '../src/runtime'
 import type { PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
 
@@ -112,5 +113,67 @@ describe('collaboration server boundary', () => {
       { stepType: 'replaceAround', from: 0, to: 4, gapFrom: 1, gapTo: 3, insert: 0.5 },
       { stepType: 'replace', from: 1, to: 1, slice: { content: [{ type: 'paragraph' }], openStart: 0.5 } },
     ]) expect(() => decodeCollaborationSteps([JSON.stringify(step)])).toThrow(/safe integers/)
+  })
+
+  it('rejects schema attribute values that the editor cannot represent', async () => {
+    const { snapshot } = await createCollaborationSnapshot('## Title\n\n```ts [a.ts]\nx\n```\n\n1. One', options)
+    const doc = decodeCollaborationDocument(snapshot.document)
+    const code = doc.child(0).nodeSize, list = code + doc.child(1).nodeSize
+    const hostile: Step[] = [
+      new SetNodeAttributeStep(0, 'level', 9), new SetNodeAttributeStep(0, 'level', '2'), new SetNodeAttributeStep(0, 'level', 0),
+      new AttrStep(0, 'level', 7),
+      new SetNodeAttributeStep(code, 'language', { script: true }), new SetNodeAttributeStep(code, 'filename', 'a.ts\nsecond line'),
+      new SetNodeAttributeStep(code, 'language', 'x'.repeat(101)),
+      new SetNodeAttributeStep(list, 'start', -1), new SetNodeAttributeStep(list, 'type', 'disc'),
+    ]
+    for (const step of hostile) {
+      // The value check runs before Markdown conversion, which could otherwise normalize the value.
+      await expect(applyCollaborationSteps(snapshot, batch(snapshot, [JSON.stringify(step.toJSON())]), options))
+        .rejects.toMatchObject({ code: 'content', message: expect.stringMatching(/heading level|Code metadata|numbered list/) })
+    }
+    const valid = [new SetNodeAttributeStep(0, 'level', 3), new SetNodeAttributeStep(code, 'language', 'js')]
+    const accepted = await applyCollaborationSteps(snapshot, batch(snapshot, valid.map(step => JSON.stringify(step.toJSON()))), options)
+    expect(accepted.markdown).toContain('### Title')
+    expect(accepted.markdown).toContain('```js [a.ts]')
+  })
+
+  it('rejects unknown marks and unsafe or malformed links', async () => {
+    const { snapshot } = await createCollaborationSnapshot('Body text.', options)
+    const link = (attrs: Record<string, unknown>) => JSON.stringify({ stepType: 'addMark', from: 1, to: 5, mark: { type: 'link', attrs } })
+    expect(() => decodeCollaborationSteps([JSON.stringify({ stepType: 'addMark', from: 1, to: 5, mark: { type: 'underline' } })])).toThrow()
+    for (const href of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,<script>x</script>', 'vbscript:x', '//evil.test/x', 'https://user:secret@evil.test/']) {
+      await expect(applyCollaborationSteps(snapshot, batch(snapshot, [link({ href, target: null, rel: null, class: null, title: null })]), options))
+        .rejects.toMatchObject({ code: 'content', message: 'A link must use a safe URL.' })
+    }
+    for (const attrs of [{ href: null }, { href: 42 }, { href: 'https://ok.test', target: '_top' }, { href: 'https://ok.test', title: { x: 1 } }]) {
+      await expect(applyCollaborationSteps(snapshot, batch(snapshot, [link({ target: null, rel: null, class: null, title: null, ...attrs })]), options))
+        .rejects.toMatchObject({ code: 'content' })
+    }
+    const accepted = await applyCollaborationSteps(snapshot,
+      batch(snapshot, [link({ href: 'https://example.com/a', target: '_blank', rel: 'noopener noreferrer nofollow', class: null, title: null })]), options)
+    expect(accepted.markdown).toContain('[Body](https://example.com/a)')
+  })
+
+  it('rejects hostile component names, oversized steps and other protocol versions', async () => {
+    const { snapshot } = await createCollaborationSnapshot('<note title="Original">\nBody.\n</note>', options)
+    for (const step of [new SetNodeAttributeStep(0, 'tag', 'script onload=x'), new SetNodeAttributeStep(0, 'tag', 42)]) {
+      await expect(applyCollaborationSteps(snapshot, batch(snapshot, [JSON.stringify(step.toJSON())]), options))
+        .rejects.toMatchObject({ code: 'content' })
+    }
+    expect(() => new SetComponentVariantStep(0, '<script>', undefined)).toThrow()
+    const huge = JSON.stringify(new SetNodePropertyStep(0, 'title', 'x'.repeat(collaborationLimits.batchBytes)).toJSON())
+    await expect(applyCollaborationSteps(snapshot, batch(snapshot, [huge]), options)).rejects.toMatchObject({ code: 'limit' })
+    const title = [JSON.stringify(new SetNodePropertyStep(0, 'title', 'Updated').toJSON())]
+    await expect(applyCollaborationSteps(snapshot, { ...batch(snapshot, title), protocolVersion: 2 as never }, options))
+      .rejects.toMatchObject({ code: 'protocol' })
+    const accepted = await applyCollaborationSteps(snapshot, { ...batch(snapshot, title), protocolVersion: collaborationProtocolVersion }, options)
+    expect(accepted.markdown).toContain('Updated')
+  })
+
+  it('checks a seeded document against the schema before storing it', async () => {
+    const seeded = await createCollaborationSnapshot('# Heading\n\nText with [a link](https://example.com).', options)
+    expect(() => decodeCollaborationDocument(seeded.snapshot.document).check()).not.toThrow()
+    const unsafe = await createCollaborationSnapshot('[a](javascript:alert(1))', options)
+    expect(unsafe.snapshot.document).not.toContain('"link"')
   })
 })

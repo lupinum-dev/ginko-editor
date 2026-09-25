@@ -61,6 +61,38 @@
     gap: .2rem;
   }
 
+  .ginko-editor__peers {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ginko-editor__peer {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-inline-start: -0.25rem;
+    border: 2px solid var(--ginko-background);
+    border-radius: 999px;
+    background: var(--ginko-collab-color, var(--ginko-muted));
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .ginko-editor__peer:first-child {
+    margin-inline-start: 0;
+  }
+
+  .ginko-editor__peer--more {
+    background: var(--ginko-muted);
+    color: var(--ginko-muted-foreground);
+  }
+
   .ginko-editor__status {
     color: var(--ginko-muted-foreground);
     font-size: .78rem;

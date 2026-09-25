@@ -325,6 +325,28 @@ defineExpose<GinkoEditorHandle>({
           {{ actions.text('markdown') }}
         </button>
       </div>
+      <ul
+        v-if="binding.peers.value.length"
+        class="ginko-editor__peers"
+        :aria-label="actions.text('sharedPeers')"
+      >
+        <li
+          v-for="peer in binding.peers.value.slice(0, 5)"
+          :key="peer.clientId"
+          class="ginko-editor__peer"
+          :style="{ '--ginko-collab-color': peer.user.color }"
+          :title="peer.user.name"
+        >
+          <span aria-hidden="true">{{ peer.user.name.trim().charAt(0).toUpperCase() || '?' }}</span>
+          <span class="ginko-editor__sr-only">{{ peer.user.name }}</span>
+        </li>
+        <li
+          v-if="binding.peers.value.length > 5"
+          class="ginko-editor__peer ginko-editor__peer--more"
+        >
+          +{{ binding.peers.value.length - 5 }}
+        </li>
+      </ul>
       <span class="ginko-editor__status">{{ statusLabel }}</span>
       <span
         class="ginko-editor__sr-only"
@@ -349,6 +371,13 @@ defineExpose<GinkoEditorHandle>({
           @click="binding.session.retry()"
         >
           {{ actions.text('sharedRetry') }}
+        </button>
+        <button
+          v-if="binding.canDiscard()"
+          type="button"
+          @click="binding.discardPending()"
+        >
+          {{ actions.text('sharedDiscard') }}
         </button>
         <button
           v-if="binding.state.value?.pendingSteps"

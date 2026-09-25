@@ -37,7 +37,7 @@ export function createDocumentExtensions(options: DocumentExtensionOptions = {})
       codeBlock: false,
       heading: false,
       underline: false,
-      link: { HTMLAttributes: { target: null }, openOnClick: false },
+      link: { HTMLAttributes: { target: null }, defaultProtocol: 'https', openOnClick: false },
     }),
     Heading.configure({
       levels: [1, 2, 3, 4, 5, 6],

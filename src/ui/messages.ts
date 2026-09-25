@@ -28,6 +28,8 @@ export const defaultMessages = {
   sharedTableLayout: 'Shared tables keep their column layout and alignment. You can edit cells and body rows.',
   sharedRetry: 'Retry connection',
   sharedRecovery: 'Save recovery copy',
+  sharedDiscard: 'Discard my unsent changes',
+  sharedPeers: 'People editing',
   sharedRemount: 'Reopen this editor with the new document and policy. Keep any unsent changes first.',
   finishImageUpload: 'Finish or remove the image upload before leaving the editor.',
   visualRecovery: 'Your changes are still here. Correct the document or use Undo before switching modes.',

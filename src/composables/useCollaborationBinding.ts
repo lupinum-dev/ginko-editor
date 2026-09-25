@@ -1,6 +1,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 
 import type {
+  CollaborationPeer,
   CollaborationStatus,
   EditorCollaborationSession,
 } from '../collaboration'
@@ -28,6 +29,8 @@ export function useCollaborationBinding(
   const state = ref(session?.state)
   const invalidBinding = ref(false)
   const stopState = session?.subscribe((next) => { state.value = next })
+  const peers = ref<readonly CollaborationPeer[]>([])
+  const stopPeers = session?.onPeersChange((next) => { peers.value = next })
 
   function invalidate() {
     invalidBinding.value = true
@@ -45,7 +48,10 @@ export function useCollaborationBinding(
     invalidate()
   })
 
-  onBeforeUnmount(() => { stopState?.() })
+  onBeforeUnmount(() => {
+    stopState?.()
+    stopPeers?.()
+  })
 
   function downloadRecovery() {
     const recovery = session?.getRecovery()
@@ -72,6 +78,9 @@ export function useCollaborationBinding(
       state.value?.status ? statusMessages[state.value.status] : undefined,
     extensions: session ? [session.extension] : [],
     downloadRecovery,
+    peers,
+    canDiscard: () => state.value?.code === 'rejected',
+    discardPending: () => session?.discardPendingAndResync(),
   }
 }
 

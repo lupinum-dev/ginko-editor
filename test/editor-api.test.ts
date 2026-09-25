@@ -73,6 +73,7 @@ function fakeSession(close = vi.fn()) {
   return {
     state: { status: 'synced', pendingSteps: 0 },
     subscribe: () => () => {},
+    onPeersChange: () => () => {},
     extension: Extension.create({ name: 'fakeCollaboration' }),
     initialDocument: { type: 'doc', content: [{ type: 'paragraph' }] },
     canEdit: true,
