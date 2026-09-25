@@ -3,7 +3,6 @@ import type { ImageUploadHandler, ImagePicker, AssetInfo } from '../../types'
 import type { EditorMessages } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import type { ImageActions } from '../nodeviews/image'
-import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
 import { tableView } from '../nodeviews/table'
 import { componentView } from '../nodeviews/component'
@@ -12,9 +11,8 @@ import { imageView } from '../nodeviews/image'
 import { createDocumentExtensions } from './documentConfig'
 import type { AssetProvider, JsonRecord } from '../../types'
 import type { AuthoringKitV1 } from '../../authoring'
-import { editorDebug } from '../debug'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import { EditorDebug, MarkdownClipboard } from '../extensions'
+import { MarkdownClipboard } from '../extensions'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -28,7 +26,6 @@ export interface CreateEditorExtensionsOptions {
   imageActions?: ImageActions
   assetProvider?: AssetProvider
   codeBlockTheme: string
-  enableDebug: boolean
   enableFiles: boolean
   enableVideo: boolean
   fileOutput: 'markdown' | 'mdc'
@@ -51,7 +48,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
   }
   const {
     codeBlockTheme,
-    enableDebug,
     placeholder,
     showMarkdownMarkers,
   } = options
@@ -80,7 +76,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       placeholder: placeholder || 'Start writing...',
     }),
     MarkdownClipboard.configure({
-      enableDebug,
       enabled: true,
       fileOutput: options.fileOutput,
       getAuthoringKit: options.getAuthoringKit,
@@ -91,7 +86,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       imageOutput: options.imageOutput,
       videoOutput: options.videoOutput,
     }),
-    ...(enableDebug ? [EditorDebug] : []),
     ImageUpload.configure({
       overlay: options.overlay,
       getMessages: options.getMessages,
@@ -103,57 +97,4 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       onPendingChange: options.onImageUploadPending,
     }),
   ]
-}
-
-const normalizingEditors = new WeakSet<Editor>()
-
-export function isCurrentlyNormalizingTable(editor: Editor): boolean {
-  return normalizingEditors.has(editor)
-}
-
-export function normalizeTableCells(editorInstance: Editor | undefined): boolean {
-  if (!editorInstance) {
-    return false
-  }
-
-  const { state } = editorInstance
-  const { schema } = state
-  const cellTypes = new Set(['tableCell', 'tableHeader'])
-  let hasChanges = false
-
-  const tr = state.tr
-  state.doc.descendants((node, pos) => {
-    if (!cellTypes.has(node.type.name)) {
-      return
-    }
-
-    let hasInlineChild = false
-    node.content.forEach((child) => {
-      if (child.isInline) {
-        hasInlineChild = true
-      }
-    })
-
-    if (!hasInlineChild) {
-      return
-    }
-
-    const paragraphType = schema.nodes.paragraph
-    if (!paragraphType) {
-      return
-    }
-
-    const paragraph = paragraphType.create(null, node.content)
-    const updatedCell = node.type.create(node.attrs, paragraph, node.marks)
-    tr.replaceWith(pos, pos + node.nodeSize, updatedCell)
-    hasChanges = true
-  })
-
-  if (hasChanges) {
-    normalizingEditors.add(editorInstance)
-    try { editorInstance.view.dispatch(tr) } finally { normalizingEditors.delete(editorInstance) }
-    editorDebug.log('Normalized table cells in editor')
-  }
-
-  return hasChanges
 }

@@ -20,11 +20,7 @@ import type { CollaborationStatus } from './collaboration'
 import type { EditorMessageKey } from './ui/messages'
 import { SetNodePropertyStep, SetNodeAttributeStep } from './lib/property-step'
 import type { JsonRecord } from './types'
-import {
-  createEditorExtensions,
-  isCurrentlyNormalizingTable,
-  normalizeTableCells,
-} from './lib/config/editorConfig'
+import { createEditorExtensions } from './lib/config/editorConfig'
 import type {
   ConversionErrorPayload,
   ConversionRecoveredPayload,
@@ -91,7 +87,6 @@ const props = withDefaults(defineProps<{
     | 'github-light'
     | 'visual-studio-dark'
   disabled?: boolean
-  enableDebug?: boolean
   enableFiles?: boolean
   enableImages?: boolean
   enableImageMetadata?: boolean
@@ -117,7 +112,6 @@ const props = withDefaults(defineProps<{
   authoringKit: undefined,
   collaboration: undefined,
   disabled: false,
-  enableDebug: false,
   enableFiles: true,
   enableImages: true,
   enableImageMetadata: false,
@@ -193,7 +187,6 @@ const insertPosition = ref({ left: '8px', top: '48px', maxHeight: '420px' })
 let insertSelection: Selection | undefined
 
 const outputOptions = computed(() => ({
-  enableDebug: props.enableDebug,
   fileOutput: props.fileOutput,
   imageOutput: props.imageOutput,
   videoOutput: props.videoOutput,
@@ -215,7 +208,6 @@ const editor = useEditor({
       parseUrl: url => resolvedAssetProvider.value.parseUrl(url),
     },
     codeBlockTheme: props.codeBlockTheme,
-    enableDebug: props.enableDebug,
     enableFiles: props.enableFiles,
     enableVideo: props.enableVideo,
     fileOutput: props.fileOutput,
@@ -254,7 +246,6 @@ const editor = useEditor({
   onUpdate: ({ editor: instance, transaction }) => {
     selectionRevision.value += 1
     if (transaction.docChanged && insertMenuOpen.value && insertMenuOrigin.value === 'button') closeInsertMenu(false)
-    if (!isCurrentlyNormalizingTable(instance) && normalizeTableCells(instance)) return
     if (!applyingDocument && transaction.docChanged) scheduleVisualUpdate(instance)
   },
   onSelectionUpdate: () => {
@@ -1002,7 +993,6 @@ onBeforeUnmount(() => {
   disposed = true
   overlays.destroy()
   cancelPendingUpdate()
-  editor.value?.destroy()
 })
 
 const statusLabel = computed(() => {

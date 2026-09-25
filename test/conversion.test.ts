@@ -18,7 +18,6 @@ function createEditor() {
     content: { content: [{ type: 'paragraph' }], type: 'doc' },
     extensions: createEditorExtensions({
       codeBlockTheme: 'github-dark',
-      enableDebug: false,
       enableFiles: true,
       enableVideo: true,
       fileOutput: 'mdc',

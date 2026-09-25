@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Keep typed `{{ … }}` text and inline code verbatim. The editor no longer turns
+  template braces into binding nodes, which Content does not define.
+- Keep `:name:` text verbatim. The editor no longer rewrites emoji shortcodes or
+  removes colons from times such as `10:30:45`.
+- Remove the `enableDebug` prop and the internal debug event log. Conversion
+  results still report their trace identifier and timeline.
+- Stop conversion with an error for an unknown editor node instead of writing
+  placeholder text into the document.
+- Change the collaboration schema revision to `ginko-editor-2` because the
+  binding node left the editor schema.
+
 - Remove block drag handles, content dragging, and block-reordering menus and
   shortcuts. Keep component duplication, deletion, column sizing and image uploads.
 

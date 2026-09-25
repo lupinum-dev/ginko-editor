@@ -494,34 +494,3 @@ export function applyTiptapDocToEditor(
 
   return success(trace.traceId, issues, finishTrace(trace, { status: 'ok' }), doc)
 }
-
-export async function applyMarkdownToEditor(
-  editor: Editor,
-  markdown: string,
-): Promise<ConversionResult<JSONContent>> {
-  const conversion = await convertMarkdownToTiptapDoc(markdown)
-  if (!conversion.ok || !conversion.value) {
-    return conversion
-  }
-
-  const applyResult = applyTiptapDocToEditor(editor, conversion.value)
-  const merged = {
-    fallbackUsed: conversion.fallbackUsed || applyResult.fallbackUsed,
-    issues: [...conversion.issues, ...applyResult.issues],
-    timeline: [...conversion.timeline, ...applyResult.timeline],
-    traceId: conversion.traceId,
-  }
-
-  if (!applyResult.ok) {
-    return {
-      ...merged,
-      ok: false,
-    }
-  }
-
-  return {
-    ...merged,
-    ok: true,
-    value: conversion.value,
-  }
-}

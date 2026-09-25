@@ -83,7 +83,6 @@ async function setup(source: string, authoringKit?: AuthoringKitV1, output?: Tip
     content: '<p></p>',
     extensions: createEditorExtensions({
       codeBlockTheme: 'github-dark',
-      enableDebug: false,
       enableFiles: true,
       enableVideo: true,
       fileOutput: 'mdc',

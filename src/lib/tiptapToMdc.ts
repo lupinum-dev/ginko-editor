@@ -2,24 +2,13 @@ import type { JSONContent } from '@tiptap/core'
 import Slugger from 'github-slugger'
 
 import type { JsonRecord, JsonValue } from '../types'
-import { validateTiptapDocShape } from './conversionInvariants'
-import { isDebugEnabled, editorDebug } from './debug'
-import { getEmojiUnicode } from './emoji'
-import { summarizeMdc, summarizeTableMdc } from './markdown'
 import type { MDCComment, MDCElement, MDCNode, MDCRoot, MDCText } from './mdcTypes'
 import { cleanSpanProps, normalizeProps } from './props'
 import { stripStyleNodes } from './stripStyleNodes'
 import { imageProperties } from './image-properties'
 
-export interface SyntaxHighlightTheme {
-  dark?: string
-  default: string
-}
-
 export interface TiptapToMDCOptions {
-  enableDebug?: boolean
   fileOutput?: 'markdown' | 'mdc'
-  highlightTheme?: SyntaxHighlightTheme
   imageOutput?: 'markdown' | 'mdc'
   videoOutput?: 'html' | 'mdc'
 }
@@ -81,13 +70,6 @@ function sanitizeNumberish(value: unknown): null | number | string {
     return null
   }
   return normalized
-}
-
-function createBindingElement(node: JSONContent): MDCElement {
-  const attrs = node.attrs as JsonRecord | undefined
-  const defaultValue = attrs?.defaultValue as string
-  const value = attrs?.value as string
-  return { children: [], props: { defaultValue, value }, tag: 'binding', type: 'element' }
 }
 
 function createBlockquoteElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
@@ -192,7 +174,6 @@ function createVideoElementWrapper(node: JSONContent, context: TiptapToMDCContex
 }
 
 const tiptapToMDCMap: TiptapToMDCMap = {
-  binding: createBindingElement,
   blockquote: createBlockquoteElement,
   bold: createBoldElement,
   br: createBrElement,
@@ -238,31 +219,10 @@ export function tiptapNodeToMDC(
   }
 
   if (node.type && tiptapToMDCMap[node.type]) {
-    if (node.type.startsWith('table')) {
-      editorDebug.log('tiptapNodeToMDC table node', {
-        attrs: node.attrs,
-        hasContent: !!node.content?.length,
-        type: node.type,
-      })
-    }
     return tiptapToMDCMap[node.type]!(node, context)
   }
 
-  if (node.type === 'emoji') {
-    return { type: 'text', value: getEmojiUnicode(node.attrs?.name || '') }
-  }
-
-  return {
-    children: [
-      {
-        type: 'text',
-        value: `--- Unknown node: ${node.type} ---`,
-      },
-    ],
-    props: {},
-    tag: 'p',
-    type: 'element',
-  }
+  throw new Error(`Cannot convert unknown editor node: ${String(node.type)}`)
 }
 
 /**
@@ -273,11 +233,6 @@ export async function tiptapToMDC(
   options?: TiptapToMDCOptions,
 ): Promise<MDCRoot> {
   const cleaned = createMdcBodyFromTiptap(node, options)
-
-  if (isDebugEnabled()) {
-    editorDebug.log('tiptapToMDC output', summarizeMdc(cleaned))
-    editorDebug.log('tiptapToMDC table summary', summarizeTableMdc(cleaned))
-  }
 
   return cleaned
 }
@@ -290,25 +245,9 @@ function createMdcBodyFromTiptap(node: JSONContent, options?: TiptapToMDCOptions
 
   const nodeCopy = structuredClone(node)
 
-  if (isDebugEnabled()) {
-    const issues = validateTiptapDocShape(nodeCopy)
-    if (issues.length > 0) {
-      editorDebug.warn('tiptapToMDC invariant issues detected before conversion', {
-        count: issues.length,
-        issues,
-      })
-    }
-  }
-
   const body = tiptapNodeToMDC(nodeCopy, context) as MDCRoot
 
-  if (isDebugEnabled()) {
-    editorDebug.log('tiptapToMDC input', summarizeTiptap(node))
-    editorDebug.log('tiptapToMDC output before highlight', summarizeMdc(body))
-    editorDebug.log('tiptapToMDC table summary', summarizeTableMdc(body))
-  }
-
-  const cleaned = stripStyleNodes(body, 'tiptapToMDC')
+  const cleaned = stripStyleNodes(body)
 
   return cleaned
 }
@@ -720,26 +659,6 @@ function mergeSiblingsWithSameTag(children: MDCNode[], allowedTags: string[]): M
   }
 
   return merged
-}
-
-function summarizeTiptap(node: JSONContent) {
-  const stats = {
-    nodes: 0,
-    nodeTypes: [] as string[],
-  }
-
-  const walk = (current: JSONContent) => {
-    stats.nodes += 1
-    if (current.type) stats.nodeTypes.push(current.type)
-    ;(current.content || []).forEach((child) => walk(child))
-  }
-
-  walk(node)
-
-  return {
-    ...stats,
-    nodeTypes: [...new Set(stats.nodeTypes)],
-  }
 }
 
 function unwrapDefaultSlot(content: JSONContent[]): JSONContent[] {

@@ -1,7 +1,6 @@
 import type { JSONContent } from '@tiptap/core'
 
-import { editorDebug } from './debug'
-import type { MDCElement, MDCNode, MDCText } from './mdcTypes'
+import type { MDCElement, MDCNode } from './mdcTypes'
 
 export const tagToMark: Record<string, string> = {
   a: 'link',
@@ -45,16 +44,7 @@ export function createMark(
 
   if (node.type === 'element' && node.tag === 'code') {
     const text = getNodeContent(node)
-    editorDebug.log('createMark: code element', {
-      children: (node as MDCElement).children,
-      isEmpty: !text,
-      marks: marks.map((m) => m.type),
-      text,
-    })
     if (!text) {
-      editorDebug.warn('createMark: skipping empty code element', {
-        marks: marks.map((m) => m.type),
-      })
       return []
     }
     return [
@@ -73,10 +63,6 @@ export function createMark(
     if (child.type === 'text') {
       const text = getNodeContent(child)
       if (!text) {
-        editorDebug.warn('createMark: skipping empty text node', {
-          childValue: (child as MDCText).value,
-          marks: marks.map((m) => m.type),
-        })
         continue
       }
       result.push({

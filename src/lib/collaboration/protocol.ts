@@ -1,5 +1,5 @@
 /** Increment when a wire step or the shared document schema changes. */
-export const editorSchemaRevision = 'ginko-editor-1' as const
+export const editorSchemaRevision = 'ginko-editor-2' as const
 
 export interface CollaborationFence {
   /** A new value fences clients after import, restore, or source replacement. */

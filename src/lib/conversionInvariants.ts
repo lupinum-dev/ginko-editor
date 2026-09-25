@@ -3,8 +3,6 @@ import type { JSONContent } from '@tiptap/core'
 import type { ConversionIssue, ConversionPhase } from './conversionTypes'
 
 const INLINE_NODE_TYPES = new Set([
-  'binding',
-  'emoji',
   'hardBreak',
   'inline-element',
   'span-style',

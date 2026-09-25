@@ -9,7 +9,6 @@ import {
   convertTiptapDocToMarkdown,
   validateMarkdownForAuthoring,
 } from '../conversionPipeline'
-import { editorDebug } from '../debug'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 
 export interface MarkdownClipboardOptions extends TiptapToMDCOptions {
@@ -28,7 +27,6 @@ export const MarkdownClipboard = Extension.create<MarkdownClipboardOptions>({
 
   addOptions() {
     return {
-      enableDebug: false,
       enabled: true,
       fileOutput: 'mdc',
       imageOutput: 'mdc',
@@ -93,11 +91,9 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
   const output = () => {
     const source = options.getOutputOptions?.() ?? options
     return {
-      enableDebug: source.enableDebug,
       fileOutput: source.fileOutput,
       imageOutput: source.imageOutput,
       videoOutput: source.videoOutput,
-      highlightTheme: source.highlightTheme ? { ...source.highlightTheme } : undefined,
     }
   }
   function prepare(view: EditorView) {
@@ -262,10 +258,6 @@ export function isProbablyMarkdown(value: string): boolean {
   )
 }
 
-function detectClipboardSource(event: ClipboardEvent) {
-  return event.clipboardData?.types?.includes('text/markdown') ? 'text/markdown' : 'text/plain'
-}
-
 async function applyMarkdownPaste(
   editor: Editor,
   markdown: string,
@@ -302,9 +294,6 @@ async function applyMarkdownPaste(
     if (!isCurrent()) return
     if (!result.ok || !result.value) {
       reject()
-      editorDebug.warn('Markdown clipboard paste parse failed', {
-        issues: result.issues,
-      })
       return
     }
 
@@ -320,23 +309,13 @@ async function applyMarkdownPaste(
       const issue = await validateMarkdownForAuthoring(candidate.value, authoringKit)
       if (issue) {
         reject()
-        editorDebug.warn('Markdown clipboard paste rejected by authoring policy', { issue })
         return
       }
     }
     if (!isCurrent()) return
     editor.view.dispatch(transaction.scrollIntoView())
-    editorDebug.log('Markdown clipboard paste applied', {
-      length: markdown.length,
-      nodeCount: content.length,
-      source: detectClipboardSource(event),
-    })
-  } catch (error) {
+  } catch {
     reject()
-    editorDebug.warn('Markdown clipboard paste failed unexpectedly', {
-      error,
-      length: markdown.length,
-    })
   } finally {
     editor.off('transaction', invalidate)
   }

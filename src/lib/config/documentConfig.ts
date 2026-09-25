@@ -9,7 +9,6 @@ import StarterKit from '@tiptap/starter-kit'
 import type { AuthoringKitV1 } from '../../authoring'
 import type { JsonRecord } from '../../types'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import { Binding } from '../extensions/binding'
 import { CodeBlock } from '../extensions/code-block'
 import { Element } from '../extensions/element'
 import { File } from '../extensions/file'
@@ -63,7 +62,6 @@ export function createDocumentExtensions(options: DocumentExtensionOptions = {})
     }).configure({ resolveSrc: options.resolveAsset }),
     Video,
     File.configure({ resolveSrc: options.resolveAsset }),
-    Binding,
     SpanStyle,
   ]
 }
