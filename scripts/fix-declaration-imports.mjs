@@ -2,6 +2,10 @@ import { readdir, readFile, writeFile, access } from 'node:fs/promises'
 import { dirname, extname, resolve } from 'node:path'
 import ts from 'typescript'
 
+async function exists(path) {
+  try { await access(path); return true } catch { return false }
+}
+
 /** Bundler-mode Vue declarations must also resolve in NodeNext backends. */
 async function fix(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -25,10 +29,15 @@ async function fix(directory) {
     for (const literal of candidates) {
       // Vue declarations are emitted as `Name.vue.d.ts`; NodeNext needs `Name.vue.js`.
       if (!literal.text.startsWith('.') || !['', '.vue'].includes(extname(literal.text))) continue
-      // Only rewrite emitted modules, never directory aliases or external paths.
-      try { await access(resolve(dirname(path), `${literal.text}.d.ts`)) } catch { continue }
       const end = literal.getEnd() - 1
-      edits.push({ start: end, end, text: '.js' })
+      // Only rewrite emitted modules and emitted directory indexes, never external paths.
+      if (await exists(resolve(dirname(path), `${literal.text}.d.ts`))) {
+        edits.push({ start: end, end, text: '.js' })
+      } else if (await exists(resolve(dirname(path), literal.text, 'index.d.ts'))) {
+        // NodeNext does not resolve directory specifiers such as `import(".")`.
+        const suffix = literal.text.endsWith('/') ? 'index.js' : '/index.js'
+        edits.push({ start: end, end, text: suffix })
+      }
     }
     // Declarations must not keep style side effects. Hosts import the extracted
     // `@lupinum/ginko-editor/style.css` export, and the source CSS is not emitted.
