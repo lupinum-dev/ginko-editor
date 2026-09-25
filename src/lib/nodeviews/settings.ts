@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Node } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { JsonValue } from '../../types'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { convertTiptapDocToMarkdown, validateMarkdownForAuthoring } from '../conversionPipeline'
@@ -17,7 +17,7 @@ export function blockSettings(
   editor: Editor,
   getNode: () => Node,
   getPos: () => number | undefined,
-  getKit: () => AuthoringKitV1 | undefined,
+  getKit: () => AuthoringKit | undefined,
   getOutputOptions: () => TiptapToMDCOptions,
   isPairedColumn: () => boolean,
   overlay?: EditorOverlayController,

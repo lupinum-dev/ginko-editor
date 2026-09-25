@@ -4,8 +4,9 @@ import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
+import { insertAsset } from './helpers/assets'
 import { parseMdcBody, validatePublicMarkdownAst } from '@lupinum/ginko-content/cms-contract'
-import { createAuthoringKit, parseAuthoringSource, type AuthoringKitSourceV1 } from '../src/authoring'
+import { createAuthoringKit, parseAuthoringSource, type AuthoringKitSource } from '../src/authoring'
 
 beforeAll(() => {
   if (!globalThis.ResizeObserver) {
@@ -31,7 +32,7 @@ const implementation = {
   slots: ['default'],
 } as const
 
-function sourceFor(tag: string): AuthoringKitSourceV1 {
+function sourceFor(tag: string): AuthoringKitSource {
   return {
     authoring: { [tag]: { label: tag } },
     implementation: { [tag]: implementation },
@@ -53,7 +54,7 @@ function sourceFor(tag: string): AuthoringKitSourceV1 {
   }
 }
 
-function configurableSource(): AuthoringKitSourceV1 {
+function configurableSource(): AuthoringKitSource {
   return {
     authoring: {
       info: {
@@ -101,7 +102,7 @@ function configurableSource(): AuthoringKitSourceV1 {
   }
 }
 
-function layoutSource(): AuthoringKitSourceV1 {
+function layoutSource(): AuthoringKitSource {
   return {
     authoring: {
       column: { label: 'Column' },
@@ -174,7 +175,7 @@ describe('editor-specific authoring kits', () => {
     try {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
-      wrapper.vm.editor!.chain().setNodeSelection(0).run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
 
       const settings = await openSettings(wrapper)
@@ -218,7 +219,7 @@ describe('editor-specific authoring kits', () => {
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       const surface = wrapper.get('.ProseMirror')
       ;(surface.element as HTMLElement).focus()
-      wrapper.vm.editor!.view.dispatch(wrapper.vm.editor!.state.tr.insertText('/note'))
+      wrapper.vm.getEditor()!.view.dispatch(wrapper.vm.getEditor()!.state.tr.insertText('/note'))
       await flushPromises()
       expect(wrapper.text()).toContain('Information')
       expect(wrapper.text()).not.toContain('No matching blocks.')
@@ -257,7 +258,7 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       const surface = wrapper.get('.ProseMirror')
-      wrapper.vm.editor!.chain().setTextSelection(3).focus().run()
+      wrapper.vm.getEditor()!.chain().setTextSelection(3).focus().run()
       await surface.trigger('keydown', { isComposing: true, key: '/' })
       expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(false)
       await surface.trigger('keydown', { key: '/' })
@@ -280,7 +281,7 @@ describe('editor-specific authoring kits', () => {
     try {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
-      wrapper.vm.editor!.chain().setNodeSelection(0).run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
       const actions = async () => (await openSettings(wrapper)).get('.ginko-editor__block-actions')
 
@@ -292,7 +293,7 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(1)
-      wrapper.vm.editor!.commands.undo()
+      wrapper.vm.getEditor()!.commands.undo()
       await wrapper.vm.flush()
       expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string).match(/First/g)).toHaveLength(2)
     } finally {
@@ -312,7 +313,7 @@ describe('editor-specific authoring kits', () => {
     try {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
-      wrapper.vm.editor!.chain().setNodeSelection(0).run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
 
       const settings = await openSettings(wrapper)
@@ -352,16 +353,16 @@ describe('editor-specific authoring kits', () => {
     })
     try {
       await flushPromises()
-      wrapper.vm.editor!.commands.setNodeSelection(0)
+      wrapper.vm.getEditor()!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
       const settings = await openSettings(wrapper)
       await settings.get('input[inputmode="decimal"]').setValue('5')
       await wrapper.vm.flush()
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(5)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(5)
 
-      wrapper.vm.editor!.commands.undo()
+      wrapper.vm.getEditor()!.commands.undo()
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(1)
       expect((settings.get('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('1')
     } finally {
       wrapper.unmount()
@@ -379,21 +380,21 @@ describe('editor-specific authoring kits', () => {
     })
     try {
       await flushPromises()
-      wrapper.vm.editor!.commands.setNodeSelection(0)
+      wrapper.vm.getEditor()!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
       const input = (await openSettings(wrapper)).get('input[inputmode="decimal"]')
 
       await input.setValue('1.')
       expect((input.element as HTMLInputElement).value).toBe('1.')
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(0)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(0)
       await input.setValue('1.5')
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
 
       await input.setValue('-')
       expect((input.element as HTMLInputElement).value).toBe('-')
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(1.5)
       await input.setValue('-2.5')
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(-2.5)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(-2.5)
       expect(wrapper.text()).not.toContain('Enter a valid number.')
     } finally {
       wrapper.unmount()
@@ -411,15 +412,15 @@ describe('editor-specific authoring kits', () => {
     })
     try {
       await flushPromises()
-      wrapper.vm.editor!.commands.setNodeSelection(0)
+      wrapper.vm.getEditor()!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
       await (await openSettings(wrapper)).get('input[inputmode="decimal"]').setValue('bad')
       await wrapper.setProps({ modelValue: '<info :count="42">\nReplacement\n</info>' })
       await flushPromises()
-      wrapper.vm.editor!.commands.setNodeSelection(0)
+      wrapper.vm.getEditor()!.commands.setNodeSelection(0)
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.editor!.state.doc.firstChild!.attrs.props.count).toBe(42)
+      expect(wrapper.vm.getEditor()!.state.doc.firstChild!.attrs.props.count).toBe(42)
       const restored = (await openSettings(wrapper)).get('input[inputmode="decimal"]')
       expect((restored.element as HTMLInputElement).value).toBe('42')
       expect(wrapper.text()).not.toContain('Enter a valid number.')
@@ -441,12 +442,12 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       const surface = wrapper.get('.ProseMirror')
-      wrapper.vm.editor!.commands.focus('end')
+      wrapper.vm.getEditor()!.commands.focus('end')
 
       const rejected = pasteMarkdown(surface.element, '<unknown>\nUnsafe\n</unknown>')
       expect(rejected.defaultPrevented).toBe(true)
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
-      expect(wrapper.vm.editor!.getText()).toBe('Original')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('Original')
 
       const accepted = pasteMarkdown(surface.element, '<info>\nPasted safely\n</info>')
       expect(accepted.defaultPrevented).toBe(true)
@@ -474,20 +475,20 @@ describe('editor-specific authoring kits', () => {
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       const surface = wrapper.get('.ProseMirror')
       const positions: number[] = []
-      wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+      wrapper.vm.getEditor()!.state.doc.descendants((node, pos) => {
         if (node.type.name === 'element' && node.attrs.tag === 'column') positions.push(pos)
       })
-      wrapper.vm.editor!.chain().setNodeSelection(positions[0]!).focus().run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(positions[0]!).focus().run()
       pasteMarkdown(surface.element, '<column>\nReplacement\n</column>')
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       await wrapper.vm.flush()
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatch(/Replacement[\s\S]*Second/)
 
-      wrapper.vm.editor!.chain().setNodeSelection(0).focus().run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(0).focus().run()
       pasteMarkdown(surface.element, '<column>\nInvalid root\n</column>')
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
-      expect(wrapper.vm.editor!.getText()).not.toContain('Invalid root')
-      expect(wrapper.vm.editor!.getJSON().content?.[0]).toMatchObject({
+      expect(wrapper.vm.getEditor()!.getText()).not.toContain('Invalid root')
+      expect(wrapper.vm.getEditor()!.getJSON().content?.[0]).toMatchObject({
         attrs: { tag: 'layout' },
         type: 'element',
       })
@@ -512,29 +513,29 @@ describe('editor-specific authoring kits', () => {
       const surface = wrapper.get('.ProseMirror')
       const columnPositions = () => {
         const positions: number[] = []
-        wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+        wrapper.vm.getEditor()!.state.doc.descendants((node, pos) => {
           if (node.type.name === 'element' && node.attrs.tag === 'column') positions.push(pos)
         })
         return positions
       }
 
-      wrapper.vm.editor!.chain().setTextSelection(columnPositions()[0]! + 2).focus().run()
+      wrapper.vm.getEditor()!.chain().setTextSelection(columnPositions()[0]! + 2).focus().run()
       await surface.trigger('keydown', { key: 'Enter' })
       expect(columnPositions()).toHaveLength(2)
 
-      wrapper.vm.editor!.chain().setTextSelection(columnPositions()[1]! + 2).focus().run()
+      wrapper.vm.getEditor()!.chain().setTextSelection(columnPositions()[1]! + 2).focus().run()
       await surface.trigger('keydown', { key: 'Backspace' })
       expect(columnPositions()).toHaveLength(2)
-      const beforeDelete = wrapper.vm.editor!.getText()
+      const beforeDelete = wrapper.vm.getEditor()!.getText()
 
-      wrapper.vm.editor!.chain().setNodeSelection(0).run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(0).run()
       await wrapper.vm.$nextTick()
       await (await openSettings(wrapper)).get('button[data-action="delete"]').trigger('click')
       await flushPromises()
       expect(columnPositions()).toHaveLength(0)
-      wrapper.vm.editor!.commands.undo()
+      wrapper.vm.getEditor()!.commands.undo()
       expect(columnPositions()).toHaveLength(2)
-      expect(wrapper.vm.editor!.getText()).toBe(beforeDelete)
+      expect(wrapper.vm.getEditor()!.getText()).toBe(beforeDelete)
       expect((await wrapper.vm.flush()).ok).toBe(true)
       await expect(parseAuthoringSource(
         wrapper.emitted('update:modelValue')?.at(-1)?.[0] as string,
@@ -558,12 +559,12 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       let columnPosition = -1
-      wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+      wrapper.vm.getEditor()!.state.doc.descendants((node, pos) => {
         if (columnPosition < 0 && node.type.name === 'element' && node.attrs.tag === 'column') {
           columnPosition = pos
         }
       })
-      wrapper.vm.editor!.chain().setNodeSelection(columnPosition).run()
+      wrapper.vm.getEditor()!.chain().setNodeSelection(columnPosition).run()
       await wrapper.vm.$nextTick()
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
       await wrapper.get('input[placeholder="Search blocks"]').setValue('Two columns')
@@ -571,7 +572,7 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       expect(wrapper.text()).toContain('This block cannot be inserted safely here.')
       let layouts = 0
-      wrapper.vm.editor!.state.doc.descendants((node) => {
+      wrapper.vm.getEditor()!.state.doc.descendants((node) => {
         if (node.type.name === 'element' && node.attrs.tag === 'layout') layouts += 1
       })
       expect(layouts).toBe(1)
@@ -610,8 +611,8 @@ describe('editor-specific authoring kits', () => {
       const image = wrapper.get('img')
       expect(image.attributes('src')).toBe('blob:https://editor.example.test/resolved')
       expect(image.attributes('src')).not.toContain('asset_123')
-      wrapper.vm.editor!.chain()
-        .setTextSelection(wrapper.vm.editor!.state.doc.content.size)
+      wrapper.vm.getEditor()!.chain()
+        .setTextSelection(wrapper.vm.getEditor()!.state.doc.content.size)
         .insertContent('Edited')
         .run()
       await wrapper.vm.flush()
@@ -640,15 +641,15 @@ describe('editor-specific authoring kits', () => {
       await flushPromises()
       await new Promise(resolve => globalThis.setTimeout(resolve, 30))
       let paragraphEnd = -1
-      wrapper.vm.editor!.state.doc.descendants((node, pos) => {
+      wrapper.vm.getEditor()!.state.doc.descendants((node, pos) => {
         if (node.type.name === 'paragraph' && node.textContent === 'Additionally.') {
           paragraphEnd = pos + node.nodeSize - 1
         }
       })
       expect(paragraphEnd).toBeGreaterThan(0)
-      wrapper.vm.editor!.commands.setTextSelection(paragraphEnd)
+      wrapper.vm.getEditor()!.commands.setTextSelection(paragraphEnd)
       expect(
-        wrapper.vm.insertImageAsset({
+        insertAsset(wrapper, 'image', {
           alt: 'Diagram',
           filename: 'diagram.png',
           id: 'asset_123',

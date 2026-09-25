@@ -249,6 +249,7 @@ async function applyLink(remove = false) {
                       @submit.prevent="run({ kind: 'table', rows, columns })"
                     >
                       <strong>{{ actions.text('table') }}</strong>
+                      <!-- Pointer shortcut only. Keyboard users set the size with the number fields. -->
                       <div
                         class="ginko-table-size"
                         role="group"
@@ -258,6 +259,7 @@ async function applyLink(remove = false) {
                           v-for="cell in 25"
                           :key="cell"
                           type="button"
+                          tabindex="-1"
                           :aria-label="`${Math.ceil(cell / 5)} × ${(cell - 1) % 5 + 1}`"
                           :data-active="Math.ceil(cell / 5) <= rows && (cell - 1) % 5 < columns || undefined"
                           @mouseenter="rows = Math.ceil(cell / 5); columns = (cell - 1) % 5 + 1"

@@ -8,13 +8,13 @@ import type { NodeView } from '@tiptap/pm/view'
 import { blockSettings } from './settings'
 import { icon } from './icons'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import { SetNodePropertyStep } from '../property-step'
 import { createPropertyInput } from '../property-input'
 
 export function componentView(
   { node: initial, editor, getPos }: NodeViewRendererProps,
-  getKit: () => AuthoringKitV1 | undefined,
+  getKit: () => AuthoringKit | undefined,
   getOutputOptions: () => TiptapToMDCOptions,
   overlay?: EditorOverlayController,
 ): NodeView {

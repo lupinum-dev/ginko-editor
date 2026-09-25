@@ -4,7 +4,7 @@ import { joinBackward, joinForward } from '@tiptap/pm/commands'
 import { TextSelection } from '@tiptap/pm/state'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
-import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring'
+import { createAuthoringKit, type AuthoringKitSource } from '../src/authoring'
 import * as conversion from '../src/lib/conversionPipeline'
 
 beforeAll(() => {
@@ -18,8 +18,8 @@ beforeAll(() => {
 })
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); vi.restoreAllMocks() })
-function kitSource(): AuthoringKitSourceV1 {
-  const source: AuthoringKitSourceV1 = {
+function kitSource(): AuthoringKitSource {
+  const source: AuthoringKitSource = {
     version: 1,
     implementation: {},
     policy: { version: 2, components: {} },
@@ -93,7 +93,7 @@ describe('nodeview review regressions', () => {
       '<info title="First title">\nFirst body\n</info>\n\n'
         + '<warning title="Second title">\nSecond body\n</warning>',
     )
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     const pos = key === 'Backspace' ? before.firstChild!.nodeSize + 2 : before.firstChild!.nodeSize - 2
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos)))
     const command = key === 'Backspace' ? joinBackward : joinForward
@@ -109,10 +109,10 @@ describe('nodeview review regressions', () => {
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('success')
     await flushPromises()
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('success')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('success')
     release(); await flushPromises()
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('success')
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.props.title).toBe('Keep this title')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('success')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.props.title).toBe('Keep this title')
   })
 
   it('cancels a pending change when the user chooses the current variant again', async () => {
@@ -120,7 +120,7 @@ describe('nodeview review regressions', () => {
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('info')
     release(); await flushPromises()
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
   it('rejects a pending variant after a temporary read-only transition', async () => {
@@ -128,7 +128,7 @@ describe('nodeview review regressions', () => {
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await wrapper.setProps({ disabled: true }); await wrapper.setProps({ disabled: false })
     release(); await flushPromises()
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
   it('rejects a pending variant after output settings change', async () => {
@@ -136,7 +136,7 @@ describe('nodeview review regressions', () => {
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning')
     await wrapper.setProps({ fileOutput: 'markdown' })
     release(); await flushPromises()
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
   it('refreshes sibling variant options when the kit changes without changing the current tag', async () => {
@@ -157,15 +157,15 @@ describe('nodeview review regressions', () => {
         .findAll('option')
         .map(option => option.text()),
     ).toEqual(['info', 'Caution', 'success'])
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.tag).toBe('info')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.tag).toBe('info')
   })
 
   it('shows a readable rejection without changing the document', async () => {
     const kit = kitSource()
     kit.policy.components.warning.props.title.allowedValues = ['A different title']
-    const wrapper = await setup(undefined, kit), before = wrapper.vm.editor!.state.doc
+    const wrapper = await setup(undefined, kit), before = wrapper.vm.getEditor()!.state.doc
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
-    expect(wrapper.vm.editor!.state.doc).toBe(before)
+    expect(wrapper.vm.getEditor()!.state.doc).toBe(before)
     expect((await settings(wrapper)).get('.ginko-editor__field-error').text()).toContain(
       'This document violates the editor authoring kit.',
     )
@@ -173,10 +173,10 @@ describe('nodeview review regressions', () => {
   })
 
   it('handles a conversion exception visibly without changing the component', async () => {
-    const wrapper = await setup(), before = wrapper.vm.editor!.state.doc
+    const wrapper = await setup(), before = wrapper.vm.getEditor()!.state.doc
     vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockRejectedValueOnce(new Error('Controlled failure'))
     await (await settings(wrapper)).get('select[aria-label="Callout type"]').setValue('warning'); await flushPromises()
-    expect(wrapper.vm.editor!.state.doc).toBe(before)
+    expect(wrapper.vm.getEditor()!.state.doc).toBe(before)
     expect((await settings(wrapper)).get('.ginko-editor__field-error').text()).toContain('Your document is unchanged.')
   })
 
@@ -184,8 +184,8 @@ describe('nodeview review regressions', () => {
     const wrapper = await setup(), input = (await settings(wrapper)).get('input[aria-label="Icon"]')
     await input.setValue('after')
     await input.trigger('keydown', { key: 'z', ctrlKey: true })
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.props.icon).toBe('before')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.props.icon).toBe('before')
     await input.trigger('keydown', { key: 'z', ctrlKey: true, shiftKey: true })
-    expect(wrapper.vm.editor!.getJSON().content?.[0].attrs?.props.icon).toBe('after')
+    expect(wrapper.vm.getEditor()!.getJSON().content?.[0].attrs?.props.icon).toBe('after')
   })
 })

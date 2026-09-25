@@ -1,7 +1,7 @@
-import type { AuthoringRecipeV1 } from '../authoring'
+import type { AuthoringRecipe } from '../authoring'
 import type { EditorText, defaultMessages } from './messages'
 
-const imageRecipe: AuthoringRecipeV1 = {
+const imageRecipe: AuthoringRecipe = {
   id: 'ginko.image',
   label: 'Image',
   description: 'Add an image with a description.',
@@ -9,7 +9,7 @@ const imageRecipe: AuthoringRecipeV1 = {
   source: '',
 }
 
-export function isImageRecipe(recipe: AuthoringRecipeV1) {
+export function isImageRecipe(recipe: AuthoringRecipe) {
   return recipe === imageRecipe
 }
 
@@ -17,7 +17,7 @@ export function isImageRecipe(recipe: AuthoringRecipeV1) {
  * toolbar command on the current selection; it does not insert this sample text.
  * Host recipe sources are prepared and validated as document fragments instead.
  */
-export const writingRecipes: readonly AuthoringRecipeV1[] = [
+export const writingRecipes: readonly AuthoringRecipe[] = [
   {
     id: 'ginko.heading-1',
     label: 'Heading 1',
@@ -87,7 +87,7 @@ export const writingRecipes: readonly AuthoringRecipeV1[] = [
   },
 ]
 
-export function recipeSymbol(recipe: AuthoringRecipeV1): string {
+export function recipeSymbol(recipe: AuthoringRecipe): string {
   const symbols: Record<string, string> = {
     'ginko.heading-1': 'H₁',
     'ginko.heading-2': 'H₂',
@@ -104,7 +104,7 @@ export function recipeSymbol(recipe: AuthoringRecipeV1): string {
 }
 
 /** Preserve recipe identity: host IDs must not acquire built-in behavior. */
-export function recipeCopy(recipe: AuthoringRecipeV1, text: EditorText) {
+export function recipeCopy(recipe: AuthoringRecipe, text: EditorText) {
   if (!writingRecipes.includes(recipe)) return recipe
   const keys: Record<string, [keyof typeof defaultMessages, keyof typeof defaultMessages]> = {
     'ginko.heading-1': ['heading', 'heading1Description'],
@@ -125,9 +125,9 @@ export function recipeCopy(recipe: AuthoringRecipeV1, text: EditorText) {
 }
 
 export function searchRecipes(
-  recipes: readonly AuthoringRecipeV1[],
+  recipes: readonly AuthoringRecipe[],
   query: string,
-  copy: (recipe: AuthoringRecipeV1) => { label: string; description?: string },
+  copy: (recipe: AuthoringRecipe) => { label: string; description?: string },
 ) {
   const normalize = (value: string) => value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().trim()
   const search = normalize(query)

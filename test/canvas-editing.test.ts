@@ -2,7 +2,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
-import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring'
+import { insertAsset } from './helpers/assets'
+import { createAuthoringKit, type AuthoringKitSource } from '../src/authoring'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
@@ -16,7 +17,7 @@ beforeAll(() => {
 const wrappers: ReturnType<typeof mount<typeof GinkoEditor>>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()) })
 const block = { kind: 'block', media: null, slots: ['default'], allowedParents: null, allowedChildren: null } as const
-function source(): AuthoringKitSourceV1 {
+function source(): AuthoringKitSource {
   return {
     version: 1,
     implementation: {
@@ -58,7 +59,7 @@ function source(): AuthoringKitSourceV1 {
     }, recipes: [],
   }
 }
-async function setup(modelValue: string, kit?: AuthoringKitSourceV1) {
+async function setup(modelValue: string, kit?: AuthoringKitSource) {
   const wrapper = mount(GinkoEditor, {
     attachTo: document.body,
     props: {
@@ -79,7 +80,7 @@ async function saved(wrapper: Awaited<ReturnType<typeof setup>>) {
 describe('direct canvas editing', () => {
   it('groups title typing into one undo step and starts a new group after refocus', async () => {
     const wrapper = await setup('<notice heading="Before">\nBody\n</notice>', source())
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     let bodyEnd = 0
     editor.state.doc.descendants((node, pos) => {
       if (node.type.name === 'paragraph' && node.textContent === 'Body') bodyEnd = pos + node.nodeSize - 1
@@ -110,7 +111,7 @@ describe('direct canvas editing', () => {
     expect(
       (reloaded.get('input[aria-label="Notice Heading"]').element as HTMLInputElement).value,
     ).toBe('A "better" heading')
-    expect(reloaded.vm.editor!.getText().trim()).toBe('Body')
+    expect(reloaded.vm.getEditor()!.getText().trim()).toBe('Body')
     expect(wrapper.find('.ginko-editor__fields input').exists()).toBe(false)
   })
   it('changes both widths together and restores both with one Undo', async () => {
@@ -124,7 +125,7 @@ describe('direct canvas editing', () => {
     expect(
       reloaded.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
     ).toBe('Equal')
-    wrapper.vm.editor!.commands.undo(); await flushPromises()
+    wrapper.vm.getEditor()!.commands.undo(); await flushPromises()
     expect(
       wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes('aria-valuetext'),
     ).toBe('Small / Large')
@@ -154,7 +155,7 @@ describe('direct canvas editing', () => {
     expect(
       wrapper.get('[tag="split"] > .ginko-block__body > [role="separator"]').attributes(),
     ).toHaveProperty('hidden')
-    expect(wrapper.vm.editor!.getText()).toContain('Third')
+    expect(wrapper.vm.getEditor()!.getText()).toContain('Third')
   })
   it('disables title and layout editing when read-only changes at runtime', async () => {
     const wrapper = await setup(columns + '\n<notice heading="Before">\nBody\n</notice>', source())
@@ -176,7 +177,7 @@ describe('direct canvas editing', () => {
   })
   it('keeps paired columns intact when the block duplication shortcut is used', async () => {
     const wrapper = await setup(columns, source())
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     let pos = 0
     editor.state.doc.descendants((node, offset) => { if (!pos && node.attrs.tag === 'pane') pos = offset })
     editor.commands.setNodeSelection(pos)
@@ -196,39 +197,39 @@ describe('direct canvas editing', () => {
     await wrapper.get('select[aria-label="Code language"]').setValue('ts')
     await wrapper.get('input[aria-label="Code file name"]').setValue('answer.ts')
     const reloaded = await setup(await saved(wrapper))
-    expect(reloaded.vm.editor!.getJSON().content?.[0].attrs).toMatchObject({
+    expect(reloaded.vm.getEditor()!.getJSON().content?.[0].attrs).toMatchObject({
       language: 'ts',
       filename: 'answer.ts',
     })
   })
   it('edits image description inline and preserves the asset reference after reload', async () => {
     const wrapper = await setup('')
-    wrapper.vm.insertImageAsset({ id: 'stable-image', alt: 'Before' })
+    insertAsset(wrapper, 'image', { id: 'stable-image', alt: 'Before' })
     await flushPromises()
     await wrapper.get('button[aria-label="Image settings"]').trigger('click')
     await flushPromises()
     await wrapper.get('input[aria-label="Image description"]').setValue('A clear description')
     const output = await saved(wrapper), reloaded = await setup(output)
     expect(
-      reloaded.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props,
+      reloaded.vm.getEditor()!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props,
     ).toMatchObject({ id: 'stable-image', alt: 'A clear description' })
     await wrapper.get('button[aria-label="Remove image"]').trigger('click')
-    expect(wrapper.vm.editor!.getJSON().content?.some(node => node.type === 'image')).toBe(false)
-    wrapper.vm.editor!.commands.undo()
+    expect(wrapper.vm.getEditor()!.getJSON().content?.some(node => node.type === 'image')).toBe(false)
+    wrapper.vm.getEditor()!.commands.undo()
     expect(
-      wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props.alt,
+      wrapper.vm.getEditor()!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props.alt,
     ).toBe('A clear description')
   })
   it('refreshes resolved image URLs without rewriting or replacing the stored image', async () => {
     const wrapper = await setup('')
-    wrapper.vm.insertImageAsset({ id: 'stable-image', alt: 'Keep this' })
+    insertAsset(wrapper, 'image', { id: 'stable-image', alt: 'Keep this' })
     await wrapper.setProps({ assetProvider: { buildUrl: () => '/before.png', parseUrl: () => null } })
     const image = wrapper.get('.ginko-image img').element
-    const document = wrapper.vm.editor!.state.doc
+    const document = wrapper.vm.getEditor()!.state.doc
     await wrapper.setProps({ assetProvider: { buildUrl: () => '/after.png', parseUrl: () => null } })
     expect(wrapper.get('.ginko-image img').element).toBe(image)
     expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/after.png')
-    expect(wrapper.vm.editor!.state.doc).toBe(document)
+    expect(wrapper.vm.getEditor()!.state.doc).toBe(document)
   })
   it.each([
     'Add row above',
@@ -240,7 +241,7 @@ describe('direct canvas editing', () => {
     'Move row to header',
   ])('preserves tables after %s', async action => {
     const wrapper = await setup('| Name | Details |\n| --- | --- |\n| Item | Description |\n| Other | Detail |')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     let firstCell = 0
     editor.state.doc.descendants((node, pos) => {
       if (node.type.name === 'tableCell' && !firstCell) firstCell = pos + 2
@@ -253,17 +254,17 @@ describe('direct canvas editing', () => {
     await wrapper.get(`button[aria-label="${action}"]`).trigger('click')
     const output = await saved(wrapper)
     const reloaded = await setup(output)
-    expect(reloaded.vm.editor!.getJSON()).toEqual(editor.getJSON())
+    expect(reloaded.vm.getEditor()!.getJSON()).toEqual(editor.getJSON())
   })
   it('aligns the whole selected column and preserves its content after reload', async () => {
     const wrapper = await setup('| Name | Details |\n| --- | --- |\n| Item | Description |')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.commands.setTextSelection(4); await flushPromises()
     await wrapper.get('button[aria-label="Align column center"]').trigger('click')
     const output = await saved(wrapper)
     expect(output).toMatch(/:-+:/)
     const reloaded = await setup(output)
     expect(reloaded.get('th').attributes('style')).toContain('center')
-    expect(reloaded.vm.editor!.getText()).toContain('Description')
+    expect(reloaded.vm.getEditor()!.getText()).toContain('Description')
   })
 })

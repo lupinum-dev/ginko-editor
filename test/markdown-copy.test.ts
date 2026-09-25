@@ -26,13 +26,13 @@ async function setup(source: string) {
   const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { modelValue: source, syncDebounceMs: 10000 } })
   wrappers.push(wrapper)
   await flushPromises()
-  expect(wrapper.vm.editor).toBeDefined()
+  expect(wrapper.vm.getEditor()).toBeDefined()
   return wrapper
 }
 function copy(
   wrapper: Awaited<ReturnType<typeof setup>>,
   type = 'copy',
-  target: Element = wrapper.vm.editor!.view.dom,
+  target: Element = wrapper.vm.getEditor()!.view.dom,
 ) {
   const data = new Map<string, string>()
   const event = new Event(type, { bubbles: true, cancelable: true })
@@ -66,7 +66,7 @@ function blobText(blob: Blob) {
 describe('canonical Markdown clipboard', () => {
   it('keeps canonical copy and cut working when plugins mount and unmount', async () => {
     const wrapper = await setup('Keep **formatting**')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     const key = new PluginKey('clipboard-lifecycle-test')
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     editor.registerPlugin(new Plugin({ key }))
@@ -80,7 +80,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('cancels old pending cuts while a recreated plugin view supports new copies', async () => {
     const wrapper = await setup('Keep **this**')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     const clipboard = asyncClipboard()
     const original = conversion.convertTiptapDocToMarkdown
     let release!: () => void
@@ -103,7 +103,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('copies formatted selection as raw Markdown in both text flavors', async () => {
     const wrapper = await setup('Before **important** after.')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 8, 17)))
     await flushPromises()
     const { data, event } = copy(wrapper)
@@ -115,7 +115,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('copies the component contract and pastes plain-text Markdown back into structure', async () => {
     const wrapper = await setup('<info title="Remember">\nA **useful** detail.\n</info>')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 0)))
     await flushPromises()
     const source = copy(wrapper).data.get('text/plain')!
@@ -130,19 +130,19 @@ describe('canonical Markdown clipboard', () => {
         getData: (type: string) => (type === 'text/plain' ? source : ''),
       },
     })
-    target.vm.editor!.view.dom.dispatchEvent(event)
+    target.vm.getEditor()!.view.dom.dispatchEvent(event)
     await flushPromises()
     expect(event.defaultPrevented).toBe(true)
-    expect(target.vm.editor!.getJSON().content?.[0]).toMatchObject({
+    expect(target.vm.getEditor()!.getJSON().content?.[0]).toMatchObject({
       type: 'element',
       attrs: { tag: 'info', props: { title: 'Remember' } },
     })
-    expect(target.vm.editor!.getText()).toContain('A useful detail.')
+    expect(target.vm.getEditor()!.getText()).toContain('A useful detail.')
   })
 
   it('serializes a rectangular table selection with its table wrapper', async () => {
     const wrapper = await setup('| A | B |\n| --- | ---: |\n| C | D |')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     const cells: number[] = []
     editor.state.doc.descendants((node, pos) => {
       if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') cells.push(pos)
@@ -159,7 +159,7 @@ describe('canonical Markdown clipboard', () => {
   it('starts an activation-safe asynchronous copy before serialization finishes', async () => {
     const wrapper = await setup('A **new** selection')
     const clipboard = asyncClipboard()
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     const { data, event } = copy(wrapper)
     expect(event.defaultPrevented).toBe(true)
@@ -171,7 +171,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('invalidates cached text when the selection changes', async () => {
     const wrapper = await setup('First and second')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1, 6)))
     await flushPromises()
     expect(copy(wrapper).data.get('text/plain')?.trim()).toBe('First')
@@ -184,7 +184,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('leaves native input selection copying alone', async () => {
     const wrapper = await setup('Document body')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     await flushPromises()
     const input = document.createElement('input')
@@ -199,7 +199,7 @@ describe('canonical Markdown clipboard', () => {
   it('deletes a cut selection only after its async clipboard write succeeds', async () => {
     const wrapper = await setup('Keep until copied')
     const clipboard = asyncClipboard()
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     copy(wrapper, 'cut')
     expect(editor.getText()).toBe('Keep until copied')
@@ -218,7 +218,7 @@ describe('canonical Markdown clipboard', () => {
       await gate
       return original(...args)
     })
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))
     copy(wrapper, 'cut')
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)))
@@ -230,7 +230,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('rejects an older pending write when a later copy supersedes it', async () => {
     const wrapper = await setup('First and second')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     const clipboard = asyncClipboard()
     const original = conversion.convertTiptapDocToMarkdown
     let release!: () => void
@@ -254,7 +254,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('reports an unavailable immediate copy and never falls back to stale text', async () => {
     const wrapper = await setup('First and second')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     vi.stubGlobal('ClipboardItem', undefined)
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1, 6)))
     await flushPromises()
@@ -270,7 +270,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('invalidates cached serialization when output options change without a transaction', async () => {
     const wrapper = await setup('<file src="/guide.pdf" title="Guide" />')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 0)))
     await flushPromises()
     expect(copy(wrapper).data.get('text/plain')).toContain('file')
@@ -288,7 +288,7 @@ describe('canonical Markdown clipboard', () => {
 
   it('reports conversion failure and preserves the cut document', async () => {
     const wrapper = await setup('Keep this document')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     asyncClipboard()
     vi.spyOn(conversion, 'convertTiptapDocToMarkdown').mockRejectedValue(new Error('Controlled serialization failure'))
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)))

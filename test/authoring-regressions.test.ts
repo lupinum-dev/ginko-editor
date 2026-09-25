@@ -2,10 +2,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
-import { createAuthoringKit, parseAuthoringSource, type AuthoringKitSourceV1 } from '../src/authoring'
+import { createAuthoringKit, parseAuthoringSource, type AuthoringKitSource } from '../src/authoring'
 import { prepareMarkdownForVisualEditing } from '../src/lib/conversionPipeline'
 
-function kitSource(): AuthoringKitSourceV1 {
+function kitSource(): AuthoringKitSource {
   return {
     version: 1,
     policy: {
@@ -103,7 +103,7 @@ describe('incoming reviewer Step 4 probes', () => {
     await expect(parseAuthoringSource('<note title="three">\nText\n</note>', kit)).rejects.toThrow('outside policy')
   })
   it('does not apply component authoring rules to explicitly native HTML', async () => {
-    const source: AuthoringKitSourceV1 = {
+    const source: AuthoringKitSource = {
       version: 1,
       policy: {
         version: 2,
@@ -129,7 +129,7 @@ describe('incoming reviewer Step 4 probes', () => {
     await expect(parseAuthoringSource('::div\nComponent\n::',kit)).rejects.toThrow('invalid_nesting')
   })
   it('applies nesting rules to unmarked colon components', async () => {
-    const source: AuthoringKitSourceV1 = {
+    const source: AuthoringKitSource = {
       version: 1,
       policy: {
         version: 2,
@@ -178,12 +178,12 @@ describe('incoming reviewer Step 4 probes', () => {
     })
     try {
       await flushPromises()
-      wrapper.vm.editor!.commands.insertContent('Pending ')
-      expect(wrapper.vm.editor!.getText()).toContain('Pending')
+      wrapper.vm.getEditor()!.commands.insertContent('Pending ')
+      expect(wrapper.vm.getEditor()!.getText()).toContain('Pending')
       await wrapper.setProps({authoringKit:equivalent})
       await flushPromises()
       await wrapper.vm.flush()
-      expect(wrapper.vm.editor!.getText()).toContain('Pending')
+      expect(wrapper.vm.getEditor()!.getText()).toContain('Pending')
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('Pending')
     } finally { wrapper.unmount() }
   })

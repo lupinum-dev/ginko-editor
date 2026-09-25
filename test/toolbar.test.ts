@@ -29,7 +29,7 @@ async function setup(source = 'Hello world') {
     },
   })
   wrappers.push(wrapper); await flushPromises()
-  return { wrapper, editor: wrapper.vm.editor!, toolbar: wrapper.getComponent(GinkoToolbar) }
+  return { wrapper, editor: wrapper.vm.getEditor()!, toolbar: wrapper.getComponent(GinkoToolbar) }
 }
 
 async function settle() {

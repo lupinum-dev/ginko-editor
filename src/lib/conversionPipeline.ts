@@ -9,11 +9,12 @@ import {
   type PortableComponentPolicy,
 } from '@lupinum/ginko-content/cms-contract'
 
-import type { AuthoringKitV1 } from '../authoring'
+import type { AuthoringKit } from '../authoring'
 import { validateTiptapDocShape } from './conversionInvariants'
 import { finishTrace, logIssue, logPhase, startTrace } from './conversionLogger'
 import type {
   ConversionIssue,
+  ConversionIssueCode,
   ConversionPhase,
   ConversionResult,
   ConversionSeverity,
@@ -27,6 +28,7 @@ export type {
   ConversionErrorPayload,
   ConversionHealthState,
   ConversionIssue,
+  ConversionIssueCode,
   ConversionPhase,
   ConversionRecoveredPayload,
   ConversionResult,
@@ -36,7 +38,7 @@ export type {
 
 function buildIssue(
   phase: ConversionPhase,
-  code: string,
+  code: ConversionIssueCode,
   message: string,
   detail?: unknown,
   context?: Record<string, unknown>,
@@ -92,7 +94,7 @@ function splitIssues(issues: ConversionIssue[]) {
 
 export async function validateMarkdownForAuthoring(
   markdown: string,
-  authoringKit: Pick<AuthoringKitV1, 'policy'>,
+  authoringKit: Pick<AuthoringKit, 'policy'>,
 ): Promise<ConversionIssue | undefined> {
   try {
     const sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
@@ -109,7 +111,7 @@ export async function validateMarkdownForAuthoring(
 
 function validateParsedDocumentForAuthoring(
   sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>,
-  authoringKit: Pick<AuthoringKitV1, 'policy'>,
+  authoringKit: Pick<AuthoringKit, 'policy'>,
 ): ConversionIssue | undefined {
   const validation = validateStoredPortableMarkdownAst(
     projectMdcDocument(sourceDocument).body,
@@ -220,7 +222,7 @@ export async function prepareMarkdownForVisualEditing(
   markdown: string,
   options?: TiptapToMDCOptions,
   schema?: Schema,
-  authoringKit?: Pick<AuthoringKitV1, 'policy'>,
+  authoringKit?: Pick<AuthoringKit, 'policy'>,
   context: 'document' | 'fragment' = 'document',
 ): Promise<ConversionResult<JSONContent>> {
   let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>

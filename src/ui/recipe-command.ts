@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import type { Transaction } from '@tiptap/pm/state'
-import type { AuthoringRecipeV1 } from '../authoring'
+import type { AuthoringRecipe } from '../authoring'
 import {
   commitEditorTransaction,
   trackEditorOperation,
@@ -26,7 +26,7 @@ const nativeCommands: Record<string, EditorCommand> = {
 /** Slash insertion shares toolbar commands and Content's final-document gate. */
 export function runRecipeCommand(
   editor: Editor,
-  recipe: AuthoringRecipeV1,
+  recipe: AuthoringRecipe,
   context: EditorOperationContext,
   replaceRange?: { from: number; to: number },
 ): Promise<BlockOperationResult> {

@@ -2,6 +2,7 @@
 import { Editor } from '@tiptap/core'
 import { mount as mountVue } from '@vue/test-utils'
 import GinkoEditor from '../src/GinkoEditor.vue'
+import { insertAsset } from './helpers/assets'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDocumentExtensions } from '../src/lib/config/documentConfig'
 import { createEditorCollaboration, parseCollaborationRecovery, CollaborationConnectionError, type CollaborationRecovery } from '../src/collaboration'
@@ -100,12 +101,12 @@ describe('collaborative editor lifecycle', () => {
     const session = createEditorCollaboration({ snapshot: backend.snapshot, clientId: 'alice/session', transport: backend.client().transport })
     const wrapper = mountVue(GinkoEditor, { props: { modelValue: 'Wrong host source.', collaboration: session } })
     wrappers.push(wrapper)
-    await vi.waitFor(() => expect(wrapper.vm.editor?.isInitialized).toBe(true))
+    await vi.waitFor(() => expect(wrapper.vm.getEditor()?.isInitialized).toBe(true))
     await session.flush()
-    expect(wrapper.vm.editor?.getText()).toBe('Shared body.')
+    expect(wrapper.vm.getEditor()?.getText()).toBe('Shared body.')
     await wrapper.setProps({ modelValue: 'A stale host checkpoint.' })
-    expect(wrapper.vm.editor?.getText()).toBe('Shared body.')
-    wrapper.vm.editor!.commands.insertContent('New ')
+    expect(wrapper.vm.getEditor()?.getText()).toBe('Shared body.')
+    wrapper.vm.getEditor()!.commands.insertContent('New ')
     expect((await wrapper.vm.flush()).ok).toBe(true)
     expect(backend.markdown.trim()).toBe('New Shared body.')
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toBe(backend.markdown)
@@ -113,9 +114,9 @@ describe('collaborative editor lifecycle', () => {
     const source = wrapper.get('textarea')
     expect(source.attributes('readonly')).toBeDefined()
     await source.setValue('Must not replace the room.')
-    expect(wrapper.vm.editor?.getText()).toBe('New Shared body.')
+    expect(wrapper.vm.getEditor()?.getText()).toBe('New Shared body.')
     await wrapper.get('button[aria-pressed="false"]').trigger('click')
-    expect(wrapper.vm.editor?.getText()).toBe('New Shared body.')
+    expect(wrapper.vm.getEditor()?.getText()).toBe('New Shared body.')
   })
 
   it('converges concurrent body and independent property edits and preserves remote text on Undo', async () => {
@@ -172,12 +173,12 @@ describe('collaborative editor lifecycle', () => {
     const session = createEditorCollaboration({ snapshot: backend.snapshot, clientId: 'alice/session', transport: backend.client().transport })
     const wrapper = mountVue(GinkoEditor, { props: { modelValue: '', collaboration: session } })
     wrappers.push(wrapper)
-    await vi.waitFor(() => expect(wrapper.vm.editor?.isInitialized).toBe(true))
+    await vi.waitFor(() => expect(wrapper.vm.getEditor()?.isInitialized).toBe(true))
     await session.flush()
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.commands.setNodeSelection(0)
     editor.registerPlugin(new Plugin({ filterTransaction: transaction => !transaction.docChanged }))
-    expect(wrapper.vm.insertImageAsset({ url: '/replacement.png' })).toBe(false)
+    expect(insertAsset(wrapper, 'image', { url: '/replacement.png' })).toBe(false)
     expect(editor.state.doc.firstChild?.attrs.props.src).toBe('/original.png')
   })
 
@@ -187,12 +188,12 @@ describe('collaborative editor lifecycle', () => {
     const session = createEditorCollaboration({ snapshot: backend.snapshot, clientId: 'alice/session', transport: imageClient.transport })
     const wrapper = mountVue(GinkoEditor, { props: { modelValue: '', collaboration: session } })
     wrappers.push(wrapper)
-    await vi.waitFor(() => expect(wrapper.vm.editor?.isInitialized).toBe(true))
+    await vi.waitFor(() => expect(wrapper.vm.getEditor()?.isInitialized).toBe(true))
     await session.flush()
     const description = await mount(backend.snapshot, descriptionClient.transport, 'bob/session')
     imageClient.connection.online = descriptionClient.connection.online = false
-    wrapper.vm.editor!.commands.setNodeSelection(0)
-    expect(wrapper.vm.insertImageAsset({ url: '/replacement.png' })).toBe(true)
+    wrapper.vm.getEditor()!.commands.setNodeSelection(0)
+    expect(insertAsset(wrapper, 'image', { url: '/replacement.png' })).toBe(true)
     description.editor.view.dispatch(description.editor.state.tr.step(new SetNodePropertyStep(0, 'alt', 'A useful description')))
     const participants = [{ connection: imageClient.connection, session }, { connection: descriptionClient.connection, session: description.session }]
     if (order === 'description-first') participants.reverse()
@@ -201,8 +202,8 @@ describe('collaborative editor lifecycle', () => {
       participant.session.retry()
       await participant.session.flush()
     }
-    await vi.waitFor(() => expect(wrapper.vm.editor!.getJSON()).toEqual(description.editor.getJSON()))
-    expect(wrapper.vm.editor!.state.doc.firstChild?.attrs.props).toMatchObject({ src: '/replacement.png', alt: 'A useful description' })
+    await vi.waitFor(() => expect(wrapper.vm.getEditor()!.getJSON()).toEqual(description.editor.getJSON()))
+    expect(wrapper.vm.getEditor()!.state.doc.firstChild?.attrs.props).toMatchObject({ src: '/replacement.png', alt: 'A useful description' })
     expect(backend.markdown).toContain('![A useful description](/replacement.png)')
   })
 

@@ -2,6 +2,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
+import { insertImageNode } from './helpers/assets'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { AssetInfo, ImageUploadHandler } from '../src/types'
 
@@ -46,7 +47,7 @@ describe('inline image uploads', () => {
     const wrapper = await mountEditor()
     await add(wrapper)
     expect(wrapper.find('[aria-label="Upload image"]').exists()).toBe(true)
-    expect(wrapper.vm.editor!.can().clearImageUploads()).toBe(true)
+    expect(wrapper.vm.getEditor()!.can().clearImageUploads()).toBe(true)
     await add(wrapper)
     expect(wrapper.findAll('.ginko-image-upload')).toHaveLength(1)
     expect(wrapper.emitted('request-image')).toBeUndefined()
@@ -63,7 +64,7 @@ describe('inline image uploads', () => {
 
   it('maps the placeholder while typing, preserves selection, and undoes only the completed upload', async () => {
     const task = deferred(), upload = vi.fn<ImageUploadHandler>(() => task.promise)
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     await add(wrapper); await choose(wrapper)
     editor.commands.setTextSelection(1)
     editor.commands.insertContent('New ')
@@ -100,7 +101,7 @@ describe('inline image uploads', () => {
   it('refreshes a completed asset URL in place without adding an undo step', async () => {
     const wrapper = await mountEditor(async () => ({ id: '/stored-photo', alt: 'Keep this description' }))
     await wrapper.setProps({ assetProvider: { buildUrl: () => '/first-display.png', parseUrl: () => null } })
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     await add(wrapper); await choose(wrapper)
     const image = wrapper.get('.ginko-image img').element, uploaded = editor.state.doc
     await wrapper.setProps({ assetProvider: { buildUrl: () => '/refreshed-display.png', parseUrl: () => null } })
@@ -129,7 +130,25 @@ describe('inline image uploads', () => {
     expect(wrapper.text()).toContain('Storage is full.')
     await choose(wrapper)
     expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
-    expect(wrapper.vm.editor!.state.doc.child(1).attrs.props.src).toBe('/retried.png')
+    expect(wrapper.vm.getEditor()!.state.doc.child(1).attrs.props.src).toBe('/retried.png')
+  })
+
+  it('keeps an upload running when the host passes a new inline handler on each render', async () => {
+    const task = deferred(); let signal: AbortSignal | undefined
+    const wrapper = await mountEditor((_file, context) => { signal = context.signal; return task.promise })
+    await add(wrapper); await choose(wrapper)
+    for (let render = 0; render < 3; render += 1) {
+      // The same capability with a new function identity, as an inline arrow creates.
+      await wrapper.setProps({ imageUpload: async () => ({ url: `/render-${render}.png` }) })
+    }
+    await wrapper.setProps({ assetProvider: { buildUrl: asset => asset.url ?? '', parseUrl: () => null } })
+    await wrapper.setProps({ assetProvider: { buildUrl: asset => asset.url ?? '', parseUrl: () => null } })
+    expect(signal?.aborted).toBe(false)
+    expect(wrapper.vm.hasPendingChanges()).toBe(true)
+    task.resolve({ url: '/uploaded.png' }); await flushPromises()
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(wrapper.vm.getEditor()!.getJSON().content?.find(node => node.type === 'image')?.attrs?.props.src)
+      .toBe('/uploaded.png')
   })
 
   it.each([
@@ -146,7 +165,7 @@ describe('inline image uploads', () => {
     if (change === 'remove') await wrapper.get('[aria-label="Remove image placeholder"]').trigger('click')
     if (change === 'disable') await wrapper.setProps({ disabled: true })
     if (change === 'images') await wrapper.setProps({ enableImages: false })
-    if (change === 'handler') await wrapper.setProps({ imageUpload: async () => ({ url: '/new.png' }) })
+    if (change === 'handler') await wrapper.setProps({ imageUpload: undefined })
     if (change === 'document') await wrapper.setProps({ modelValue: 'Replacement\n' })
     if (change === 'unmount') wrapper.unmount()
     expect(signal?.aborted).toBe(true)
@@ -156,7 +175,7 @@ describe('inline image uploads', () => {
   })
 
   it('keeps the pending anchor outside a block that is wrapped while uploading', async () => {
-    const task = deferred(), wrapper = await mountEditor(() => task.promise), editor = wrapper.vm.editor!
+    const task = deferred(), wrapper = await mountEditor(() => task.promise), editor = wrapper.vm.getEditor()!
     await add(wrapper); await choose(wrapper)
     editor.commands.toggleBlockquote()
     task.resolve({ url: '/outside.png' }); await flushPromises()
@@ -170,8 +189,8 @@ describe('inline image uploads', () => {
       signal = context.signal
       return task.promise
     })
-    const editor = wrapper.vm.editor!
-    wrapper.vm.insertImageAsset({ url: '/original.png', alt: 'Original' })
+    const editor = wrapper.vm.getEditor()!
+    insertImageNode(wrapper, { url: '/original.png', alt: 'Original' })
     editor.commands.setNodeSelection(0)
     await add(wrapper); await choose(wrapper)
     expect(editor.state.doc.firstChild!.attrs.props.src).toBe('/original.png')
@@ -191,8 +210,8 @@ describe('inline image uploads', () => {
       signal = context.signal
       return task.promise
     })
-    const editor = wrapper.vm.editor!
-    wrapper.vm.insertImageAsset({ url: '/original.png' }); editor.commands.setNodeSelection(0)
+    const editor = wrapper.vm.getEditor()!
+    insertImageNode(wrapper, { url: '/original.png' }); editor.commands.setNodeSelection(0)
     await add(wrapper); await choose(wrapper)
     editor.commands.deleteSelection(); await flushPromises()
     expect(signal?.aborted).toBe(true)
@@ -207,8 +226,8 @@ describe('inline image uploads', () => {
       signal = context.signal
       return task.promise
     })
-    const editor = wrapper.vm.editor!
-    wrapper.vm.insertImageAsset({ url: '/original.png', alt: 'Original' }); await flushPromises()
+    const editor = wrapper.vm.getEditor()!
+    insertImageNode(wrapper, { url: '/original.png', alt: 'Original' }); await flushPromises()
     const original = editor.state.doc, image = wrapper.get('.ginko-image img').element
     await wrapper.get('button[aria-label="Image settings"]').trigger('click'); await flushPromises()
     expect(wrapper.find('input[aria-label="Image description"]').exists()).toBe(true)
@@ -234,8 +253,8 @@ describe('inline image uploads', () => {
     const upload = vi.fn<ImageUploadHandler>()
       .mockRejectedValueOnce(new Error('Storage is full.'))
       .mockResolvedValueOnce({ url: '/retry.png' })
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
-    wrapper.vm.insertImageAsset({ url: '/original.png' }); await flushPromises()
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
+    insertImageNode(wrapper, { url: '/original.png' }); await flushPromises()
     const original = editor.state.doc
     editor.commands.setNodeSelection(0); await add(wrapper); await choose(wrapper)
     expect(editor.state.doc).toBe(original)
@@ -257,7 +276,7 @@ describe('inline image uploads', () => {
       signal = context.signal
       return task.promise
     })
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     await add(wrapper); await choose(wrapper)
     editor.setEditable(false); await flushPromises()
     expect(signal?.aborted).toBe(true)
@@ -272,7 +291,7 @@ describe('inline image uploads', () => {
       signal = context.signal
       return task.promise
     })
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     await add(wrapper); await choose(wrapper)
     const pluginKey = new PluginKey('uploadLifecycleTest')
     editor.registerPlugin(new Plugin({ key: pluginKey })); await flushPromises()
@@ -292,7 +311,7 @@ describe('inline image uploads', () => {
     const upload = vi.fn<ImageUploadHandler>()
       .mockReturnValueOnce(replacement.promise)
       .mockReturnValueOnce(addition.promise)
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
     editor.commands.setNodeSelection(7)
     await add(wrapper); await choose(wrapper)
@@ -321,7 +340,7 @@ describe('inline image uploads', () => {
     )
     await add(wrapper); await choose(wrapper)
     expect(await wrapper.vm.flush()).toMatchObject({ ok: true })
-    expect(wrapper.vm.editor!.state.doc.child(1).attrs.props).toMatchObject({
+    expect(wrapper.vm.getEditor()!.state.doc.child(1).attrs.props).toMatchObject({
       fit: 'cover',
       focalX: 0.25,
       focalY: 0.75,
@@ -347,7 +366,7 @@ describe('inline image uploads', () => {
 
   it('asks before replacing the image under the drop, independently of the text selection', async () => {
     const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
     editor.commands.setTextSelection(1)
     await wrapper.get('.ginko-image img').trigger('dragover', { dataTransfer: { types: ['Files'] } })
@@ -367,7 +386,7 @@ describe('inline image uploads', () => {
 
   it('anchors replacement to the image through scrolling and removes its decoration on cancellation', async () => {
     const upload = vi.fn<ImageUploadHandler>()
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
     const image = wrapper.get('.ginko-image').element
     let top = 100
@@ -399,7 +418,7 @@ describe('inline image uploads', () => {
 
   it('maps a confirmed drop across typing and prevents confirmation after target removal', async () => {
     const upload = vi.fn<ImageUploadHandler>().mockResolvedValue({ url: '/dropped.png' })
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     await wrapper.get('.ginko-editor').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
     editor.commands.insertContent('Changed ')
     await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click'); await flushPromises()
@@ -415,7 +434,7 @@ describe('inline image uploads', () => {
   it('does not reattach a replacement panel after an aborted target change', async () => {
     const wrapper = await mountEditor((_file, { signal }) => new Promise((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(new Error('Aborted')))
-    })), editor = wrapper.vm.editor!
+    })), editor = wrapper.vm.getEditor()!
     editor.commands.insertContentAt(7, { type: 'image', attrs: { props: { src: '/original.png' } } })
     await wrapper.get('.ginko-image img').trigger('drop', { dataTransfer: { types: ['Files'], files: [file()] } })
     await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click')
@@ -466,7 +485,7 @@ describe('inline image uploads', () => {
       await wrapper.get('.ginko-image-upload__actions button:last-child').trigger('click')
       expect(document.activeElement).toBe(wrapper.get('[aria-label="Remove image placeholder"]').element)
       task.resolve({ url: '/confirmed.png' }); await flushPromises()
-      expect(document.activeElement).toBe(wrapper.vm.editor!.view.dom)
+      expect(document.activeElement).toBe(wrapper.vm.getEditor()!.view.dom)
       expect(revoke).toHaveBeenCalledWith('blob:second')
     } finally { URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke }
   })
@@ -487,7 +506,7 @@ describe('inline image uploads', () => {
   it('resolves concurrent placeholders independently', async () => {
     const first = deferred(), second = deferred()
     const upload = vi.fn<ImageUploadHandler>().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
-    const wrapper = await mountEditor(upload), editor = wrapper.vm.editor!
+    const wrapper = await mountEditor(upload), editor = wrapper.vm.getEditor()!
     await add(wrapper); await choose(wrapper)
     editor.commands.setTextSelection(editor.state.doc.content.size - 1)
     await add(wrapper); await choose(wrapper, file(), 1)

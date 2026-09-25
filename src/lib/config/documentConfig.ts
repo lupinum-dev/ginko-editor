@@ -6,7 +6,7 @@ import { TableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
 import StarterKit from '@tiptap/starter-kit'
 
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { JsonRecord } from '../../types'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { CodeBlock } from '../extensions/code-block'
@@ -21,7 +21,7 @@ import { Video } from '../extensions/video'
 import { registerPropertyStep } from '../property-step'
 
 interface DocumentExtensionOptions {
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   nodeViews?: Partial<Record<'codeBlock' | 'element' | 'image' | 'table', NodeViewRenderer>>
   resolveAsset?: (props: JsonRecord) => string | null | undefined
