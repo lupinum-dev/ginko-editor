@@ -117,6 +117,11 @@ export class SetComponentVariantStep extends Step {
     const pos = mapping.mapResult(this.pos, 1)
     return pos.deleted ? null : new SetComponentVariantStep(pos.pos, this.tag, this.syntax)
   }
+  /** A later variant choice for the same component replaces the earlier one. */
+  merge(other: Step) {
+    return other instanceof SetComponentVariantStep && other.pos === this.pos
+      ? new SetComponentVariantStep(this.pos, other.tag, other.syntax) : null
+  }
   toJSON() {
     return { stepType: variantStepType, pos: this.pos, tag: this.tag,
       ...(this.syntax === undefined ? { removeSyntax: true } : { syntax: this.syntax }) }

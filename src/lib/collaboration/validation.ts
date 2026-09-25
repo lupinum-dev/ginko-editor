@@ -1,17 +1,20 @@
 import type { Node, Schema } from '@tiptap/pm/model'
 import { AttrStep, Step, Transform } from '@tiptap/pm/transform'
-import type { PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
+import { isSafePublicMarkdownUrl, type PortableComponentPolicyV2 } from '@lupinum/ginko-content/cms-contract'
+import type { Mark } from '@tiptap/pm/model'
 import { createEditorSchema } from '../config/documentConfig'
 import { convertTiptapDocToMarkdown, prepareMarkdownForVisualEditing, validateMarkdownForAuthoring } from '../conversionPipeline'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { imageProperties } from '../image-properties'
 import {
-  assertCollaborationHead, collaborationLimits, CollaborationError, editorSchemaRevision, fenceMismatch,
+  assertCollaborationHead, assertProtocolVersion, collaborationLimits, CollaborationError, editorSchemaRevision, fenceMismatch,
   type CollaborationSnapshot, type CollaborationSteps,
 } from './protocol'
 
-const wireSteps = new Set(['replace', 'replaceAround', 'addMark', 'removeMark', 'addNodeMark',
+/** Step IDs accepted on the wire. Changing this list requires a new schema revision. */
+export const collaborationWireSteps: readonly string[] = Object.freeze(['replace', 'replaceAround', 'addMark', 'removeMark', 'addNodeMark',
   'removeNodeMark', 'attr', 'ginkoSetNodePropertyV1', 'ginkoSetComponentVariantV1', 'ginkoSetNodeAttributeV1'])
+const wireSteps = new Set(collaborationWireSteps)
 const encoder = new TextEncoder()
 
 function validateStepPositions(json: Record<string, unknown>) {
@@ -53,7 +56,10 @@ function parseBounded(source: string, maxBytes: number): unknown {
   }
 }
 
-/** Reject unknown nodes, attributes and malformed shapes instead of dropping them. */
+/**
+ * Reject unknown nodes, attributes and malformed shapes instead of dropping them.
+ * @experimental
+ */
 export function decodeCollaborationDocument(source: string, schema: Schema = createEditorSchema()): Node {
   const json = parseBounded(source, collaborationLimits.documentBytes)
   try {
@@ -68,7 +74,10 @@ export function decodeCollaborationDocument(source: string, schema: Schema = cre
   }
 }
 
-/** The caller must check host authorization and the document fence first. */
+/**
+ * The caller must check host authorization and the document fence first.
+ * @experimental
+ */
 export function decodeCollaborationSteps(encoded: readonly string[], schema: Schema = createEditorSchema()): Step[] {
   if (!Array.isArray(encoded) || encoded.length < 1 || encoded.length > collaborationLimits.stepsPerBatch) {
     throw new CollaborationError('limit', 'The change has an invalid number of steps.')
@@ -91,19 +100,88 @@ export function decodeCollaborationSteps(encoded: readonly string[], schema: Sch
   })
 }
 
+/** @experimental */
 export interface CollaborationContentOptions {
   policy: PortableComponentPolicyV2
   output?: TiptapToMDCOptions
 }
 
+/** @experimental */
 export interface CollaborationCheckpoint {
   snapshot: CollaborationSnapshot
   /** Derived from the accepted snapshot, never taken from a client checkpoint. */
   markdown: string
 }
 
+const componentTag = /^[A-Za-z][\w.:-]{0,127}$/
+const slotName = /^[^\s"'<>=`\\]{1,128}$/
+const orderedListTypes = new Set([null, '1', 'a', 'A', 'i', 'I'])
+
+function optionalText(value: unknown, maxLength: number, singleLine = false) {
+  return value === null || (typeof value === 'string' && value.length <= maxLength && (!singleLine || !/[\r\n]/.test(value)))
+}
+
+function optionalNumber(value: unknown) {
+  return value === null || (typeof value === 'number' && Number.isFinite(value))
+    || (typeof value === 'string' && value.length <= 32 && value.trim() !== '' && Number.isFinite(Number(value)))
+}
+
+function invalidValue(message: string): never {
+  throw new CollaborationError('content', message)
+}
+
+function validateMark(mark: Mark) {
+  const attrs = mark.attrs
+  if (mark.type.name !== 'link') return
+  if (typeof attrs.href !== 'string' || attrs.href.length > 2048 || !isSafePublicMarkdownUrl(attrs.href, 'href')) {
+    invalidValue('A link must use a safe URL.')
+  }
+  if (![null, '_blank'].includes(attrs.target) || !optionalText(attrs.rel, 200, true)
+    || !optionalText(attrs.class, 200, true) || !optionalText(attrs.title, 1000)) {
+    invalidValue('A link has an unsupported attribute value.')
+  }
+}
+
+/** Check each schema attribute value. ProseMirror only checks attribute names. */
+function validateAttributeValues(node: Node) {
+  const attrs = node.attrs
+  switch (node.type.name) {
+    case 'heading':
+      if (!Number.isSafeInteger(attrs.level) || attrs.level < 1 || attrs.level > 6) invalidValue('A heading level must be a whole number from 1 to 6.')
+      break
+    case 'orderedList': {
+      const start = typeof attrs.start === 'string' && /^\d{1,9}$/.test(attrs.start) ? Number(attrs.start) : attrs.start
+      if (!Number.isSafeInteger(start) || start < 0 || start > 999_999_999 || !orderedListTypes.has(attrs.type)) {
+        invalidValue('A numbered list has an unsupported start or type.')
+      }
+      break
+    }
+    case 'codeBlock':
+      if (!optionalText(attrs.language, 100, true) || !optionalText(attrs.filename, 500, true)) invalidValue('Code metadata must be one line of text.')
+      break
+    case 'element':
+    case 'inline-element':
+      if (typeof attrs.tag !== 'string' || !componentTag.test(attrs.tag)) invalidValue('A component has an unsupported name.')
+      break
+    case 'slot':
+      if (typeof attrs.name !== 'string' || !slotName.test(attrs.name)) invalidValue('A component slot has an unsupported name.')
+      break
+    case 'video':
+      if (!optionalText(attrs.src, 2048, true) || !optionalText(attrs.title, 1000) || !optionalText(attrs.alt, 1000)
+        || typeof attrs.key !== 'string' || attrs.key.length > 200 || !optionalNumber(attrs.width) || !optionalNumber(attrs.height)) {
+        invalidValue('A video has an unsupported attribute value.')
+      }
+      break
+    case 'span-style':
+      if (!optionalText(attrs.class, 500, true) || !optionalText(attrs.style, 2000, true)) invalidValue('Styled text has an unsupported attribute value.')
+      break
+  }
+  for (const mark of node.marks) validateMark(mark)
+}
+
 function validateRuntimeMetadata(doc: Node) {
   doc.descendants(node => {
+    validateAttributeValues(node)
     const props: unknown = node.attrs.props
     if (props && (typeof props !== 'object' || Array.isArray(props))) throw new CollaborationError('content', 'Node properties must be an object.')
     if (props && typeof props === 'object') {
@@ -154,6 +232,11 @@ function validateRuntimeMetadata(doc: Node) {
 }
 
 async function checkpoint(doc: Node, head: Omit<CollaborationSnapshot, 'document'>, options: CollaborationContentOptions): Promise<CollaborationCheckpoint> {
+  try {
+    doc.check()
+  } catch {
+    throw new CollaborationError('content', 'The collaborative document does not match this editor schema.')
+  }
   validateRuntimeMetadata(doc)
   const document = JSON.stringify(doc.toJSON())
   if (encoder.encode(document).byteLength > collaborationLimits.documentBytes) {
@@ -166,7 +249,10 @@ async function checkpoint(doc: Node, head: Omit<CollaborationSnapshot, 'document
   return { snapshot: { ...head, document }, markdown: result.value }
 }
 
-/** Seed or replace a room only inside a host-authorized transaction with a new epoch. */
+/**
+ * Seed or replace a room only inside a host-authorized transaction with a new epoch.
+ * @experimental
+ */
 export async function createCollaborationSnapshot(markdown: string, options: CollaborationContentOptions & {
   epoch: string
   policyRevision: string
@@ -179,14 +265,24 @@ export async function createCollaborationSnapshot(markdown: string, options: Col
   const schema = createEditorSchema()
   const prepared = await prepareMarkdownForVisualEditing(markdown, options.output, schema, { policy: options.policy })
   if (!prepared.ok || !prepared.value) throw new CollaborationError('content', 'This source needs source-only editing.')
-  return checkpoint(schema.nodeFromJSON(prepared.value), head, options)
+  let doc: Node
+  try {
+    doc = schema.nodeFromJSON(prepared.value)
+  } catch {
+    throw new CollaborationError('content', 'This source needs source-only editing.')
+  }
+  return checkpoint(doc, head, options)
 }
 
-/** Apply an exact-version batch. Persist the result and operation log atomically. */
+/**
+ * Apply an exact-version batch. Persist the result and operation log atomically.
+ * @experimental
+ */
 export async function applyCollaborationSteps(snapshot: CollaborationSnapshot, batch: CollaborationSteps,
   options: CollaborationContentOptions): Promise<CollaborationCheckpoint> {
   assertCollaborationHead(snapshot)
   assertCollaborationHead(batch)
+  assertProtocolVersion(batch)
   const mismatch = fenceMismatch(snapshot, batch)
   if (mismatch) throw new CollaborationError(mismatch, 'The collaborative document has changed. Reopen it with your recovery copy.')
   if (batch.version !== snapshot.version) throw new CollaborationError('version', 'Fetch accepted steps before submitting this change.')
@@ -205,7 +301,8 @@ export async function applyCollaborationSteps(snapshot: CollaborationSnapshot, b
       transform.step(step)
     }
     transform.doc.check()
-  } catch {
+  } catch (error) {
+    if (error instanceof CollaborationError) throw error
     throw new CollaborationError('content', 'The editor change does not apply to this document.')
   }
   return checkpoint(transform.doc, { epoch: snapshot.epoch, schemaRevision: snapshot.schemaRevision,
