@@ -3,6 +3,8 @@ import type { EditorText, defaultMessages } from './messages'
 
 const imageRecipe: AuthoringRecipe = {
   id: 'ginko.image',
+  group: 'media',
+  icon: 'image',
   label: 'Image',
   description: 'Add an image with a description.',
   keywords: ['photo', 'picture', 'media'],
@@ -20,6 +22,8 @@ export function isImageRecipe(recipe: AuthoringRecipe) {
 export const writingRecipes: readonly AuthoringRecipe[] = [
   {
     id: 'ginko.heading-1',
+    group: 'text',
+    icon: 'heading-1',
     label: 'Heading 1',
     description: 'A large section heading.',
     keywords: ['h1', 'title'],
@@ -27,6 +31,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.heading-2',
+    group: 'text',
+    icon: 'heading-2',
     label: 'Heading 2',
     description: 'A medium section heading.',
     keywords: ['h2', 'subtitle'],
@@ -34,6 +40,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.heading-3',
+    group: 'text',
+    icon: 'heading-3',
     label: 'Heading 3',
     description: 'A small section heading.',
     keywords: ['h3'],
@@ -41,6 +49,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.bullets',
+    group: 'lists',
+    icon: 'list',
     label: 'Bulleted list',
     description: 'A simple list of ideas.',
     keywords: ['ul', 'list', 'bullet'],
@@ -48,6 +58,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.numbered',
+    group: 'lists',
+    icon: 'list-ordered',
     label: 'Numbered list',
     description: 'Steps in a clear order.',
     keywords: ['ol', 'list'],
@@ -55,6 +67,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.quote',
+    group: 'text',
+    icon: 'quote',
     label: 'Quote',
     description: 'Make a passage stand out.',
     keywords: ['blockquote'],
@@ -62,6 +76,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.code',
+    group: 'advanced',
+    icon: 'square-code',
     label: 'Code block',
     description: 'Code with its formatting intact.',
     keywords: ['snippet'],
@@ -69,6 +85,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   },
   {
     id: 'ginko.divider',
+    group: 'text',
+    icon: 'minus',
     label: 'Divider',
     description: 'A quiet break between sections.',
     keywords: ['rule', 'line', 'hr'],
@@ -77,6 +95,8 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
   imageRecipe,
   {
     id: 'ginko.table',
+    group: 'advanced',
+    icon: 'table-2',
     label: 'Table',
     description: 'Compare information side by side.',
     keywords: ['grid'],
@@ -86,22 +106,6 @@ export const writingRecipes: readonly AuthoringRecipe[] = [
       + '| Second item | Description | Ready |',
   },
 ]
-
-export function recipeSymbol(recipe: AuthoringRecipe): string {
-  const symbols: Record<string, string> = {
-    'ginko.heading-1': 'H₁',
-    'ginko.heading-2': 'H₂',
-    'ginko.heading-3': 'H₃',
-    'ginko.bullets': '• ≡',
-    'ginko.numbered': '1.',
-    'ginko.quote': '“',
-    'ginko.code': '</>',
-    'ginko.divider': '—',
-    'ginko.table': '▦',
-  }
-
-  return symbols[recipe.id] ?? '◇'
-}
 
 /** Preserve recipe identity: host IDs must not acquire built-in behavior. */
 export function recipeCopy(recipe: AuthoringRecipe, text: EditorText) {
@@ -122,22 +126,4 @@ export function recipeCopy(recipe: AuthoringRecipe, text: EditorText) {
   if (!entry) return recipe
   const label = text(entry[0]) + (recipe.id.startsWith('ginko.heading-') ? ` ${recipe.id.slice(-1)}` : '')
   return { label, description: text(entry[1]) }
-}
-
-export function searchRecipes(
-  recipes: readonly AuthoringRecipe[],
-  query: string,
-  copy: (recipe: AuthoringRecipe) => { label: string; description?: string },
-) {
-  const normalize = (value: string) => value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().trim()
-  const search = normalize(query)
-  if (!search) return recipes
-  const tokens = search.split(/\s+/)
-  return recipes.map((recipe, index) => {
-    const display = copy(recipe)
-    const names = [display.label, recipe.label, ...(recipe.keywords ?? [])].map(normalize)
-    const searchable = [...names, normalize(recipe.id), normalize(display.description ?? '')].join(' ')
-    const rank = names.includes(search) ? 0 : names.some(name => name.startsWith(search)) ? 1 : 2
-    return { recipe, index, rank, matches: tokens.every(token => searchable.includes(token)) }
-  }).filter(item => item.matches).sort((a, b) => a.rank - b.rank || a.index - b.index).map(item => item.recipe)
 }

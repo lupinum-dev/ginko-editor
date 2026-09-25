@@ -396,7 +396,7 @@ defineExpose<GinkoEditorHandle>({
       v-model:active-index="insertMenu.activeIndex.value"
       :to="insertMenu.container.value"
       :origin="insertMenu.origin.value"
-      :recipes="insertMenu.recipes.value"
+      :groups="insertMenu.groups.value"
       :busy="insertMenu.busy.value"
       :error="insertMenu.error.value"
       :position="insertMenu.position.value"

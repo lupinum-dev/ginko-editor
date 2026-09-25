@@ -2,8 +2,10 @@
 import { computed, ref, useSlots } from 'vue'
 
 import type { AuthoringRecipe } from '../authoring'
+import GinkoRecipeIcon from './GinkoRecipeIcon.vue'
 import type { EditorText } from './messages'
-import { isImageRecipe, recipeCopy, recipeSymbol } from './writingRecipes'
+import type { RecipeGroup, RecipeMatch } from './recipe-search'
+import { isImageRecipe } from './writingRecipes'
 
 defineOptions({ name: 'GinkoInsertMenu' })
 
@@ -11,7 +13,7 @@ const props = defineProps<{
   id: string
   to: InstanceType<typeof globalThis.HTMLElement> | string
   origin: 'button' | 'slash'
-  recipes: readonly AuthoringRecipe[]
+  groups: readonly RecipeGroup[]
   busy: boolean
   error: string | null
   position: { left: string; top: string; maxHeight: string }
@@ -28,16 +30,49 @@ defineSlots<{ 'recipe-preview'?: (props: { recipe: AuthoringRecipe }) => unknown
 const slots = useSlots()
 const root = ref<InstanceType<typeof globalThis.HTMLElement>>()
 const search = ref<InstanceType<typeof globalThis.HTMLInputElement>>()
-const activeRecipe = computed(() => props.recipes[activeIndex.value])
+/** Groups with the keyboard index of each option. */
+const sections = computed(() => {
+  let index = 0
+  return props.groups.map((group, groupIndex) => ({
+    ...group,
+    headingId: `${props.id}-group-${groupIndex}`,
+    options: group.matches.map(match => ({ match, index: index++ })),
+  }))
+})
+const entries = computed(() => props.groups.flatMap(group => group.matches))
+const activeRecipe = computed(() => entries.value[activeIndex.value]?.recipe)
 const showsPreview = computed(() =>
-  !!activeRecipe.value && !isImageRecipe(activeRecipe.value) && !!slots['recipe-preview'],
+  !!activeRecipe.value
+  && !isImageRecipe(activeRecipe.value)
+  && activeRecipe.value.id !== 'ginko.context.add-item'
+  && !!slots['recipe-preview'],
 )
+let pointer: { x: number; y: number } | undefined
 
-function description(recipe: AuthoringRecipe) {
-  return recipeCopy(recipe, props.text).description
-    || (recipe.keywords?.length
-      ? `/${recipe.keywords[0]}`
-      : props.text('insertRecipe', { label: recipe.label.toLocaleLowerCase() }))
+/** Hovering selects only after a real pointer movement, not when keyboard scrolling moves the list. */
+function hover(event: InstanceType<typeof globalThis.MouseEvent>, index: number) {
+  if (pointer && pointer.x === event.clientX && pointer.y === event.clientY) return
+  pointer = { x: event.clientX, y: event.clientY }
+  activeIndex.value = index
+}
+
+function parts(match: RecipeMatch) {
+  const result: { text: string; matched: boolean }[] = []
+  let at = 0
+  for (const [start, end] of match.ranges) {
+    if (start > at) result.push({ text: match.label.slice(at, start), matched: false })
+    result.push({ text: match.label.slice(start, end), matched: true })
+    at = end
+  }
+  if (at < match.label.length) result.push({ text: match.label.slice(at), matched: false })
+  return result
+}
+
+function description(match: RecipeMatch) {
+  return match.description
+    || (match.recipe.keywords?.length
+      ? `/${match.recipe.keywords[0]}`
+      : props.text('insertRecipe', { label: match.label.toLocaleLowerCase() }))
 }
 
 defineExpose({ root, search })
@@ -84,42 +119,70 @@ defineExpose({ root, search })
         role="listbox"
         :aria-label="text('availableBlocks')"
       >
-        <button
-          v-for="(recipe, index) in recipes"
-          :id="`${id}-${index}`"
-          :key="`${index}-${recipe.id}`"
-          tabindex="-1"
-          type="button"
-          role="option"
-          :aria-selected="index === activeIndex"
-          :disabled="busy"
-          @mousedown.prevent
-          @mouseenter="activeIndex = index"
-          @click="emit('select', recipe)"
+        <div
+          v-for="section in sections"
+          :key="section.key"
+          class="ginko-editor__insert-group"
+          role="group"
+          :aria-labelledby="section.headingId"
         >
-          <span
-            class="ginko-editor__recipe-symbol"
-            aria-hidden="true"
-          >{{ recipeSymbol(recipe) }}</span>
-          <span class="ginko-editor__recipe-text">
-            <strong>{{ recipeCopy(recipe, text).label }}</strong>
-            <small>{{ description(recipe) }}</small>
-          </span>
-          <span
-            v-if="index === activeIndex"
-            aria-hidden="true"
-          >↵</span>
-        </button>
-        <p
-          v-if="recipes.length === 0"
+          <div
+            :id="section.headingId"
+            class="ginko-editor__insert-group-label"
+            role="presentation"
+          >
+            {{ section.label }}
+          </div>
+          <button
+            v-for="{ match, index } in section.options"
+            :id="`${id}-${index}`"
+            :key="`${section.key}-${index}-${match.recipe.id}`"
+            tabindex="-1"
+            type="button"
+            role="option"
+            :aria-selected="index === activeIndex"
+            :disabled="busy"
+            :data-recipe="match.recipe.id"
+            @mousedown.prevent
+            @mousemove="hover($event, index)"
+            @click="emit('select', match.recipe)"
+          >
+            <span
+              class="ginko-editor__recipe-symbol"
+              aria-hidden="true"
+            ><GinkoRecipeIcon :name="match.recipe.icon" /></span>
+            <span class="ginko-editor__recipe-text">
+              <strong><template
+                v-for="(part, partIndex) in parts(match)"
+                :key="partIndex"
+              ><mark
+                v-if="part.matched"
+                class="ginko-editor__recipe-match"
+              >{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></strong>
+              <small>{{ description(match) }}</small>
+            </span>
+            <span
+              v-if="index === activeIndex"
+              aria-hidden="true"
+            >↵</span>
+          </button>
+        </div>
+        <div
+          v-if="entries.length === 0"
           class="ginko-editor__insert-empty"
         >
-          {{ text('noBlocks') }}
-        </p>
+          <p>{{ text('noBlocks') }}</p>
+          <p class="ginko-editor__insert-hint">
+            {{ text('noBlocksHint') }}
+          </p>
+        </div>
       </div>
       <div
         v-if="showsPreview && activeRecipe"
         class="ginko-editor__recipe-preview"
+        tabindex="-1"
+        role="region"
+        :aria-label="text('recipePreview')"
       >
         <slot
           name="recipe-preview"
@@ -142,6 +205,10 @@ defineExpose({ root, search })
         <span>
           <kbd>↵</kbd>
           {{ text('insertHelp') }}
+        </span>
+        <span v-if="showsPreview">
+          <kbd>tab</kbd>
+          {{ text('previewHelp') }}
         </span>
         <span>
           <kbd>esc</kbd>
