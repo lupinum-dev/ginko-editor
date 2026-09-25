@@ -3,7 +3,8 @@ import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/pr
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
-const contentArchive = process.env.GINKO_CONTENT_TARBALL
+// Remove the default candidate when Content 1.0.0-beta.10 is published (internals/migrations.md).
+const contentArchive = process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz'
 const manifest = JSON.parse(await readFile('package.json', 'utf8'))
 const contentDependency = contentArchive ? `file:${resolve(contentArchive)}` : manifest.dependencies['@lupinum/ginko-content']
 const legacy = join(homedir(), '.convex/anonymous-convex-backend-state/anonymous-agent')

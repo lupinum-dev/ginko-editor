@@ -8,9 +8,8 @@ import { URL } from 'node:url'
 const release = JSON.parse(await readFile('release-artifacts/release.json', 'utf8'))
 const pkg = release.packages[0]
 const archive = resolve('release-artifacts', pkg.filename)
-const contentArchive = process.env.GINKO_CONTENT_TARBALL
-  ? resolve(process.env.GINKO_CONTENT_TARBALL)
-  : null
+// Remove the default candidate when Content 1.0.0-beta.10 is published (internals/migrations.md).
+const contentArchive = resolve(process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz')
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 
 const packageInputs = [...(contentArchive ? [contentArchive] : []), archive]

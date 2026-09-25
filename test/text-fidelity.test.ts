@@ -52,3 +52,29 @@ describe('typed text fidelity', () => {
     expect(textOf(reopened.value)).toContain('const t = `{{ x }}`')
   })
 })
+
+describe('heading id fidelity', () => {
+  it.each([
+    '# Hello\n\n## Ünïcode héading\n\n### 1st step\n',
+    '## Custom {#my-id}\n\nText\n',
+    '## Same\n\n## Same\n\n### Same\n',
+  ])('opens and saves %j without changes', async (source) => {
+    const opened = await prepareMarkdownForVisualEditing(source)
+    expect(opened.ok).toBe(true)
+    const saved = await convertTiptapDocToMarkdown(opened.value!)
+    expect(saved.value).toBe(source)
+  })
+})
+
+describe('syntax-like text fidelity', () => {
+  it.each([
+    'Meet at 10:30:45 :fire: done',
+    '::card',
+    'a{.b}',
+    'Visit example.com or mail a@b.co',
+  ])('keeps %j as plain text', async (text) => {
+    const { doc } = await saveAndReopen(paragraph([{ text, type: 'text' }]))
+    expect(textOf(doc)).toBe(text)
+    expect(JSON.stringify(doc)).not.toMatch(/inline-element|"element"|"link"/)
+  })
+})
