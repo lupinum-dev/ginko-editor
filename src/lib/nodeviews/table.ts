@@ -7,6 +7,7 @@ import { createEditorText, type EditorMessageKey } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import { iconButton, type IconName } from './icons'
 import { inlinePopover } from './popover'
+import { observeNodeViewRefresh } from './lifecycle'
 import {
   applyTableOperation,
   canApplyTableOperation,
@@ -237,6 +238,19 @@ export function tableView(
       render()
     }
   })
+  let layoutFrame: number | undefined
+  /** Batch layout reads into one animation frame. */
+  function scheduleHandles() {
+    if (destroyed || layoutFrame !== undefined) return
+    if (typeof requestAnimationFrame === 'undefined') {
+      placeHandles()
+      return
+    }
+    layoutFrame = requestAnimationFrame(() => {
+      layoutFrame = undefined
+      placeHandles()
+    })
+  }
   function placeHandles() {
     if (destroyed) return
     const rect = hovered ?? selected()
@@ -262,11 +276,7 @@ export function tableView(
     end - start > 1
       ? text(axis === 'row' ? 'tableRows' : 'tableColumns', { start: start + 1, end })
       : text(axis === 'row' ? 'tableRow' : 'tableColumn', { number: start + 1 })
-  function render() {
-    if (destroyed) return
-    const rect = selected()
-    const target = hovered ?? rect
-    const shape = portableTable(node)
+  function relabel() {
     toolbar.setAttribute('aria-label', text('tableEditing'))
     alignment.setAttribute('aria-label', text('columnAlignment'))
     add.setAttribute('aria-label', text('addToTable'))
@@ -274,6 +284,12 @@ export function tableView(
     headerHint.textContent = text('tableHeaderHint')
     deleteTable.setAttribute('aria-label', text('deleteTable'))
     deleteTable.title = deleteLabel.data = text('deleteTable')
+  }
+  function render() {
+    if (destroyed) return
+    const rect = selected()
+    const target = hovered ?? rect
+    const shape = portableTable(node)
     controls.forEach(({ button, key, label }) => {
       button.setAttribute('aria-label', text(key))
       button.title = text(key)
@@ -321,23 +337,22 @@ export function tableView(
       }
     })
     deleteTable.disabled = !editor.isEditable
-    placeHandles()
+    scheduleHandles()
   }
-  const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(placeHandles)
+  const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(scheduleHandles)
   resize?.observe(viewport)
   resize?.observe(table)
-  viewport.addEventListener('scroll', render)
-  window.addEventListener('resize', render)
+  viewport.addEventListener('scroll', scheduleHandles)
+  window.addEventListener('resize', scheduleHandles)
+  const refresh = observeNodeViewRefresh({ editor, overlay: controller, render, relabel })
   const selectionChanged = () => {
     hovered = undefined
-    render()
+    refresh.refresh(true)
   }
   editor.on('selectionUpdate', selectionChanged)
   const stopOverlayWatch = controller && watch(controller.active, render, { flush: 'post' })
   menus.forEach((menu) => menu.onOpenChange(render))
-  editor.on('update', render)
-  editor.on('transaction', render)
-  render()
+  refresh.refresh(true)
   return {
     dom,
     contentDOM,
@@ -345,7 +360,7 @@ export function tableView(
       if (next.type !== node.type) return false
       if (node !== next) hovered = undefined
       node = next
-      render()
+      refresh.refresh(true)
       return true
     },
     stopEvent(event) {
@@ -360,12 +375,12 @@ export function tableView(
     },
     destroy() {
       destroyed = true
+      if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame)
       stopOverlayWatch?.()
       resize?.disconnect()
-      window.removeEventListener('resize', render)
-      viewport.removeEventListener('scroll', render)
-      editor.off('transaction', render)
-      editor.off('update', render)
+      window.removeEventListener('resize', scheduleHandles)
+      viewport.removeEventListener('scroll', scheduleHandles)
+      refresh.destroy()
       editor.off('selectionUpdate', selectionChanged)
       menus.forEach((menu) => menu.destroy())
     },

@@ -1,10 +1,10 @@
 import { mergeAttributes, Node } from '@tiptap/core'
 
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { JsonRecord } from '../../types'
 
 export interface SlotOptions {
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  getAuthoringKit?: () => AuthoringKit | undefined
   HTMLAttributes: JsonRecord
   nestable: boolean
 }

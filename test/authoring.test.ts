@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { composeAuthoringKits, createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring'
+import { composeAuthoringKits, createAuthoringKit, type AuthoringKitSource } from '../src/authoring'
 
 const learningObjective = {
   authoring: {
@@ -52,7 +52,7 @@ const learningObjective = {
       + 'Goal\n\n<template #tip>\nHint\n</template>\n</learning-objective>',
   }],
   version: 1,
-} as const satisfies AuthoringKitSourceV1
+} as const satisfies AuthoringKitSource
 
 describe('authoring kits', () => {
   it('validates and freezes a custom component with union, boolean, and named-slot metadata', async () => {
@@ -67,7 +67,7 @@ describe('authoring kits', () => {
 
   it('creates isolated kits without a mutable global registry', async () => {
     const first = await createAuthoringKit(structuredClone(learningObjective))
-    const secondSource = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const secondSource = structuredClone(learningObjective) as unknown as AuthoringKitSource
     secondSource.recipes[0].label = 'Second label'
     const second = await createAuthoringKit(secondSource)
 
@@ -77,17 +77,17 @@ describe('authoring kits', () => {
   })
 
   it('rejects duplicate recipes', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     source.recipes = [...source.recipes, { ...source.recipes[0] }]
     await expect(createAuthoringKit(source)).rejects.toThrow('duplicate "advanced-objective"')
   })
 
   it('rejects empty and duplicate recipe search keywords', async () => {
-    const empty = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const empty = structuredClone(learningObjective) as unknown as AuthoringKitSource
     empty.recipes[0].keywords = ['goal', '  ']
     await expect(createAuthoringKit(empty)).rejects.toThrow('contains an empty value')
 
-    const duplicate = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const duplicate = structuredClone(learningObjective) as unknown as AuthoringKitSource
     duplicate.recipes[0].keywords = ['goal', 'goal']
     await expect(createAuthoringKit(duplicate)).rejects.toThrow('contains duplicate "goal"')
   })
@@ -99,7 +99,7 @@ describe('authoring kits', () => {
   })
 
   it('rejects policy exposure of an unsupported complex prop', async () => {
-    const source = structuredClone(learningObjective) as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as AuthoringKitSource
     source.policy.components['learning-objective'].props.class = {
       required: false,
       types: ['string', 'number', 'boolean', 'json'],
@@ -109,13 +109,13 @@ describe('authoring kits', () => {
   })
 
   it('rejects recipes outside the explicit Content policy', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     source.recipes[0].source = '<unknown-widget>Unsafe</unknown-widget>'
     await expect(createAuthoringKit(source)).rejects.toThrow('outside policy')
   })
 
   it('validates controls against the narrower policy type', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     const authoring = source.authoring['learning-objective']
     const level = authoring.props?.level
     if (!level) throw new Error('Expected level authoring metadata.')
@@ -127,7 +127,7 @@ describe('authoring kits', () => {
   })
 
   it('rejects required implementation props that policy cannot provide', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     const implementation = source.implementation['learning-objective']
     source.implementation['learning-objective'] = {
       ...implementation,
@@ -140,13 +140,13 @@ describe('authoring kits', () => {
   })
 
   it('rejects recipe values outside the policy allow-list', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     source.recipes[0].source = '<learning-objective level="unsupported">\nGoal\n</learning-objective>'
     await expect(createAuthoringKit(source)).rejects.toThrow('outside policy')
   })
 
   it('rejects recipe component nesting outside authoring constraints', async () => {
-    const source = structuredClone(learningObjective) as unknown as AuthoringKitSourceV1
+    const source = structuredClone(learningObjective) as unknown as AuthoringKitSource
     source.policy.components['learning-objective'].allowedParents = ['learning-objective']
     await expect(createAuthoringKit(source)).rejects.toThrow('invalid_nesting')
   })

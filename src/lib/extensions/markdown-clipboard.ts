@@ -3,17 +3,20 @@ import { Fragment, Slice } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import {
   prepareMarkdownForVisualEditing,
   convertTiptapDocToMarkdown,
   validateMarkdownForAuthoring,
 } from '../conversionPipeline'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
+import { createEditorText, type EditorText } from '../../ui/messages'
 
 export interface MarkdownClipboardOptions extends TiptapToMDCOptions {
   enabled: boolean
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  /** Localized user-facing text. Defaults to the English messages. */
+  text?: EditorText
+  getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   canPaste?: () => boolean
   onPasteError?: (message: string | undefined) => void
@@ -144,9 +147,7 @@ function createMarkdownCopy(editor: Editor, options: MarkdownClipboardOptions) {
     options.onCopyError?.(undefined)
     const fail = () => {
       if (!disposed && currentRequest === request)
-        options.onCopyError?.(
-          'The selection could not be copied as Markdown. Keep it selected and copy again, or use Markdown mode.',
-        )
+        options.onCopyError?.((options.text ?? createEditorText())('copyFailed'))
     }
     const removeCopiedSelection = () => {
       if (cut && !disposed && editor.isEditable && view.state === before && JSON.stringify(output()) === snapshot.key) {
@@ -278,10 +279,7 @@ async function applyMarkdownPaste(
     options.getAuthoringKit?.() === authoringKit
   const reject = () => {
     if (isCurrent())
-      options.onPasteError?.(
-        'This content cannot be pasted safely here. Your document is unchanged. '
-        + 'Use Markdown mode to keep the original source.',
-      )
+      options.onPasteError?.((options.text ?? createEditorText())('pasteRejected'))
   }
   try {
     const result = await prepareMarkdownForVisualEditing(

@@ -4,6 +4,7 @@ import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
+import { insertAsset } from './helpers/assets'
 import type { AssetInfo, EditorAssetRequest } from '../src/types'
 
 beforeAll(() => {
@@ -46,7 +47,7 @@ async function mountEditor(modelValue: string, syncDebounceMs = 0) {
   })
   wrappers.push(wrapper)
   await flushPromises()
-  await waitFor(() => Boolean(wrapper.vm.editor))
+  await waitFor(() => Boolean(wrapper.vm.getEditor()))
   return wrapper
 }
 
@@ -89,7 +90,7 @@ describe('GinkoEditor browser journey', () => {
 
   it('edits, emits markdown, and supports undo', async () => {
     const wrapper = await mountEditor('Start\n')
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.commands.insertContent(' changed')
     await waitFor(() => Boolean(wrapper.emitted('update:modelValue')))
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('changed')
@@ -110,7 +111,7 @@ describe('GinkoEditor browser journey', () => {
     await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
     await flushPromises()
     await waitFor(() => wrapper.attributes('data-mode') === 'visual')
-    expect(wrapper.vm.editor?.getText()).toContain('Recovered')
+    expect(wrapper.vm.getEditor()?.getText()).toContain('Recovered')
   })
 
   it('falls back to source mode for unsupported content', async () => {
@@ -123,19 +124,19 @@ describe('GinkoEditor browser journey', () => {
 
   it('applies only the newest external document and cancels a pending local edit', async () => {
     const wrapper = await mountEditor('First\n', 50)
-    wrapper.vm.editor?.commands.insertContent(' stale')
+    wrapper.vm.getEditor()?.commands.insertContent(' stale')
     await wrapper.setProps({ modelValue: 'Second\n' })
     await wrapper.setProps({ modelValue: 'Third\n' })
     await flushPromises()
-    await waitFor(() => wrapper.vm.editor?.getText().includes('Third') === true)
+    await waitFor(() => wrapper.vm.getEditor()?.getText().includes('Third') === true)
     await new Promise((resolve) => globalThis.setTimeout(resolve, 80))
-    expect(wrapper.vm.editor?.getText()).toContain('Third')
+    expect(wrapper.vm.getEditor()?.getText()).toContain('Third')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('flushes a pending edit before the host closes the component', async () => {
     const wrapper = await mountEditor('Original\n', 120)
-    wrapper.vm.editor?.commands.insertContent(' pending')
+    wrapper.vm.getEditor()?.commands.insertContent(' pending')
     expect(wrapper.vm.hasPendingChanges()).toBe(true)
     expect(wrapper.emitted('pending-change')?.at(-1)).toEqual([true])
     const result = await wrapper.vm.flush()
@@ -151,9 +152,9 @@ describe('GinkoEditor browser journey', () => {
 
   it('includes an edit made while a flush is converting', async () => {
     const wrapper = await mountEditor('Original\n', 120)
-    wrapper.vm.editor?.commands.insertContent(' first')
+    wrapper.vm.getEditor()?.commands.insertContent(' first')
     const flushing = wrapper.vm.flush()
-    wrapper.vm.editor?.commands.insertContent(' second')
+    wrapper.vm.getEditor()?.commands.insertContent(' second')
     const result = await flushing
     expect(result.ok).toBe(true)
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('first second')
@@ -171,27 +172,27 @@ describe('GinkoEditor browser journey', () => {
 
   it('does not restore a stale local emission after an external replacement', async () => {
     const wrapper = await mountEditor('First\n')
-    wrapper.vm.editor?.commands.insertContent(' local')
+    wrapper.vm.getEditor()?.commands.insertContent(' local')
     await waitFor(() => Boolean(wrapper.emitted('update:modelValue')))
     const staleEmission = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
 
     await wrapper.setProps({ modelValue: 'Replacement\n' })
-    await waitFor(() => wrapper.vm.editor?.getText().includes('Replacement') === true)
+    await waitFor(() => wrapper.vm.getEditor()?.getText().includes('Replacement') === true)
     await wrapper.setProps({ modelValue: staleEmission })
     await flushPromises()
-    expect(wrapper.vm.editor?.getText()).toContain('Replacement')
+    expect(wrapper.vm.getEditor()?.getText()).toContain('Replacement')
 
     await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
     await flushPromises()
     expect(wrapper.get('textarea').element.value).toBe('Replacement\n')
     await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
     await waitFor(() => wrapper.attributes('data-mode') === 'visual')
-    expect(wrapper.vm.editor?.getText()).toContain('Replacement')
+    expect(wrapper.vm.getEditor()?.getText()).toContain('Replacement')
   })
 
   it('keeps block separation when an image is inserted before a heading', async () => {
     const wrapper = await mountEditor('# Review document\n\nOriginal paragraph.\n')
-    expect(wrapper.vm.insertImageAsset({ alt: 'Sample', url: '/sample.svg' })).toBe(true)
+    expect(insertAsset(wrapper, 'image', { alt: 'Sample', url: '/sample.svg' })).toBe(true)
     const result = await wrapper.vm.flush()
     expect(result.ok).toBe(true)
     const emitted = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
@@ -199,13 +200,13 @@ describe('GinkoEditor browser journey', () => {
 
     await wrapper.setProps({ modelValue: emitted })
     await flushPromises()
-    expect(wrapper.vm.editor?.getJSON().content?.some((node) => node.type === 'heading')).toBe(true)
+    expect(wrapper.vm.getEditor()?.getJSON().content?.some((node) => node.type === 'heading')).toBe(true)
   })
 
   it('keeps caller-supplied URLs when the default asset provider also receives an id', async () => {
     const wrapper = await mountEditor('')
     expect(
-      wrapper.vm.insertImageAsset({
+      insertAsset(wrapper, 'image', {
         alt: 'Example',
         id: 'asset-id',
         url: 'https://example.com/image.png',
@@ -235,18 +236,18 @@ describe('GinkoEditor browser journey', () => {
     })
     wrappers.push(wrapper)
     await flushPromises()
-    await waitFor(() => Boolean(wrapper.vm.editor))
-    expect(wrapper.vm.insertImageAsset({
+    await waitFor(() => Boolean(wrapper.vm.getEditor()))
+    expect(insertAsset(wrapper, 'image', {
       alt: 'Diagram',
       filename: 'diagram.png',
       id: 'asset_123456789012345',
       url: '/resolved.png',
     })).toBe(true)
     let imagePosition = -1
-    wrapper.vm.editor!.state.doc.descendants((node, position) => {
+    wrapper.vm.getEditor()!.state.doc.descendants((node, position) => {
       if (imagePosition < 0 && node.type.name === 'image') imagePosition = position
     })
-    wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
+    wrapper.vm.getEditor()!.chain().setNodeSelection(imagePosition).run()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.get('.ginko-image img').attributes('data-filename')).toBe('diagram.png')
@@ -263,12 +264,12 @@ describe('GinkoEditor browser journey', () => {
 
   it('hides image metadata when the host does not support that action', async () => {
     const wrapper = await mountEditor('')
-    expect(wrapper.vm.insertImageAsset({ id: 'asset_123', filename: 'diagram.png' })).toBe(true)
+    expect(insertAsset(wrapper, 'image', { id: 'asset_123', filename: 'diagram.png' })).toBe(true)
     let imagePosition = -1
-    wrapper.vm.editor!.state.doc.descendants((node, position) => {
+    wrapper.vm.getEditor()!.state.doc.descendants((node, position) => {
       if (imagePosition < 0 && node.type.name === 'image') imagePosition = position
     })
-    wrapper.vm.editor!.chain().setNodeSelection(imagePosition).run()
+    wrapper.vm.getEditor()!.chain().setNodeSelection(imagePosition).run()
     await wrapper.vm.$nextTick()
     expect((await imageSettings(wrapper)).get('button[aria-label="Image metadata"]').attributes('hidden')).toBeDefined()
   })
@@ -284,9 +285,9 @@ describe('GinkoEditor browser journey', () => {
     })
     wrappers.push(wrapper)
     await flushPromises()
-    await waitFor(() => Boolean(wrapper.vm.editor))
+    await waitFor(() => Boolean(wrapper.vm.getEditor()))
     expect(
-      wrapper.vm.insertFileAsset({
+      insertAsset(wrapper, 'file', {
         filename: 'Guide.pdf',
         id: 'guide-id',
         url: '/guide.pdf',
@@ -319,9 +320,9 @@ describe('GinkoEditor browser journey', () => {
     await requestImage(replacedWrapper)
     const replacedRequest = replacedWrapper.emitted('request-image')![0]![0] as EditorAssetRequest<Partial<AssetInfo>>
     await replacedWrapper.setProps({ modelValue: 'New document\n' })
-    await waitFor(() => replacedWrapper.vm.editor?.getText().includes('New document') === true)
+    await waitFor(() => replacedWrapper.vm.getEditor()?.getText().includes('New document') === true)
     expect(replacedRequest.complete(asset)).toBe(false)
-    expect(replacedWrapper.vm.editor?.getText()).toContain('New document')
+    expect(replacedWrapper.vm.getEditor()?.getText()).toContain('New document')
 
     const unmountedWrapper = await mountEditor('Unmount guard\n')
     await requestImage(unmountedWrapper)
@@ -333,15 +334,15 @@ describe('GinkoEditor browser journey', () => {
   it('guards direct media operations outside an editable visual document', async () => {
     const wrapper = await mountEditor('Direct guard\n')
     await wrapper.get('.ginko-editor__modes button:nth-child(2)').trigger('click')
-    expect(wrapper.vm.insertImageAsset({ url: '/raw.png' })).toBe(false)
-    expect(wrapper.vm.insertFileAsset({ url: '/raw.pdf' })).toBe(false)
-    expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
+    expect(insertAsset(wrapper, 'image', { url: '/raw.png' })).toBe(false)
+    expect(insertAsset(wrapper, 'file', { url: '/raw.pdf' })).toBe(false)
+    expect(insertAsset(wrapper, 'video', { src: 'https://example.com/video' })).toBe(false)
     expect(wrapper.get('textarea').element.value).toBe('Direct guard\n')
 
     await wrapper.get('.ginko-editor__modes button:first-child').trigger('click')
     await waitFor(() => wrapper.attributes('data-mode') === 'visual')
     await wrapper.setProps({ disabled: true })
-    expect(wrapper.vm.insertImageAsset({ url: '/disabled.png' })).toBe(false)
+    expect(insertAsset(wrapper, 'image', { url: '/disabled.png' })).toBe(false)
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
@@ -352,17 +353,17 @@ describe('GinkoEditor browser journey', () => {
     })
     wrappers.push(wrapper)
     await flushPromises()
-    await waitFor(() => Boolean(wrapper.vm.editor))
+    await waitFor(() => Boolean(wrapper.vm.getEditor()))
     expect(wrapper.find('button[aria-label="Add image"]').exists()).toBe(true)
     expect(wrapper.find('button[aria-label="Add file"]').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="Add video"]').exists()).toBe(false)
-    expect(wrapper.vm.insertFileAsset({ url: '/file.pdf' })).toBe(false)
-    expect(wrapper.vm.insertVideo({ src: 'https://example.com/video' })).toBe(false)
+    expect(insertAsset(wrapper, 'file', { url: '/file.pdf' })).toBe(false)
+    expect(insertAsset(wrapper, 'video', { src: 'https://example.com/video' })).toBe(false)
   })
 
   it('reports a flush conversion failure and keeps recovery available', async () => {
     const wrapper = await mountEditor('<Badge>\nLast safe value\n</Badge>\n', 120)
-    const editor = wrapper.vm.editor!
+    const editor = wrapper.vm.getEditor()!
     editor.view.dispatch(editor.state.tr.setNodeMarkup(0, undefined, {
       ...editor.state.doc.firstChild?.attrs,
       props: { unsupported: () => 'not cloneable' },
@@ -390,7 +391,7 @@ describe('GinkoEditor browser journey', () => {
     expect(editor.state.doc.firstChild?.attrs.props.unsupported).toBeUndefined()
 
     await wrapper.setProps({ modelValue: '# Recovered externally\n' })
-    await waitFor(() => wrapper.vm.editor?.getText().includes('Recovered externally') === true)
+    await waitFor(() => wrapper.vm.getEditor()?.getText().includes('Recovered externally') === true)
     expect(wrapper.emitted('conversion-recovered')).toHaveLength(1)
   })
 })

@@ -12,20 +12,20 @@ import type { JsonValue } from './types'
 export type AuthoringControl = 'number' | 'select' | 'text' | 'toggle'
 export type ImplementationPropType = 'boolean' | 'complex' | 'number' | 'object' | 'string'
 
-export interface ComponentImplementationPropV1 {
+export interface ComponentImplementationProp {
   default?: JsonValue
   options?: readonly (boolean | number | string)[]
   required: boolean
   types: readonly ImplementationPropType[]
 }
 
-export interface ComponentImplementationMetadataV1 {
+export interface ComponentImplementationMetadata {
   componentName: string
-  props: Readonly<Record<string, ComponentImplementationPropV1>>
+  props: Readonly<Record<string, ComponentImplementationProp>>
   slots: readonly string[]
 }
 
-export interface ComponentAuthoringFieldV1 {
+export interface ComponentAuthoringField {
   control: AuthoringControl
   help?: string
   label: string
@@ -33,7 +33,7 @@ export interface ComponentAuthoringFieldV1 {
 
 type ComponentPolicy = PortableComponentPolicyV2['components'][string]
 
-export type ComponentAuthoringMetadataV1<
+export type ComponentAuthoringMetadata<
   Definition extends ComponentPolicy = ComponentPolicy,
 > = {
   /** Canvas interactions reference the same properties as the content policy. */
@@ -49,11 +49,11 @@ export type ComponentAuthoringMetadataV1<
   }
   description?: string
   label: string
-  props?: Partial<Record<keyof Definition['props'] & string, ComponentAuthoringFieldV1>>
+  props?: Partial<Record<keyof Definition['props'] & string, ComponentAuthoringField>>
   slots?: Partial<Record<Definition['slots'][number], { label: string }>>
 }
 
-export interface AuthoringRecipeV1 {
+export interface AuthoringRecipe {
   /** Short explanation shown while choosing a block. */
   description?: string
   id: string
@@ -64,19 +64,36 @@ export interface AuthoringRecipeV1 {
 
 type ComponentMap = PortableComponentPolicyV2['components']
 
-export type AuthoringKitSourceV1<Components extends ComponentMap = ComponentMap> = {
+export type AuthoringKitSource<Components extends ComponentMap = ComponentMap> = {
   authoring: {
-    [Tag in keyof Components]: ComponentAuthoringMetadataV1<Components[Tag]>
+    [Tag in keyof Components]: ComponentAuthoringMetadata<Components[Tag]>
   }
-  implementation: { [Tag in keyof Components]: ComponentImplementationMetadataV1 }
+  implementation: { [Tag in keyof Components]: ComponentImplementationMetadata }
   policy: { version: 2; components: Components }
-  recipes: readonly AuthoringRecipeV1[]
+  recipes: readonly AuthoringRecipe[]
   version: 1
 }
 
-export type AuthoringKitV1<Components extends ComponentMap = ComponentMap> = Readonly<
-  AuthoringKitSourceV1<Components>
+export type AuthoringKit<Components extends ComponentMap = ComponentMap> = Readonly<
+  AuthoringKitSource<Components>
 >
+
+/** @deprecated Use `ComponentImplementationProp`. */
+export type ComponentImplementationPropV1 = ComponentImplementationProp
+/** @deprecated Use `ComponentImplementationMetadata`. */
+export type ComponentImplementationMetadataV1 = ComponentImplementationMetadata
+/** @deprecated Use `ComponentAuthoringField`. */
+export type ComponentAuthoringFieldV1 = ComponentAuthoringField
+/** @deprecated Use `ComponentAuthoringMetadata`. */
+export type ComponentAuthoringMetadataV1<
+  Definition extends ComponentPolicy = ComponentPolicy,
+> = ComponentAuthoringMetadata<Definition>
+/** @deprecated Use `AuthoringRecipe`. */
+export type AuthoringRecipeV1 = AuthoringRecipe
+/** @deprecated Use `AuthoringKitSource`. */
+export type AuthoringKitSourceV1<Components extends ComponentMap = ComponentMap> = AuthoringKitSource<Components>
+/** @deprecated Use `AuthoringKit`. */
+export type AuthoringKitV1<Components extends ComponentMap = ComponentMap> = AuthoringKit<Components>
 
 const controlTypes: Record<AuthoringControl, readonly ImplementationPropType[]> = {
   number: ['number'],
@@ -137,8 +154,8 @@ function expectedImplementationTypes(types: ComponentPolicy['props'][string]['ty
 function validateComponent(
   tag: string,
   policy: ComponentPolicy,
-  implementation: ComponentImplementationMetadataV1,
-  authoring: ComponentAuthoringMetadataV1,
+  implementation: ComponentImplementationMetadata,
+  authoring: ComponentAuthoringMetadata,
 ): void {
   if (!/^[a-z][a-z0-9-]*$/.test(tag)) fail(`component tag "${tag}" is not canonical kebab-case.`)
   if (!implementation.componentName.trim()) fail(`${tag}.implementation.componentName is empty.`)
@@ -221,8 +238,8 @@ function freezeJson<T>(value: T): T {
 }
 
 export async function createAuthoringKit<const Components extends ComponentMap>(
-  source: AuthoringKitSourceV1<Components>,
-): Promise<AuthoringKitV1<Components>> {
+  source: AuthoringKitSource<Components>,
+): Promise<AuthoringKit<Components>> {
   assertJsonValue(source, 'source')
   if (source.version !== 1) fail('version must be 1.')
   try {
@@ -252,7 +269,7 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
   }
 
   for (const tag of policyTags) {
-    const metadata: ComponentAuthoringMetadataV1 = source.authoring[tag]
+    const metadata: ComponentAuthoringMetadata = source.authoring[tag]
     const columns = metadata.canvas?.columns
     if (!columns) continue
     const child = source.policy.components[columns.childTag]
@@ -306,7 +323,7 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
 
 export async function parseAuthoringSource(
   markdown: string,
-  kit: AuthoringKitSourceV1,
+  kit: AuthoringKitSource,
   label = 'source',
 ): Promise<ParseMdcBodyResult['body']> {
   const { body } = await parseMdcBody(markdown, { autoClose: false })
@@ -320,7 +337,7 @@ export async function parseAuthoringSource(
 
 async function parsePublicRecipeSource(
   markdown: string,
-  kit: AuthoringKitSourceV1,
+  kit: AuthoringKitSource,
   label: string,
 ): Promise<ParseMdcBodyResult['body']> {
   const { body } = await parseMdcBody(markdown, { autoClose: false })
@@ -333,12 +350,12 @@ async function parsePublicRecipeSource(
 }
 
 export async function composeAuthoringKits(
-  ...sources: readonly AuthoringKitSourceV1[]
-): Promise<AuthoringKitV1> {
-  const implementation: Record<string, ComponentImplementationMetadataV1> = {}
+  ...sources: readonly AuthoringKitSource[]
+): Promise<AuthoringKit> {
+  const implementation: Record<string, ComponentImplementationMetadata> = {}
   const components: ComponentMap = {}
-  const authoring: Record<string, ComponentAuthoringMetadataV1> = {}
-  const recipes: AuthoringRecipeV1[] = []
+  const authoring: Record<string, ComponentAuthoringMetadata> = {}
+  const recipes: AuthoringRecipe[] = []
   const recipeIds = new Set<string>()
 
   for (const source of sources) {

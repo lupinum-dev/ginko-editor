@@ -1,5 +1,5 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 
 /** Return direct columns, including the parser's explicit default-slot form. */
 export function columnChildren(node: ProseMirrorNode, childTag: string) {
@@ -18,7 +18,7 @@ export function columnChildren(node: ProseMirrorNode, childTag: string) {
 }
 
 /** Paired column membership is shared by pointer controls and block shortcuts. */
-export function parentColumnConfig(doc: ProseMirrorNode, pos: number, kit: AuthoringKitV1 | undefined) {
+export function parentColumnConfig(doc: ProseMirrorNode, pos: number, kit: AuthoringKit | undefined) {
   const resolved = doc.resolve(pos), node = doc.nodeAt(pos)
   if (!node) return undefined
   for (let depth = resolved.depth; depth > 0; depth--) {

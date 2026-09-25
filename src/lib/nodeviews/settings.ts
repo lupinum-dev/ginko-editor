@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Node } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { JsonValue } from '../../types'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { convertTiptapDocToMarkdown, validateMarkdownForAuthoring } from '../conversionPipeline'
@@ -12,12 +12,13 @@ import { createEditorText } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import { SetComponentVariantStep } from '../property-step'
 import { createPropertyInput } from '../property-input'
+import { createStalenessGuard, handleHistoryKeydown } from './lifecycle'
 
 export function blockSettings(
   editor: Editor,
   getNode: () => Node,
   getPos: () => number | undefined,
-  getKit: () => AuthoringKitV1 | undefined,
+  getKit: () => AuthoringKit | undefined,
   getOutputOptions: () => TiptapToMDCOptions,
   isPairedColumn: () => boolean,
   overlay?: EditorOverlayController,
@@ -38,7 +39,8 @@ export function blockSettings(
   actions.className = 'ginko-editor__block-actions'
   panel.append(heading, fields, error, actions)
   const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>()
-  let signature = '', disposed = false, variantRequest = 0
+  let signature = ''
+  const variantRequests = createStalenessGuard()
   let previousEditable = editor.isEditable, previousKit = getKit()
   let renderedNode = getNode()
   const report = (message = '') => {
@@ -48,15 +50,7 @@ export function blockSettings(
   popover.onOpenChange(open => {
     if (open) render()
   })
-  const handleUndo = (event: KeyboardEvent) => {
-    if (!event.isComposing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-      event.preventDefault()
-      event.stopPropagation()
-      propertyInput.reset()
-      if (event.shiftKey) editor.commands.redo()
-      else editor.commands.undo()
-    }
-  }
+  const handleUndo = (event: KeyboardEvent) => { handleHistoryKeydown(editor, event, propertyInput.reset, true) }
   dom.addEventListener('keydown', handleUndo)
   panel.addEventListener('keydown', handleUndo)
   panel.addEventListener('focusin', () => propertyInput.reset())
@@ -69,14 +63,13 @@ export function blockSettings(
   }
   async function switchVariant(tag: string) {
     // Even choosing the current variant cancels an earlier pending choice.
-    const request = ++variantRequest
+    const isCurrentRequest = variantRequests.start()
     const node = getNode(), kit = getKit(), pos = getPos(), before = editor.state
     if (!kit || pos === undefined || !editor.isEditable || tag === node.attrs.tag) return
     const group = kit.authoring[node.attrs.tag]?.canvas?.switchGroup
     if (!group || kit.authoring[tag]?.canvas?.switchGroup !== group) return
     const output = getOutputOptions(), outputKey = JSON.stringify(output)
-    const current = () => !disposed
-      && request === variantRequest
+    const current = () => isCurrentRequest()
       && dom.isConnected
       && getKit() === kit
       && editor.state === before
@@ -124,7 +117,7 @@ export function blockSettings(
   }
   function render() {
     const node = getNode(), kit = getKit(), metadata = kit?.authoring[node.attrs.tag], paired = isPairedColumn()
-    if (editor.isEditable !== previousEditable || kit !== previousKit) variantRequest += 1
+    if (editor.isEditable !== previousEditable || kit !== previousKit) variantRequests.cancel()
     previousEditable = editor.isEditable
     previousKit = kit
     const changed = node !== renderedNode
@@ -254,8 +247,7 @@ export function blockSettings(
     render,
     contains: popover.contains,
     destroy() {
-      disposed = true
-      variantRequest += 1
+      variantRequests.dispose()
       popover.destroy()
     },
   }

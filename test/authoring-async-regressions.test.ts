@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import GinkoEditor from '../src/GinkoEditor.vue'
-import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring'
+import { createAuthoringKit, type AuthoringKitSource } from '../src/authoring'
 
 const state = vi.hoisted(() => ({ pause: undefined as undefined | (() => Promise<void>) }))
 
@@ -21,7 +21,7 @@ vi.mock('../src/lib/conversionPipeline', async (importOriginal) => {
   }
 })
 
-function source(): AuthoringKitSourceV1 {
+function source(): AuthoringKitSource {
   return {
     version: 1,
     policy: {
@@ -82,7 +82,7 @@ describe('async authoring validation regressions', () => {
           signalStarted()
           return blocked
         }
-        wrapper.vm.editor!.commands.insertContent('Stale ')
+        wrapper.vm.getEditor()!.commands.insertContent('Stale ')
         const flushing = wrapper.vm.flush()
         await started
         if (action === 'replace') await wrapper.setProps({ modelValue: 'Replacement\n' })
@@ -94,7 +94,10 @@ describe('async authoring validation regressions', () => {
         release()
         await flushing
         expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-        if (action === 'replace') expect(wrapper.vm.rawContent).toBe('Replacement\n')
+        if (action === 'replace') {
+          await flushPromises()
+          expect(wrapper.vm.getEditor()!.getText()).toBe('Replacement')
+        }
       } finally {
         state.pause = undefined
         if (!unmounted) wrapper.unmount()
@@ -118,11 +121,11 @@ describe('async authoring validation regressions', () => {
       const started = new Promise<void>(resolve => { signalStarted = resolve })
       const blocked = new Promise<void>(resolve => { release = resolve })
       state.pause = () => { signalStarted(); return blocked }
-      wrapper.vm.editor!.commands.insertContent('Edited ')
+      wrapper.vm.getEditor()!.commands.insertContent('Edited ')
       const first = wrapper.vm.flush()
       await started
       const second = wrapper.vm.flush()
-      wrapper.vm.editor!.commands.insertImageUpload()
+      wrapper.vm.getEditor()!.commands.insertImageUpload()
       release()
       for (const result of await Promise.all([first, second])) {
         expect(result).toMatchObject({ ok: false, error: { code: 'image_upload_pending' } })
@@ -148,10 +151,10 @@ describe('async authoring validation regressions', () => {
         signalStarted()
         return blocked
       }
-      wrapper.vm.editor!.commands.insertContent('First ')
+      wrapper.vm.getEditor()!.commands.insertContent('First ')
       const staleFlush = wrapper.vm.flush()
       await started
-      wrapper.vm.editor!.commands.insertContent('Later ')
+      wrapper.vm.getEditor()!.commands.insertContent('Later ')
       release()
       await staleFlush
       const emissions = wrapper.emitted('update:modelValue')
@@ -185,7 +188,7 @@ describe('async authoring validation regressions', () => {
         signalStarted()
         return blocked
       }
-      wrapper.vm.editor!.commands.insertContent('Pending ')
+      wrapper.vm.getEditor()!.commands.insertContent('Pending ')
       const flushing = wrapper.vm.flush()
       await started
       const replacing = wrapper.setProps({ authoringKit: replacementKit })
@@ -195,7 +198,7 @@ describe('async authoring validation regressions', () => {
       await flushPromises()
 
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('Pending')
-      expect(wrapper.vm.editor!.getText()).toContain('Pending')
+      expect(wrapper.vm.getEditor()!.getText()).toContain('Pending')
     } finally {
       state.pause = undefined
       wrapper.unmount()

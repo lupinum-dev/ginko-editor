@@ -87,16 +87,16 @@ describe('node-view popovers', () => {
 
   it('ports into the host container, retains its own theme, and removes content on destruction', async () => {
     const editorRoot = root(), host = root()
-    editorRoot.style.setProperty('--ginko-bg', 'rgb(12, 23, 34)')
+    editorRoot.style.setProperty('--ginko-background', 'rgb(12, 23, 34)')
     const controller = createEditorOverlayController({ getContainer: () => host, getThemeElement: () => editorRoot })
     const popover = setup(editorRoot, controller)
     await open(popover)
     const content = host.querySelector<HTMLElement>('[role="dialog"]')!
     expect(content.contains(popover.panel)).toBe(true)
-    expect(content.style.getPropertyValue('--ginko-bg')).toBe('rgb(12, 23, 34)')
-    editorRoot.style.setProperty('--ginko-bg', 'rgb(45, 56, 67)')
+    expect(content.style.getPropertyValue('--ginko-background')).toBe('rgb(12, 23, 34)')
+    editorRoot.style.setProperty('--ginko-background', 'rgb(45, 56, 67)')
     await flushPromises()
-    expect(content.style.getPropertyValue('--ginko-bg')).toBe('rgb(45, 56, 67)')
+    expect(content.style.getPropertyValue('--ginko-background')).toBe('rgb(45, 56, 67)')
     expect(editorRoot.querySelector('[role="dialog"]')).toBeNull()
     popover.destroy(); popovers.splice(popovers.indexOf(popover), 1)
     await flushPromises()

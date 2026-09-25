@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import { NodeSelection, Selection, type Transaction } from '@tiptap/pm/state'
-import type { AuthoringKitV1 } from '../authoring'
+import type { AuthoringKit } from '../authoring'
 import { convertTiptapDocToMarkdown, validateMarkdownForAuthoring } from './conversionPipeline'
 import type { TiptapToMDCOptions } from './tiptapToMdc'
 import { columnChildren } from './nodeviews/columns'
@@ -14,7 +14,7 @@ export interface BlockReference {
   readonly pos: number
 }
 export interface EditorOperationContext {
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   canMutate?: () => boolean
 }
@@ -79,7 +79,7 @@ function contextFor(editor: Editor, context?: EditorOperationContext): EditorOpe
   return { getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions, ...context }
 }
 
-function pairedColumns(editor: Editor, block: BlockReference, kit: AuthoringKitV1 | undefined) {
+function pairedColumns(editor: Editor, block: BlockReference, kit: AuthoringKit | undefined) {
   const resolved = block.doc.resolve(block.pos)
   for (let depth = resolved.depth; depth > 0; depth--) {
     const parent = resolved.node(depth), config = kit?.authoring[parent.attrs.tag]?.canvas?.columns
@@ -112,7 +112,7 @@ function componentParent(doc: ProseMirrorNode, pos: number): string | undefined 
 function acceptsPlacement(
   node: ProseMirrorNode,
   parentTag: string | undefined,
-  kit: AuthoringKitV1 | undefined,
+  kit: AuthoringKit | undefined,
 ): boolean {
   if (!kit) return true
   const isComponent = node.type.name === 'element' || node.type.name === 'inline-element'
@@ -141,7 +141,7 @@ function buildAction(
   editor: Editor,
   block: BlockReference,
   action: BlockAction,
-  kit: AuthoringKitV1 | undefined,
+  kit: AuthoringKit | undefined,
 ): Transaction | undefined {
   if (!isCurrentBlock(editor, block)) return undefined
   if (pairedColumns(editor, block, kit)) return undefined
@@ -235,7 +235,7 @@ export function trackEditorOperation<T>(editor: Editor, run: () => Promise<T>): 
 function execute(
   editor: Editor,
   context: EditorOperationContext | undefined,
-  build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined,
+  build: (kit: AuthoringKit | undefined) => Transaction | undefined,
 ): Promise<BlockOperationResult> {
   return trackEditorOperation(editor, () => executeValidated(editor, context, build))
 }
@@ -243,7 +243,7 @@ function execute(
 async function executeValidated(
   editor: Editor,
   context: EditorOperationContext | undefined,
-  build: (kit: AuthoringKitV1 | undefined) => Transaction | undefined,
+  build: (kit: AuthoringKit | undefined) => Transaction | undefined,
 ): Promise<BlockOperationResult> {
   const options = contextFor(editor, context)
   if (editor.isDestroyed || !editor.isEditable || options.canMutate?.() === false) {

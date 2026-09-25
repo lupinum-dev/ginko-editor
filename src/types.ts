@@ -41,14 +41,35 @@ export interface AssetProvider {
   parseUrl: (url: string) => Partial<AssetInfo> | null
 }
 
-/** Host-owned persistence for an inline image upload. Reject to show a retryable error. */
-export type ImageUploadHandler = (file: File, context: { signal: AbortSignal }) => Promise<Partial<AssetInfo>>
+/** A stored asset reference: a stable `id`, a durable `url`, or both. */
+export type EditorAssetReference = { id: string; url?: string } | { id?: never; url: string }
 
 /** An image's stored identity and presentation. Storage and temporary display URLs stay with the host. */
 export type EditorImage = Partial<Pick<AssetInfo,
   'alt' | 'title' | 'width' | 'height' | 'fit' | 'quality' |
   'focalX' | 'focalY' | 'cropX' | 'cropY' | 'cropWidth' | 'cropHeight'
->> & ({ id: string; url?: string } | { id?: never; url: string })
+>> & EditorAssetReference
+
+/** A file's stored identity and download presentation. */
+export type EditorFile = Partial<Pick<AssetInfo, 'filename' | 'title' | 'size' | 'mimeType'>> & EditorAssetReference
+
+/** A video source and its optional title. */
+export interface EditorVideo {
+  src: string
+  title?: string
+}
+
+/**
+ * @deprecated Return `EditorImage` from an upload handler. The editor still reads
+ * the image fields of this older asset shape at runtime.
+ */
+export type LegacyImageUploadResult = Partial<AssetInfo>
+
+/** Host-owned persistence for an inline image upload. Reject to show a retryable error. */
+export type ImageUploadHandler = (
+  file: File,
+  context: { signal: AbortSignal },
+) => Promise<EditorImage | LegacyImageUploadResult>
 
 /** Host-supplied library display data, separate from the image stored in the document. */
 export interface EditorImagePickerItem {
@@ -66,20 +87,43 @@ export interface EditorAssetRequest<T> {
   complete: (value: T | null) => boolean
 }
 
+/** A flush failure that is not a conversion result. */
+export type EditorFlushStateErrorCode = 'collaboration_pending' | 'image_upload_pending' | 'not_ready'
+
+export interface EditorFlushStateError {
+  code: EditorFlushStateErrorCode
+  message: string
+}
+
+/** A conversion failure, or an editor state that prevents a safe flush. Check `code` to tell them apart. */
+export type EditorFlushError =
+  | import('./lib/conversionTypes').ConversionErrorPayload
+  | EditorFlushStateError
+
 export type EditorFlushResult =
   | { emitted: boolean; ok: true }
-  | { error: import('./lib/conversionTypes').ConversionErrorPayload; ok: false }
+  | { error: EditorFlushError; ok: false }
 
+/** The public component instance API. Get it with a template ref. */
 export interface GinkoEditorHandle {
+  /** Emit pending visual edits. Await it before you close the editor or replace its document. */
   flush: () => Promise<EditorFlushResult>
+  /** True while visual edits, image operations, commands, or shared steps are pending. */
   hasPendingChanges: () => boolean
+  /** Remove the selected image, file, or video. Returns false when nothing was removed. */
   removeSelectedMedia: () => boolean
+  /** Move keyboard focus into the visual editor, or into the Markdown source in source mode. */
+  focus: (position?: 'start' | 'end') => void
+  /**
+   * Unstable escape hatch: the TipTap editor instance, or `undefined` before it exists.
+   * Its API follows TipTap and the editor schema and can change in any release.
+   * Do not dispatch changes that bypass the editor's validation.
+   */
+  getEditor: () => import('@tiptap/core').Editor | undefined
 }
 
-export interface VideoInfo {
-  src: string
-  title?: string
-}
+/** @deprecated Use `EditorVideo`. */
+export type VideoInfo = EditorVideo
 
 export interface PropFormItem {
   custom?: boolean

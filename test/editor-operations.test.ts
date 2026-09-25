@@ -2,7 +2,7 @@
 import { Editor } from '@tiptap/core'
 import { Fragment } from '@tiptap/pm/model'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createAuthoringKit, type AuthoringKitV1 } from '../src/authoring'
+import { createAuthoringKit, type AuthoringKit } from '../src/authoring'
 import { createEditorExtensions } from '../src/lib/config/editorConfig'
 import { applyTiptapDocToEditor, prepareMarkdownForVisualEditing } from '../src/lib/conversionPipeline'
 import {
@@ -77,18 +77,13 @@ async function kit() {
     restricted: { label: 'Restricted' },
   } })
 }
-async function setup(source: string, authoringKit?: AuthoringKitV1, output?: TiptapToMDCOptions) {
+async function setup(source: string, authoringKit?: AuthoringKit, output?: TiptapToMDCOptions) {
   const editor = new Editor({
     element: document.body.appendChild(document.createElement('div')),
     content: '<p></p>',
     extensions: createEditorExtensions({
       codeBlockTheme: 'github-dark',
-      enableFiles: true,
-      enableVideo: true,
-      fileOutput: 'mdc',
-      imageOutput: 'mdc',
       showMarkdownMarkers: false,
-      videoOutput: 'mdc',
       getAuthoringKit: () => authoringKit,
       getOutputOptions: () => output ?? {},
     }),
@@ -235,7 +230,7 @@ describe('validated editor operations', () => {
   it('rejects in-flight changes in document, selection, editability, kit, and output options', async () => {
     for (const change of ['document', 'selection', 'disabled', 'kit', 'output'] as const) {
       const editor = await setup('First\n\nSecond')
-      let authoringKit: AuthoringKitV1 | undefined, output: 'mdc' | 'markdown' = 'mdc'
+      let authoringKit: AuthoringKit | undefined, output: 'mdc' | 'markdown' = 'mdc'
       const nextKit = await kit()
       const pending = performBlockAction(editor, paragraph(editor, 'First'), 'duplicate', {
         getAuthoringKit: () => authoringKit,

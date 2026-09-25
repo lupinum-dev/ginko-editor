@@ -1,6 +1,6 @@
 import { ImageUpload } from '../extensions/image-upload'
-import type { ImageUploadHandler, ImagePicker, AssetInfo } from '../../types'
-import type { EditorMessages } from '../../ui/messages'
+import type { ImageUploadHandler, ImagePicker, EditorImage, LegacyImageUploadResult } from '../../types'
+import { createEditorText, type EditorMessages } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import type { ImageActions } from '../nodeviews/image'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -10,9 +10,10 @@ import { codeView } from '../nodeviews/code'
 import { imageView } from '../nodeviews/image'
 import { createDocumentExtensions } from './documentConfig'
 import type { AssetProvider, JsonRecord } from '../../types'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { MarkdownClipboard } from '../extensions'
+import { ComponentBoundary } from '../extensions/component-boundary'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -20,44 +21,40 @@ export interface CreateEditorExtensionsOptions {
   getImagePicker?: () => ImagePicker | undefined
   getImageDropTarget?: () => HTMLElement | undefined
   getImageUpload?: () => ImageUploadHandler | undefined
+  /** The largest accepted image upload, in bytes. */
+  getImageMaxBytes?: () => number
   canUploadImage?: () => boolean
-  insertUploadedImage?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
+  insertUploadedImage?: (asset: EditorImage | LegacyImageUploadResult, pos: number, replaceSize?: number) => boolean
   onImageUploadPending?: (count: number) => void
   imageActions?: ImageActions
   assetProvider?: AssetProvider
-  codeBlockTheme: string
-  enableFiles: boolean
-  enableVideo: boolean
-  fileOutput: 'markdown' | 'mdc'
-  imageOutput: 'markdown' | 'mdc'
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  /** Initial value of the code block extension storage. */
+  codeBlockTheme?: string
+  getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   canPaste?: () => boolean
   onCopyError?: (message: string | undefined) => void
   onPasteError?: (message: string | undefined) => void
-  placeholder?: string
-  showMarkdownMarkers: boolean
-  videoOutput: 'html' | 'mdc'
+  /** Read on each placeholder render, so the text can change without a new editor. */
+  getPlaceholder?: () => string | undefined
+  /** Initial value of the heading extension storage. */
+  showMarkdownMarkers?: boolean
 }
 
-export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
+export function createEditorExtensions(options: CreateEditorExtensionsOptions = {}) {
   const resolveAsset = (props: JsonRecord) => {
     const src = typeof props.src === 'string' ? props.src : undefined
     const id = typeof props.id === 'string' ? props.id : undefined
     return options.assetProvider?.buildUrl({ id: id ?? src, url: src })
   }
-  const {
-    codeBlockTheme,
-    placeholder,
-    showMarkdownMarkers,
-  } = options
+  const text = options.overlay?.text ?? createEditorText(options.getMessages)
 
   return [
     ...createDocumentExtensions({
       getAuthoringKit: options.getAuthoringKit,
       getOutputOptions: options.getOutputOptions,
-      showMarkdownMarkers,
-      codeBlockTheme,
+      showMarkdownMarkers: options.showMarkdownMarkers,
+      codeBlockTheme: options.codeBlockTheme,
       resolveAsset,
       nodeViews: {
         table: props => tableView(props, options.overlay),
@@ -73,18 +70,16 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
     }),
     Placeholder.configure({
       emptyEditorClass: 'mdc-editor-empty',
-      placeholder: placeholder || 'Start writing...',
+      placeholder: () => options.getPlaceholder?.() || text('startWriting'),
     }),
     MarkdownClipboard.configure({
       enabled: true,
-      fileOutput: options.fileOutput,
+      text,
       getAuthoringKit: options.getAuthoringKit,
       getOutputOptions: options.getOutputOptions,
       canPaste: options.canPaste,
       onPasteError: options.onPasteError,
       onCopyError: options.onCopyError,
-      imageOutput: options.imageOutput,
-      videoOutput: options.videoOutput,
     }),
     ImageUpload.configure({
       overlay: options.overlay,
@@ -92,9 +87,11 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
       dropTarget: options.getImageDropTarget,
       upload: options.getImageUpload,
       picker: options.getImagePicker,
+      maxBytes: options.getImageMaxBytes,
       enabled: options.canUploadImage,
       insert: options.insertUploadedImage,
       onPendingChange: options.onImageUploadPending,
     }),
+    ComponentBoundary,
   ]
 }

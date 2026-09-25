@@ -3,7 +3,7 @@ import { closeHistory } from '@tiptap/pm/history'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
-import type { AssetInfo, EditorImage, ImagePicker, ImageUploadHandler } from '../../types'
+import type { EditorImage, ImagePicker, ImageUploadHandler, LegacyImageUploadResult } from '../../types'
 import { createEditorText, type EditorMessages, type EditorText } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import { icon } from '../nodeviews/icons'
@@ -14,11 +14,24 @@ export interface UploadOptions {
   dropTarget?: () => HTMLElement | undefined
   upload?: () => ImageUploadHandler | undefined
   picker?: () => ImagePicker | undefined
+  /** The largest accepted file, in bytes. Defaults to 10 MB. */
+  maxBytes?: () => number
   enabled?: () => boolean
-  insert?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
+  insert?: (asset: ImageResult, pos: number, replaceSize?: number) => boolean
   onPendingChange?: (count: number) => void
 }
+type ImageResult = EditorImage | LegacyImageUploadResult
 interface ReplacementRange { from: number; to: number }
+export const defaultImageMaxBytes = 10 * 1024 * 1024
+
+/** A short, readable file size such as "10 MB" or "512 KB". */
+export function formatFileSize(bytes: number): string {
+  const units = ['bytes', 'KB', 'MB', 'GB']
+  let value = bytes, unit = 0
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1 }
+  const rounded = Math.round(value * 10) / 10
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} ${units[unit]}`
+}
 export interface UploadStorage { add: (range?: ReplacementRange) => boolean; clear: () => void }
 interface UploadEntry {
   committing?: boolean
@@ -45,7 +58,7 @@ const imageNumberProperties = [
   'cropHeight',
 ] as const
 
-function validateImageResult(asset: Partial<AssetInfo>, text: EditorText) {
+function validateImageResult(asset: ImageResult, text: EditorText) {
   if (!asset || typeof asset !== 'object' || Array.isArray(asset)) throw new Error(text('imageReferenceRequired'))
   for (const field of ['id', 'url', ...imageTextProperties] as const) {
     if (asset[field] !== undefined && typeof asset[field] !== 'string')
@@ -105,6 +118,11 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       text = createEditorText(() => options.getMessages?.()),
       entries = new Map<string, UploadEntry>()
     let view: EditorView | undefined, sequence = 0, destroyed = false
+    const maxBytes = () => {
+      const value = options.maxBytes?.()
+      return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : defaultImageMaxBytes
+    }
+    const sizeText = () => formatFileSize(maxBytes())
     const decorations = () => view ? key.getState(view.state) ?? DecorationSet.empty : DecorationSet.empty
     const enabled = () => !destroyed && editor.isEditable && options.enabled?.() !== false
     const position = (id: string) => decorations().find(undefined, undefined, spec => spec.id === id)[0]?.from
@@ -147,6 +165,16 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       }
       const id = `image-upload-${++sequence}`
       const overlayOwner = {}
+      // A replacement opens from a control outside the document. Return there when it closes.
+      const returnFocus = target && document.activeElement instanceof HTMLElement
+        && document.activeElement !== document.body
+        && !view.dom.contains(document.activeElement)
+        ? document.activeElement
+        : undefined
+      const restoreFocus = () => {
+        if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
+        else editor.view.focus()
+      }
       const dom = document.createElement('div')
       dom.className = 'ginko-image-upload'
       dom.contentEditable = 'false'
@@ -155,7 +183,11 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
         'aria-label',
         target ? text('replaceImage') : text('imageUpload'),
       )
-      if (target) dom.dataset.replacement = 'true'
+      if (target) {
+        dom.dataset.replacement = 'true'
+        // The replacement panel is anchored to its image and does not block the page.
+        dom.setAttribute('aria-modal', 'false')
+      }
       const area = document.createElement('button')
       area.type = 'button'
       area.className = 'ginko-image-upload__dropzone'
@@ -167,7 +199,9 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       label.className = 'ginko-image-upload__label'
       const hint = document.createElement('span')
       hint.className = 'ginko-image-upload__hint'
-      hint.textContent = text('imageUploadHint')
+      hint.id = `ginko-${id}-hint`
+      hint.textContent = text('imageUploadHint', { size: sizeText() })
+      dom.setAttribute('aria-describedby', hint.id)
       area.append(symbol, label, hint)
       const browse = document.createElement('button')
       browse.type = 'button'
@@ -219,8 +253,8 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
         preview.hidden = true
       }
       function fileError(file: File) {
-        return file.size > 10 * 1024 * 1024
-          ? text('imageTooLarge')
+        return file.size > maxBytes()
+          ? text('imageTooLarge', { size: sizeText() })
           : !file.type.startsWith('image/') || !file.size
             ? text('invalidImageFile')
             : undefined
@@ -257,7 +291,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       function render() {
         dom.setAttribute('aria-label', text(target ? 'replaceImage' : 'imageUpload'))
         area.setAttribute('aria-label', text('uploadImage'))
-        hint.textContent = text('imageUploadHint')
+        hint.textContent = text('imageUploadHint', { size: sizeText() })
         input.setAttribute('aria-label', text('imageFile'))
         cancel.title = text('removeImagePlaceholder')
         cancel.setAttribute('aria-label', text('removeImagePlaceholder'))
@@ -282,7 +316,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
         dom.dataset.uploading = String(busy)
         positionReplacement()
       }
-      async function completeOperation(operation: (signal: AbortSignal) => Promise<Partial<AssetInfo> | null>) {
+      async function completeOperation(operation: (signal: AbortSignal) => Promise<ImageResult | null>) {
         if (busy || !enabled() || position(id) === undefined) return
         error.hidden = true
         controller?.abort()
@@ -296,7 +330,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
           if (attempt.signal.aborted || !enabled() || current === undefined || !entries.has(id)) return
           if (asset === null) {
             remove(id)
-            editor.view.focus()
+            restoreFocus()
             return
           }
           validateImageResult(asset, text)
@@ -355,7 +389,7 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       })
       decline.addEventListener('click', () => {
         remove(id)
-        editor.view.focus()
+        restoreFocus()
       })
       area.addEventListener('click', () => input.click())
       input.addEventListener('change', () => {
@@ -404,13 +438,13 @@ export const ImageUpload = Extension.create<UploadOptions, UploadStorage>({
       })
       cancel.addEventListener('click', () => {
         remove(id)
-        editor.view.focus()
+        restoreFocus()
       })
       dom.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !event.isComposing) {
           event.preventDefault()
           remove(id)
-          editor.view.focus()
+          restoreFocus()
         }
       })
       let anchoredImage: Element | undefined

@@ -24,7 +24,7 @@ describe('editing without block movement', () => {
     })
     try {
       await flushPromises()
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       const before = editor.getJSON()
       editor.commands.setNodeSelection(editor.state.doc.firstChild!.nodeSize)
       for (const key of ['ArrowUp', 'ArrowDown']) {
@@ -84,7 +84,7 @@ describe('editing without block movement', () => {
     })
     try {
       await flushPromises()
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       editor.commands.setTextSelection(2)
       editor.view.dom.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'D', altKey: true, shiftKey: true, bubbles: true, cancelable: true }),

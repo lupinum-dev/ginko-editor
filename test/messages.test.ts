@@ -94,7 +94,7 @@ describe('interface messages', () => {
       },
     })
     cleanup.push(() => wrapper.unmount()); await flushPromises()
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     expect(wrapper.get('input[aria-label="Hinweis Titel"]').attributes('placeholder')).toBe('Titel hinzufügen…')
     await wrapper.get('button[aria-label="Einstellungen für Hinweis"]').trigger('click'); await flushPromises()
     expect(wrapper.get('select[aria-label="Appearance"]').findAll('option')[0].text()).toBe('Standard')
@@ -149,7 +149,7 @@ describe('interface messages', () => {
       },
     })
     cleanup.push(() => wrapper.unmount()); await flushPromises()
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     editor.commands.insertImageUpload(); await flushPromises()
     expect(wrapper.get('button[aria-label="Bild hochladen"]').text()).toContain('Bilddatei bis 10 MB auswählen')
     const input = wrapper.get('input[type="file"]')

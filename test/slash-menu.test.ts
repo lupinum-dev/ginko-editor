@@ -26,7 +26,7 @@ describe('writing block menu', () => {
   it.each([false, true])('replaces /image only when a host request succeeds: %s', async accept => {
     const wrapper = await setup()
     try {
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       editor.view.dispatch(editor.state.tr.insertText('/image'))
       await flushPromises()
       await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Enter' })
@@ -50,7 +50,7 @@ describe('writing block menu', () => {
     } })
     try {
       await flushPromises()
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       editor.commands.setTextSelection(editor.state.doc.content.size - 1)
       // A typing transaction opens the command; merely loading source does not.
       editor.view.dispatch(editor.state.tr.insertText('s'))
@@ -77,11 +77,11 @@ describe('writing block menu', () => {
     try {
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
       expect(wrapper.find('[role="combobox"]').exists()).toBe(true)
-      wrapper.vm.editor!.commands.insertContentAt(1, 'Arrived ')
+      wrapper.vm.getEditor()!.commands.insertContentAt(1, 'Arrived ')
       await flushPromises()
       expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
       await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Escape' })
-      expect(wrapper.vm.editor!.getText()).toBe('Arrived Original')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('Arrived Original')
       expect((await wrapper.vm.flush()).ok).toBe(true)
     } finally { wrapper.unmount() }
   })
@@ -118,7 +118,7 @@ describe('writing block menu', () => {
       expect(document.activeElement).toBe(wrapper.get('.ProseMirror').element)
       expect((await wrapper.vm.flush()).ok).toBe(true)
       expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('## My heading')
-      wrapper.vm.editor!.commands.undo()
+      wrapper.vm.getEditor()!.commands.undo()
       expect(wrapper.get('.ProseMirror p').text()).toBe('My heading')
     } finally { wrapper.unmount() }
   })
@@ -130,12 +130,12 @@ describe('writing block menu', () => {
       await wrapper.get('[role="combobox"]').setValue('table')
       await wrapper.get('[role="combobox"]').trigger('keydown', { key: 'Enter' })
       expect((await wrapper.vm.flush()).ok).toBe(true)
-      const table = wrapper.vm.editor!.getJSON().content?.find(node => node.type === 'table')
+      const table = wrapper.vm.getEditor()!.getJSON().content?.find(node => node.type === 'table')
       expect(table?.content).toHaveLength(3)
       expect(table?.content?.every(row => 'content' in row && row.content?.length === 3)).toBe(true)
-      expect(wrapper.vm.editor!.getText()).not.toContain('Description')
-      wrapper.vm.editor!.commands.undo()
-      expect(wrapper.vm.editor!.getJSON().content?.some(node => node.type === 'table')).toBe(false)
+      expect(wrapper.vm.getEditor()!.getText()).not.toContain('Description')
+      wrapper.vm.getEditor()!.commands.undo()
+      expect(wrapper.vm.getEditor()!.getJSON().content?.some(node => node.type === 'table')).toBe(false)
     } finally { wrapper.unmount() }
   })
 
@@ -170,7 +170,7 @@ describe('writing block menu', () => {
     })
     try {
       await flushPromises()
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       let position = 0
       editor.state.doc.descendants((node, pos) => {
         if (node.type.name === 'paragraph' && node.textContent === 'Keep') position = pos + 1
@@ -218,7 +218,7 @@ describe('writing block menu', () => {
       release()
       expect((await pending).ok).toBe(true)
       await flushPromises()
-      expect(wrapper.vm.editor!.getText().trim()).toBe(cancel ? '' : 'Example')
+      expect(wrapper.vm.getEditor()!.getText().trim()).toBe(cancel ? '' : 'Example')
       if (!cancel) expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toContain('# Example')
     } finally { release?.(); wrapper.unmount(); vi.restoreAllMocks() }
   })
@@ -226,12 +226,12 @@ describe('writing block menu', () => {
   it('keeps slash text on no results and escape, and dismisses on an outside click', async () => {
     const wrapper = await setup()
     try {
-      wrapper.vm.editor!.view.dispatch(wrapper.vm.editor!.state.tr.insertText('/there-is-no-such-block'))
+      wrapper.vm.getEditor()!.view.dispatch(wrapper.vm.getEditor()!.state.tr.insertText('/there-is-no-such-block'))
       await flushPromises()
       const search = wrapper.get('.ProseMirror')
       await search.trigger('keydown', { key: 'Enter' })
       expect(wrapper.text()).toContain('No matching blocks.')
-      expect(wrapper.vm.editor!.getText()).toBe('/there-is-no-such-block')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('/there-is-no-such-block')
       await search.trigger('keydown', { key: 'Escape' })
       expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
       expect(document.activeElement).toBe(wrapper.get('.ProseMirror').element)
@@ -245,7 +245,7 @@ describe('writing block menu', () => {
   it('types at the caret, maps its command through independent edits, and undoes insertion atomically', async () => {
     const wrapper = await setup('First\n\nSecond')
     try {
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       editor.commands.setTextSelection(editor.state.doc.content.size - 1)
       editor.view.dispatch(editor.state.tr.insertText(' /h2'))
       await flushPromises()
@@ -272,7 +272,7 @@ describe('writing block menu', () => {
     for (const action of ['move', 'delete', 'disable'] as const) {
       const wrapper = await setup()
       try {
-        const editor = wrapper.vm.editor!
+        const editor = wrapper.vm.getEditor()!
         editor.view.dispatch(editor.state.tr.insertText('/head'))
         await flushPromises()
         expect(wrapper.find('.ginko-editor__insert-menu').exists()).toBe(true)
@@ -289,7 +289,7 @@ describe('writing block menu', () => {
   it('does not reopen a dismissed command during continued typing or parse URLs as commands', async () => {
     const wrapper = await setup()
     try {
-      const editor = wrapper.vm.editor!
+      const editor = wrapper.vm.getEditor()!
       editor.view.dispatch(editor.state.tr.insertText('/head'))
       await flushPromises()
       await wrapper.get('.ProseMirror').trigger('keydown', { key: 'Escape' })
@@ -308,7 +308,7 @@ describe('writing block menu', () => {
     const wrapper = await setup()
     try {
       await wrapper.setProps({ messages: { heading: 'Überschrift', heading2Description: 'Ein Abschnitt.' } })
-      wrapper.vm.editor!.view.dispatch(wrapper.vm.editor!.state.tr.insertText('/uberschrift'))
+      wrapper.vm.getEditor()!.view.dispatch(wrapper.vm.getEditor()!.state.tr.insertText('/uberschrift'))
       await flushPromises()
       expect(wrapper.findAll('[role="option"]')).toHaveLength(3)
       expect(wrapper.text()).toContain('Überschrift 2')
@@ -322,11 +322,11 @@ describe('writing block menu', () => {
       await wrapper.get('button[aria-label="Insert block"]').trigger('click')
       await wrapper.get('[role="combobox"]').trigger('keydown', { key: 'Enter', isComposing: true })
       expect(wrapper.find('[role="combobox"]').exists()).toBe(true)
-      expect(wrapper.vm.editor!.getText()).toBe('')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('')
       await wrapper.setProps({ modelValue: 'A different document' })
       await flushPromises()
       expect(wrapper.find('[role="combobox"]').exists()).toBe(false)
-      expect(wrapper.vm.editor!.getText()).toBe('A different document')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('A different document')
     } finally { wrapper.unmount() }
   })
 
@@ -357,7 +357,7 @@ describe('writing block menu', () => {
       await wrapper.get('[role="combobox"]').setValue('image')
       await wrapper.get('[role="combobox"]').trigger('keydown', { key: 'Enter' })
       expect(wrapper.emitted('request-image')).toHaveLength(1)
-      expect(wrapper.vm.editor!.getText()).toBe('')
+      expect(wrapper.vm.getEditor()!.getText()).toBe('')
     } finally { wrapper.unmount() }
   })
 })

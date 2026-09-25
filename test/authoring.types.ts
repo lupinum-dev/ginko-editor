@@ -1,4 +1,4 @@
-import type { AuthoringKitSourceV1 } from '../src/authoring'
+import type { AuthoringKitSource } from '../src/authoring'
 
 const policy = {
   version: 2,
@@ -35,4 +35,4 @@ export const inferredAuthoringKeys = {
     },
   },
   recipes: [],
-} as const satisfies AuthoringKitSourceV1<typeof policy.components>
+} as const satisfies AuthoringKitSource<typeof policy.components>
