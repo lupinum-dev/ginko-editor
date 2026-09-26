@@ -103,7 +103,11 @@ describe('save path property', () => {
       }
       let saves = 0
       for (const seed of seeds) {
-        const edited = mutate(opened.value!, random(seed * 7919 + recipe.id.length), freeText)
+        const mutated = mutate(opened.value!, random(seed * 7919 + recipe.id.length), freeText)
+        // Odd seeds place the block inside a quote, where property blocks carry a `>` prefix.
+        const edited: JSONContent = seed % 2
+          ? { type: 'doc', content: [{ type: 'blockquote', content: mutated.content }] }
+          : mutated
         const saved = await convertTiptapDocToMarkdown(edited, {})
         if (!saved.ok) continue // Refusing to save is safe; writing different content is not.
         saves += 1

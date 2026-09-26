@@ -296,7 +296,7 @@ describe('GinkoEditor browser journey', () => {
     const result = await wrapper.vm.flush()
     expect(result.ok).toBe(true)
     const emitted = wrapper.emitted('update:modelValue')!.at(-1)![0] as string
-    expect(emitted).toMatch(/\[Guide\.pdf\]\(\/guide\.pdf\)(?:\{[^\n]+\})?\n\n# File review/)
+    expect(emitted).toMatch(/\[Guide\.pdf\]\(\/guide\.pdf(?: "[^"\n]*")?\)(?:\{[^\n]+\})?\n\n# File review/)
   })
 
   it('rejects asset completion after mode, editability, document, or lifetime changes', async () => {

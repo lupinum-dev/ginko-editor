@@ -82,6 +82,8 @@
   documents with non-ASCII or nested headings open visually. A split, paste, or
   duplicate never repeats a custom anchor.
 - Typed links default to `https:`.
+- Saved Markdown escapes text that a site parser would turn into a link, such as
+  `example\.com`, so the published page shows the text that was typed.
 - Stop conversion with an error for an unknown editor node instead of writing
   placeholder text.
 - A seeded property test saves and reopens mutated versions of every layout
