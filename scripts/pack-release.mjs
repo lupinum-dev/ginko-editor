@@ -23,8 +23,10 @@ const sourceSha = source.stdout.trim()
 if (source.status !== 0 || !/^[0-9a-f]{40}$/.test(sourceSha)) {
   throw new Error(source.stderr || 'Cannot resolve the source commit.')
 }
-if (process.env.GITHUB_SHA && sourceSha !== process.env.GITHUB_SHA) {
-  throw new Error('The release source differs from GITHUB_SHA.')
+// GitHub resets built-in GITHUB_* variables; a pull-request preview names its checked-out head separately.
+const expectedSha = process.env.RELEASE_SOURCE_SHA || process.env.GITHUB_SHA
+if (expectedSha && sourceSha !== expectedSha) {
+  throw new Error('The release source differs from the expected commit.')
 }
 const changelog = await readFile('CHANGELOG.md', 'utf8')
 const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
