@@ -2,6 +2,7 @@ import type {
   ConversionErrorPayload,
   ConversionHealthState,
   ConversionIssue,
+  ConversionIssueCode,
   ConversionPhase,
   ConversionRecoveredPayload,
   ConversionResult,
@@ -39,7 +40,7 @@ export function maybeBuildRecoveryPayload(
 export function toConversionErrorPayload(
   result: ConversionResult<unknown>,
   options: {
-    fallbackCode?: string
+    fallbackCode?: ConversionIssueCode
     fallbackMessage: string
     fallbackPhase: ConversionPhase
     recoverable?: boolean

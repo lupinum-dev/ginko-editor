@@ -5,7 +5,7 @@ import { parseMdcDocument } from '@lupinum/ginko-content/cms-contract'
 import { describe, expect, it } from 'vitest'
 
 import { createEditorExtensions } from '../src/lib/config/editorConfig.js'
-import { createAuthoringKit, type AuthoringKitSourceV1 } from '../src/authoring.js'
+import { createAuthoringKit, type AuthoringKitSource } from '../src/authoring.js'
 import {
   applyTiptapDocToEditor,
   convertMarkdownToTiptapDoc,
@@ -18,20 +18,14 @@ function createEditor() {
     content: { content: [{ type: 'paragraph' }], type: 'doc' },
     extensions: createEditorExtensions({
       codeBlockTheme: 'github-dark',
-      enableDebug: false,
-      enableFiles: true,
-      enableVideo: true,
-      fileOutput: 'mdc',
-      imageOutput: 'mdc',
       showMarkdownMarkers: false,
-      videoOutput: 'mdc',
     }),
   })
 }
 
 describe('editor conversion contract', () => {
   it('uses authored angle and colon form metadata when enforcing component kind', async () => {
-    const source: AuthoringKitSourceV1 = {
+    const source: AuthoringKitSource = {
       version: 1,
       policy: {
         version: 2,

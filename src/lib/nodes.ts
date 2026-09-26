@@ -4,10 +4,9 @@
  * Handles document structure: headings, paragraphs, lists, tables, etc.
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import type { JsonRecord } from '../types'
-import { editorDebug } from './debug'
 import type { MDCElement, MDCNode } from './mdcTypes'
 
 /**
@@ -23,7 +22,11 @@ export function createHeadingNode(
 ): JSONContent {
   const element = node as MDCElement
   const level = Number.parseInt(element.tag?.charAt(1) || '1', 10)
-  return createTipTapNodeFn(element, 'heading', { attrs: { level } })
+  // The adapter keeps `id` only when the author chose it; generated ids stay implicit.
+  const { id, ...props } = element.props ?? {}
+  const attrs: JsonRecord = { level }
+  if (typeof id === 'string' && id) attrs.id = id
+  return createTipTapNodeFn({ ...element, props }, 'heading', { attrs })
 }
 
 /**
@@ -50,7 +53,7 @@ export function createParagraphNode(
   const paragraphAttrs =
     !node.props || Object.keys(node.props).length === 0 ? undefined : node.props
 
-  const inlineTypes = new Set(['binding', 'hardBreak', 'inline-element', 'span-style', 'text'])
+  const inlineTypes = new Set(['hardBreak', 'inline-element', 'span-style', 'text'])
 
   const hasBlockChildren = content.some((child) => {
     const type = child?.type
@@ -217,10 +220,6 @@ export function createPreNode(
   const codeText = typeof rawCodeText === 'string' ? rawCodeText : getNodeTextFn(node)
   const initialContent = tiptapNode.content as Array<JSONContent> | undefined
   if ((!initialContent || initialContent.length === 0) && codeText) {
-    editorDebug.warn('Code block content missing, restoring text', {
-      filename: node.props?.filename,
-      language: node.props?.language,
-    })
     tiptapNode.content = [{ text: codeText, type: 'text' }]
   }
 

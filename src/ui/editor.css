@@ -1,0 +1,484 @@
+/* Editor frame, header, insert menu, and writing surface. */
+@layer ginko {
+  .ginko-editor {
+    position: relative;
+    overflow: visible;
+    border: 1px solid var(--ginko-border);
+    border-radius: var(--ginko-radius);
+    background: var(--ginko-background);
+    color: var(--ginko-foreground);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Only the editor's own chrome. Toolbar and node view controls have their own rules. */
+  :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) button {
+    min-height: 2.25rem;
+    border: 0;
+    border-radius: .4rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    padding: .35rem .65rem;
+    white-space: nowrap;
+  }
+
+  :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) button:hover,
+  :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) button[aria-pressed='true'] {
+    background: var(--ginko-muted);
+  }
+
+  :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) :is(button, input, select):focus-visible,
+  .ginko-editor__source:focus-visible {
+    outline-offset: 2px;
+  }
+
+  .ginko-editor__header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: .5rem;
+    border-bottom: 1px solid var(--ginko-border);
+    padding: .45rem .55rem;
+  }
+
+  .ginko-editor__insert-trigger {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-weight: 650;
+  }
+
+  .ginko-editor__insert-trigger span[aria-hidden='true'] {
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  .ginko-editor__modes {
+    display: flex;
+    gap: .2rem;
+  }
+
+  .ginko-editor__peers {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ginko-editor__peer {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-inline-start: -0.25rem;
+    border: 2px solid var(--ginko-background);
+    border-radius: 999px;
+    background: var(--ginko-collab-color, var(--ginko-muted));
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .ginko-editor__peer:first-child {
+    margin-inline-start: 0;
+  }
+
+  .ginko-editor__peer--more {
+    background: var(--ginko-muted);
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__status {
+    color: var(--ginko-muted-foreground);
+    font-size: .78rem;
+    white-space: nowrap;
+  }
+
+  .ginko-editor__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The menu overlays the page without changing the writer's document geometry. */
+  .ginko-editor__insert-menu {
+    position: fixed;
+    z-index: var(--ginko-z-menu);
+    display: flex;
+    flex-direction: column;
+    width: min(320px, calc(100vw - 24px));
+    overflow: hidden;
+    border: 1px solid var(--ginko-border);
+    border-radius: .75rem;
+    background: var(--ginko-background);
+    box-shadow: var(--ginko-shadow-lg);
+    padding: .35rem;
+  }
+
+  @media (min-width: 700px) {
+    .ginko-editor__insert-menu--preview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      width: min(620px, calc(100vw - 24px));
+    }
+    .ginko-editor__insert-menu--preview .ginko-editor__insert-search,
+    .ginko-editor__insert-menu--preview .ginko-editor__insert-query,
+    .ginko-editor__insert-menu--preview .ginko-editor__insert-results,
+    .ginko-editor__insert-menu--preview .ginko-editor__insert-help,
+    .ginko-editor__insert-menu--preview .ginko-editor__insert-error {
+      grid-column: 1;
+    }
+    .ginko-editor__insert-menu--preview .ginko-editor__recipe-preview {
+      display: flex;
+      align-items: safe center;
+      min-width: 0;
+      grid-column: 2;
+      grid-row: 1 / 5;
+      max-height: none;
+      margin: -.35rem -.35rem -.35rem .35rem;
+      padding: 1.1rem;
+      border-top: 0;
+      border-left: 1px solid var(--ginko-border);
+      background: color-mix(in srgb, var(--ginko-background) 97%, var(--ginko-foreground));
+    }
+  }
+
+  .ginko-editor__insert-search {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    border-bottom: 1px solid var(--ginko-border);
+    margin: 0 .35rem .35rem;
+    padding: .2rem .35rem .55rem;
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__insert-query {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .55rem .6rem;
+    color: var(--ginko-muted-foreground);
+    font-size: .75rem;
+    border-bottom: 1px solid var(--ginko-border);
+    margin-bottom: .35rem;
+  }
+
+  .ginko-editor__insert-query kbd {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ginko-editor__insert-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ginko-foreground);
+    padding: .4rem 0;
+    font: inherit;
+  }
+
+  .ginko-editor__insert-search:focus-within {
+    border-bottom-color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__insert-results {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    min-height: 48px;
+    flex: 1 1 auto;
+  }
+
+  .ginko-editor__insert-results button {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    width: 100%;
+    min-height: 57px;
+    padding: .5rem;
+    text-align: start;
+    white-space: normal;
+  }
+
+  .ginko-editor__insert-results button[aria-selected='true'] {
+    background: var(--ginko-muted);
+  }
+
+  .ginko-editor__recipe-symbol {
+    display: grid;
+    place-items: center;
+    flex: 0 0 35px;
+    height: 35px;
+    border: 1px solid var(--ginko-border);
+    border-radius: .4rem;
+    background: var(--ginko-background);
+    font: 500 16px/1 ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .ginko-editor__recipe-symbol svg {
+    width: 17px;
+    height: 17px;
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__insert-group + .ginko-editor__insert-group {
+    margin-top: .25rem;
+  }
+
+  .ginko-editor__insert-group-label {
+    padding: .45rem .5rem .2rem;
+    color: var(--ginko-muted-foreground);
+    font: 600 .66rem/1.4 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+  }
+
+  .ginko-editor__recipe-match {
+    background: transparent;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-decoration-color: color-mix(in srgb, var(--ginko-tone-info) 70%, transparent);
+    text-underline-offset: 2px;
+  }
+
+  .ginko-editor__insert-empty p {
+    margin: 0;
+  }
+
+  .ginko-editor__insert-empty .ginko-editor__insert-hint {
+    margin-top: .25rem;
+    font-size: .75rem;
+  }
+
+  .ginko-editor__recipe-preview:focus-visible {
+    outline: 2px solid var(--ginko-ring);
+    outline-offset: -2px;
+  }
+
+  .ginko-editor__recipe-text {
+    display: grid;
+    gap: .1rem;
+    flex: 1;
+  }
+
+  .ginko-editor__recipe-text strong {
+    font-size: .85rem;
+    font-weight: 550;
+  }
+
+  .ginko-editor__recipe-text small {
+    font-size: .73rem;
+    color: var(--ginko-muted-foreground);
+    line-height: 1.4;
+  }
+
+  .ginko-editor__recipe-preview {
+    flex: 0 0 auto;
+    max-height: 150px;
+    overflow: auto;
+    border-top: 1px solid var(--ginko-border);
+    padding: .7rem;
+  }
+
+  .ginko-editor__insert-empty, .ginko-editor__insert-error {
+    margin: 0;
+    padding: .75rem;
+    font-size: .85rem;
+  }
+
+  .ginko-editor__insert-empty {
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__insert-error {
+    color: var(--ginko-destructive);
+  }
+
+  .ginko-editor__insert-help {
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+    border-top: 1px solid var(--ginko-border);
+    margin: .3rem 0 0;
+    padding: .55rem .35rem .15rem;
+    color: var(--ginko-muted-foreground);
+    font-size: .68rem;
+  }
+
+  .ginko-editor__insert-help kbd {
+    font: inherit;
+    margin-inline-end: .2rem;
+  }
+
+  .ginko-editor__warning {
+    display: grid;
+    gap: .15rem;
+    border-bottom: 1px solid var(--ginko-warning);
+    background: var(--ginko-warning-background);
+    padding: .65rem .8rem;
+    color: var(--ginko-warning-foreground);
+  }
+
+  .ginko-editor__clipboard-error {
+    margin: 0;
+    border-bottom: 1px solid var(--ginko-border);
+    padding: .65rem .8rem;
+    color: var(--ginko-destructive);
+    font-size: .85rem;
+  }
+
+  .ginko-editor__surface {
+    padding: clamp(1rem, 3vw, 1.75rem);
+  }
+
+  .ginko-editor__surface .ProseMirror {
+    max-width: 46rem;
+    min-height: 22rem;
+    margin-inline: auto;
+    outline: none;
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .ginko-editor__surface .ProseMirror p.mdc-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: var(--ginko-muted-foreground);
+  }
+
+  .ginko-editor__surface .ProseMirror h1 {
+    font-size: 2rem;
+    font-weight: 650;
+  }
+
+  .ginko-editor__surface .ProseMirror h2 {
+    font-size: 1.5rem;
+    font-weight: 650;
+  }
+
+  .ginko-editor__surface .ProseMirror h3 {
+    font-size: 1.2rem;
+    font-weight: 650;
+  }
+
+  .ginko-editor__surface .ProseMirror ul {
+    list-style: disc;
+    padding-inline-start: 1.5rem;
+  }
+
+  .ginko-editor__surface .ProseMirror ol {
+    list-style: decimal;
+    padding-inline-start: 1.5rem;
+  }
+
+  .ginko-editor__surface .ProseMirror blockquote {
+    border-inline-start: 3px solid var(--ginko-foreground);
+    padding-inline-start: 1rem;
+    margin-inline: 0;
+  }
+
+  .ginko-editor__surface .ProseMirror pre {
+    background: var(--ginko-muted);
+    border-radius: .5rem;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+
+  .ginko-editor__surface .ProseMirror > :first-child {
+    margin-top: 0;
+  }
+
+  .ginko-editor__surface .ProseMirror > * + * {
+    margin-block-start: 1em;
+  }
+
+  .ginko-editor__surface .ProseMirror h1,
+  .ginko-editor__surface .ProseMirror h2,
+  .ginko-editor__surface .ProseMirror h3 {
+    line-height: 1.2;
+    letter-spacing: -.02em;
+  }
+
+  .ginko-editor__surface .ProseMirror div[data-type='Slot'] {
+    position: relative;
+    min-height: 3.5rem;
+    border: 1px dashed var(--ginko-border);
+    border-radius: .5rem;
+    padding: 1.8rem .7rem .5rem;
+  }
+
+  .ginko-editor__surface .ProseMirror div[data-type='Slot']::before {
+    position: absolute;
+    inset-block-start: .45rem;
+    inset-inline-start: .6rem;
+    content: attr(name);
+    color: var(--ginko-muted-foreground);
+    font-size: .68rem;
+    font-weight: 650;
+    text-transform: uppercase;
+  }
+
+  .ginko-editor__surface .ProseMirror img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .ginko-editor__surface table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ginko-editor__surface td, .ginko-editor__surface th {
+    border: 1px solid var(--ginko-border);
+    padding: .5rem;
+  }
+
+  .ginko-editor__source {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 280px;
+    resize: vertical;
+    border: 0;
+    background: var(--ginko-background);
+    color: var(--ginko-foreground);
+    padding: 1rem;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    outline: none;
+  }
+
+  @media (max-width: 34rem) {
+    :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) button {
+      min-height: 2.75rem;
+    }
+    .ginko-editor__header {
+      grid-template-columns: 1fr auto;
+    }
+    .ginko-editor__status {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      padding-inline: .65rem;
+    }
+    .ginko-editor__surface {
+      padding: 1rem;
+    }
+    .ginko-editor__surface .ProseMirror {
+      min-height: 18rem;
+    }
+  }
+}

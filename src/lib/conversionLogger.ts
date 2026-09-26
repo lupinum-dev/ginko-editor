@@ -1,5 +1,4 @@
 import type { ConversionIssue, ConversionPhase, ConversionTraceEvent } from './conversionTypes'
-import { editorDebug } from './debug'
 
 interface ConversionTraceHandle {
   traceId: string
@@ -29,10 +28,6 @@ export function startTrace(data?: Record<string, unknown>): ConversionTraceHandl
     ],
   }
 
-  editorDebug.log('conversion trace started', {
-    traceId: trace.traceId,
-    ...data,
-  })
 
   return trace
 }
@@ -48,11 +43,6 @@ export function logPhase(
     phase,
     data,
   })
-  editorDebug.log('conversion phase', {
-    traceId: trace.traceId,
-    phase,
-    ...data,
-  })
 }
 
 export function logIssue(trace: ConversionTraceHandle, issue: ConversionIssue) {
@@ -67,17 +57,9 @@ export function logIssue(trace: ConversionTraceHandle, issue: ConversionIssue) {
   })
 
   if (issue.severity === 'error') {
-    editorDebug.error('conversion issue', {
-      traceId: trace.traceId,
-      issue,
-    })
     return
   }
 
-  editorDebug.warn('conversion issue', {
-    traceId: trace.traceId,
-    issue,
-  })
 }
 
 export function finishTrace(
@@ -88,10 +70,6 @@ export function finishTrace(
     at: nowIso(),
     kind: 'finish',
     data,
-  })
-  editorDebug.log('conversion trace finished', {
-    traceId: trace.traceId,
-    ...data,
   })
   return trace.timeline
 }

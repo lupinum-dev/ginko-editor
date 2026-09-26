@@ -1,0 +1,258 @@
+/* Container items: tabs, accordions, steps, grids, timelines, and stacks. */
+@layer ginko {
+  .ginko-editor [data-ginko-item-hidden='true'] {
+    display: none !important;
+  }
+
+  .ginko-editor .ginko-items__strip {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    min-width: 0;
+    margin: .3rem 0 .6rem;
+    border-bottom: 1px solid var(--ginko-border);
+  }
+
+  .ginko-editor .ginko-items__strip[hidden],
+  .ginko-editor .ginko-items__footer[hidden],
+  .ginko-editor .ginko-items__add[hidden] {
+    display: none;
+  }
+
+  .ginko-editor .ginko-items__tabs {
+    display: flex;
+    gap: .15rem;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .ginko-editor .ginko-items__tab {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+  }
+
+  .ginko-editor .ginko-items__tab[data-active='true'] {
+    border-bottom-color: var(--ginko-foreground);
+  }
+
+  .ginko-editor .ginko-items__tab > [role='tab'] {
+    padding: .3rem .5rem;
+    border: 0;
+    border-radius: .3rem .3rem 0 0;
+    background: transparent;
+    color: var(--ginko-muted-foreground);
+    font: 500 .8rem/1.5 ui-sans-serif, system-ui, sans-serif;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .ginko-editor .ginko-items__tab[data-active='true'] > [role='tab'],
+  .ginko-editor .ginko-items__tab > [role='tab']:hover {
+    color: var(--ginko-foreground);
+  }
+
+  .ginko-editor .ginko-items__tab > [role='tab']:focus-visible,
+  .ginko-editor .ginko-items__add:focus-visible,
+  .ginko-editor .ginko-block__collapse:focus-visible {
+    outline: 2px solid var(--ginko-ring);
+    outline-offset: -2px;
+  }
+
+  .ginko-editor .ginko-items__rename {
+    width: 12ch;
+    margin: .15rem .25rem;
+    padding: .1rem .3rem;
+    border: 1px solid var(--ginko-input);
+    border-radius: .3rem;
+    background: var(--ginko-background);
+    color: var(--ginko-foreground);
+    font: 500 .8rem/1.5 ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .ginko-editor .ginko-items__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ginko-muted-foreground);
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .ginko-editor .ginko-items__remove svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .ginko-editor .ginko-items__tab:hover > .ginko-items__remove,
+  .ginko-editor .ginko-items__tab[data-active='true'] > .ginko-items__remove {
+    opacity: .7;
+  }
+
+  .ginko-editor .ginko-items__remove[data-confirm='true'] {
+    opacity: 1;
+    color: var(--ginko-destructive);
+    background: color-mix(in srgb, var(--ginko-destructive) 10%, transparent);
+  }
+
+  .ginko-editor .ginko-items__add {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .55rem;
+    border: 1px dashed var(--ginko-border);
+    border-radius: .4rem;
+    background: transparent;
+    color: var(--ginko-muted-foreground);
+    font: 500 .75rem/1.5 ui-sans-serif, system-ui, sans-serif;
+    cursor: pointer;
+  }
+
+  .ginko-editor .ginko-items__add:hover {
+    color: var(--ginko-foreground);
+    background: var(--ginko-muted);
+  }
+
+  .ginko-editor .ginko-items__add--strip {
+    flex: 0 0 auto;
+    padding: .2rem;
+    border: 0;
+  }
+
+  .ginko-editor .ginko-items__add svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .ginko-editor .ginko-items__footer {
+    margin-top: .5rem;
+  }
+
+  /* Tab children: the strip shows the name. */
+  .ginko-editor .ginko-block[data-ginko-item='tabs'] {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .ginko-editor .ginko-block[data-ginko-item='tabs'] > .ginko-block__header > :is(.ginko-block__title, .ginko-block__label) {
+    display: none;
+  }
+
+  /* Grid: the column count follows the container property. */
+  .ginko-editor .ginko-block[data-items='grid'] > .ginko-block__body > .ginko-block__content {
+    display: grid;
+    grid-template-columns: repeat(var(--ginko-item-columns, 2), minmax(0, 1fr));
+    gap: .6rem;
+  }
+
+  .ginko-editor .ginko-block[data-items='grid'] > .ginko-block__body > .ginko-block__content > * {
+    margin: 0;
+  }
+
+  /* Steps: a number beside each step heading and a line beside its content. */
+  .ginko-editor [data-ginko-item='steps'] {
+    position: relative;
+    margin-left: 0;
+    padding-left: 2.1rem;
+  }
+
+  .ginko-editor [data-ginko-item='steps']::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: -.6rem;
+    left: .7rem;
+    width: 1px;
+    background: var(--ginko-border);
+  }
+
+  .ginko-editor [data-ginko-item='steps'][data-ginko-item-start='true']::before {
+    content: attr(data-ginko-item-index);
+    position: absolute;
+    z-index: 1;
+    top: .15em;
+    left: 0;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 999px;
+    background: var(--ginko-muted);
+    color: var(--ginko-foreground);
+    font: 600 .75rem/1.45rem ui-sans-serif, system-ui, sans-serif;
+    text-align: center;
+  }
+
+  .ginko-editor [data-ginko-item='steps'][data-ginko-item-start='true']::after {
+    top: 1.8rem;
+  }
+
+  /* Timeline: a marker beside each event. */
+  .ginko-editor .ginko-block[data-ginko-item='timeline'] {
+    margin-left: 1.3rem;
+  }
+
+  .ginko-editor .ginko-block[data-ginko-item='timeline']::after {
+    content: '';
+    position: absolute;
+    top: 1.05rem;
+    left: -1.05rem;
+    width: .55rem;
+    height: .55rem;
+    border: 2px solid var(--ginko-background);
+    border-radius: 999px;
+    background: var(--ginko-tone-info);
+    box-shadow: 0 0 0 1px var(--ginko-border);
+  }
+
+  .ginko-editor .ginko-block[data-items='timeline'] > .ginko-block__body > .ginko-block__content {
+    border-left: 1px solid var(--ginko-border);
+    margin-left: .35rem;
+    padding-left: 0;
+  }
+
+  /* Accordion items collapse in this view only. */
+  .ginko-editor .ginko-block__collapse {
+    width: 22px;
+    height: 22px;
+    min-height: 22px;
+    margin-left: -.35rem;
+  }
+
+  .ginko-editor .ginko-block__collapse[hidden] {
+    display: none;
+  }
+
+  .ginko-editor .ginko-block__collapse svg {
+    transition: transform 120ms;
+  }
+
+  .ginko-editor .ginko-block__collapse[aria-expanded='false'] svg {
+    transform: rotate(-90deg);
+  }
+
+  .ginko-editor .ginko-block[data-ginko-item-collapsed='true'] > .ginko-block__body {
+    display: none;
+  }
+
+  /* Stack items and accordion items sit close together. */
+  .ginko-editor .ginko-block[data-items='accordion'] > .ginko-block__body > .ginko-block__content > [data-ginko-item] + [data-ginko-item],
+  .ginko-editor .ginko-block[data-items='stack'] > .ginko-block__body > .ginko-block__content > [data-ginko-item] + [data-ginko-item] {
+    margin-top: .5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ginko-editor .ginko-block__collapse svg {
+      transition: none;
+    }
+  }
+}

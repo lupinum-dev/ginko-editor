@@ -44,7 +44,10 @@ export const learningObjectiveSource = {
     id: 'learning-objective',
     label: 'Learning objective',
     source:
-      '<learning-objective title="Understand the contract" assessed>\nExplain the outcome in plain language.\n\n<template #tip>\nKeep the example concrete.\n</template>\n</learning-objective>',
+      '<learning-objective title="Understand the contract" assessed>\n' +
+      'Explain the outcome in plain language.\n\n' +
+      '<template #tip>\nKeep the example concrete.\n</template>\n' +
+      '</learning-objective>',
   }],
 } as const satisfies AuthoringKitSourceV1
 
@@ -56,11 +59,21 @@ export const hostNoteSource = {
   policy: {
     version: 2,
     components: {
-      'host-note': { kind: 'block', media: null, props: {}, slots: ['default'], allowedParents: null, allowedChildren: null },
+      'host-note': {
+        kind: 'block',
+        media: null,
+        props: {},
+        slots: ['default'],
+        allowedParents: null,
+        allowedChildren: null,
+      },
     },
   },
   authoring: {
-    'host-note': { label: 'Host note', description: 'Available only in the isolated editor.' },
+    'host-note': {
+      label: 'Host note',
+      description: 'Available only in the isolated editor.',
+    },
   },
   recipes: [{
     id: 'host-note',

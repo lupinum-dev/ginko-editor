@@ -1,16 +1,15 @@
-import { componentView } from '../nodeviews/component'
 import type { Content } from '@tiptap/core'
 import { InputRule, mergeAttributes, Node } from '@tiptap/core'
 
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
 import type { JsonRecord } from '../../types'
 import type { EditorOverlayController } from '../../ui/context'
 
 export interface ElementOptions {
   overlay?: EditorOverlayController
   getOutputOptions?: () => TiptapToMDCOptions
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  getAuthoringKit?: () => AuthoringKit | undefined
   HTMLAttributes: JsonRecord
 }
 
@@ -110,10 +109,6 @@ export const Element = Node.create<ElementOptions>({
 
   parseHTML() {
     return [{ tag: 'div[data-type="element"]' }]
-  },
-
-  addNodeView() {
-    return props => componentView(props, () => this.options.getAuthoringKit?.(), () => this.options.getOutputOptions?.() ?? {}, this.options.overlay)
   },
 
   renderHTML({ HTMLAttributes }) {
