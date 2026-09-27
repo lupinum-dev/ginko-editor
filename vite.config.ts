@@ -14,6 +14,8 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     include: ['test/**/*.test.ts'],
+    // Vue/jsdom integration checks need headroom on shared development machines.
+    testTimeout: 15_000,
   },
   build: {
     lib: {
