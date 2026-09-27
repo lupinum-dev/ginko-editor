@@ -1,7 +1,0 @@
-version: 2
-updates:
-  # Renovate does not manage actions. Keep the 24-hour dependency quarantine.
-  - package-ecosystem: github-actions
-    directory: /
-    schedule: { interval: weekly }
-    cooldown: { default-days: 1 }

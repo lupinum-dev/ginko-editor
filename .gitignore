@@ -2,6 +2,9 @@ node_modules
 .pnpm-store
 .npm-cache
 dist
+release
+.pack
+# Preserve local artifacts from the retired workflow.
 release-artifacts
 .preview-artifacts
 .nuxt

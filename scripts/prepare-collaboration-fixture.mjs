@@ -6,13 +6,13 @@ import { dirname, join, resolve } from 'node:path'
 // Remove the default candidate when Content 1.0.0-beta.10 is published (internals/migrations.md).
 const contentArchive = process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz'
 const manifest = JSON.parse(await readFile('package.json', 'utf8'))
-const contentDependency = contentArchive ? `file:${resolve(contentArchive)}` : manifest.dependencies['@lupinum/ginko-content']
+const contentDependency = contentArchive ? `file:${resolve(contentArchive)}` : manifest.devDependencies['@lupinum/ginko-content']
 const legacy = join(homedir(), '.convex/anonymous-convex-backend-state/anonymous-agent')
 let legacyExists = false
 try { await access(legacy); legacyExists = true } catch { /* New anonymous deployment uses project-local storage. */ }
 if (legacyExists) throw new Error('An existing anonymous-agent deployment would be reused. Use a separate named local fixture instead.')
-const release = JSON.parse(await readFile('release-artifacts/release.json', 'utf8'))
-const archive = resolve('release-artifacts', release.packages[0].filename)
+if (!process.env.GINKO_EDITOR_TARBALL) throw new Error('Set GINKO_EDITOR_TARBALL to the Editor archive to verify.')
+const archive = resolve(process.env.GINKO_EDITOR_TARBALL)
 await access(archive)
 if (contentArchive) await access(contentArchive)
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-convex-'))

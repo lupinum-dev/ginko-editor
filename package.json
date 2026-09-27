@@ -38,7 +38,8 @@
       "import": "./dist/collaboration.js"
     },
     "./style.css": "./dist/style.css",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./agent-docs": "./dist/agent/AGENTS.md"
   },
   "types": "./dist/index.d.ts",
   "files": [
@@ -51,22 +52,23 @@
     "access": "public"
   },
   "scripts": {
-    "check:dependencies": "node scripts/check-dependency-policy.mjs",
-    "audit:all": "pnpm audit",
-    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/fix-declaration-imports.mjs",
+    "build:library": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/fix-declaration-imports.mjs",
+    "build": "pnpm build:library && pnpm docs:build && pnpm docs:agent",
+    "changeset": "changeset",
     "docs:build": "pnpm --dir docs build",
-    "dev": "pnpm build && pnpm docs:dev",
+    "docs:agent": "node scripts/agent-docs.mjs",
+    "dev": "pnpm build:library && pnpm docs:dev",
     "docs:dev": "pnpm --dir docs dev",
-    "lint": "eslint .",
-    "pack:release": "node scripts/pack-release.mjs",
-    "preview:pack": "node scripts/pack-release.mjs --preview",
-    "release:prepare": "changelogen --bump --clean",
-    "release:verify": "pnpm audit:all && pnpm verify && pnpm pack:release && node scripts/verify-packed-consumer.mjs",
-    "test": "vitest run",
+    "lint": "eslint . && node scripts/lint-changesets.mjs",
+    "test": "vitest run && node --test scripts/*.test.mjs",
+    "test:packed": "node scripts/test-packed.mjs",
+    "test:compat": "pnpm build:library && pnpm typecheck && pnpm test",
     "typecheck": "vue-tsc --noEmit",
-    "verify": "pnpm check:dependencies && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm docs:build"
+    "verify": "pnpm audit --audit-level=high && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:packed"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "0.7.0",
+    "@changesets/cli": "2.31.0",
     "@eslint/js": "10.0.1",
     "@lupinum/ginko-content": "1.0.0-beta.10",
     "@tiptap/core": "3.31.3",
@@ -75,7 +77,6 @@
     "@types/node": "26.1.1",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/test-utils": "^2.4.10",
-    "changelogen": "0.6.2",
     "eslint": "^10.4.1",
     "eslint-plugin-vue": "^10.9.0",
     "jsdom": "^29.1.1",

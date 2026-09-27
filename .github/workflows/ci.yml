@@ -1,45 +1,58 @@
 name: ci
 
 on:
-  push: { branches: [main] }
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: '17 3 * * 1'
-    - cron: '23 4 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event.schedule }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
-    name: Verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with: { persist-credentials: false }
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with: { node-version: 24.18.0, package-manager-cache: false }
-      - run: corepack enable pnpm && corepack prepare pnpm@11.21.0 --activate
-      - if: github.event.schedule == '23 4 * * *'
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - if: github.event.schedule != '23 4 * * *'
-        run: pnpm install --frozen-lockfile
-      # The action check imports `yaml`, so it must run after installation.
-      - run: node scripts/verify-action-shas.mjs
-      - if: github.event.schedule == '23 4 * * *'
-        run: pnpm check:dependencies
-      - if: github.event.schedule != '23 4 * * *'
-        run: pnpm release:verify
-      - if: github.event.schedule != '23 4 * * *'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: release-candidate
-          path: release-artifacts
-          if-no-files-found: error
-          retention-days: 90
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+
+  compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.18.0
+          package-manager-cache: false
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:compat
+
+  ci:
+    name: ci
+    if: always()
+    needs: [verify, compatibility]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - env:
+          VERIFY: ${{ needs.verify.result }}
+          COMPATIBILITY: ${{ needs.compatibility.result }}
+        run: test "$VERIFY" = success && test "$COMPATIBILITY" = success
