@@ -118,7 +118,13 @@ jobs:
           own="$(git ls-tree -r --name-only HEAD | grep -E "$manifests" |
             while read -r file; do git show "HEAD:$file"; done | jq -s '[.[].name | strings]')"
           # shellcheck disable=SC2016 # a jq program: $own and $name are jq variables
-          normalize='del(.version) | reduce ($own[]) as $name (.; reduce ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies") as $field (.; if .[$field][$name]? then .[$field][$name] = "own" else . end))'
+          # Normalize only numeric versions, retaining protocol and range operator. Wrap both
+          # recognized and unchanged values so an input cannot impersonate a normalization marker.
+          normalize='def own_range:
+            if type == "string" and test("^(?<prefix>(workspace:)?[~^]?)[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z-]+([.][0-9A-Za-z-]+)*)?([+][0-9A-Za-z-]+([.][0-9A-Za-z-]+)*)?$")
+            then {kind: "version-range", prefix: capture("^(?<prefix>(workspace:)?[~^]?)").prefix}
+            else {kind: "unmodified", value: .} end;
+            del(.version) | reduce ($own[]) as $name (.; reduce ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies") as $field (.; if .[$field][$name]? then .[$field][$name] |= own_range else . end))'
           manifest=""
           for file in $(git diff --cached --name-only --no-renames | grep -E "$manifests" || true); do
             diff <(git show "HEAD:$file" | jq -S --argjson own "$own" "$normalize") \
