@@ -58,5 +58,5 @@ const accepted = await applyCollaborationSteps(snapshot, { ...snapshot, clientId
   steps: unrelated.steps.map(step => JSON.stringify(step.toJSON())),
 }, options)
 assert.equal(accepted.markdown, '::note\nBody\n::\n\nUnrelated After\n')
-assert.deepEqual(JSON.parse(accepted.snapshot.document), unrelated.doc.toJSON())
+assert.equal(accepted.snapshot.document, JSON.stringify(unrelated.doc.toJSON()))
 assert.deepEqual(JSON.parse(accepted.snapshot.document).content[0].attrs.props, {})
