@@ -175,7 +175,11 @@ const uploadImage: ImageUploadHandler = async (file, { signal }) => {
 
 Return a durable URL, or an `id` with an `asset-provider` that resolves it for
 display. The provider's safe display URL takes precedence over the stored image
-source. Match stored references to the consuming Content policy; native image
+source. A host-policy `image` keeps native controls after reload when its stable
+`id` equals `src` and its complete property and media contract matches native
+image editing. Restricted or extended image policies keep component controls so
+native actions cannot write unsupported properties.
+Match stored references to the consuming Content policy; native image
 URLs support site-relative paths such as `/images/photo.png`. Use
 `image-output="markdown"` for native Markdown; the default MDC output also
 preserves supported image dimensions and crop/focal metadata.

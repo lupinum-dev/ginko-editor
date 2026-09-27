@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep native image replacement and description controls after reopening a
+  canonical host-policy image. Restricted and extended image components retain
+  their own controls and authored properties.
+
 ### Breaking changes and migration
 
 - Install `@lupinum/ginko-content` in the host. It is now a peer dependency
