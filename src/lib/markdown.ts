@@ -17,6 +17,14 @@ type ComarkElementNode = [string, Record<string, unknown>, ...ComarkNode[]]
 type ComarkCommentNode = [null, Record<string, unknown>, string]
 type ComarkNode = string | ComarkElementNode | ComarkCommentNode
 
+// Older Editor commands persisted components without source-origin metadata.
+// Preserve their colon default until hosts reseed those rooms from canonical
+// Markdown. Explicit origins on newly inserted or parsed nodes take precedence.
+// The intersection also accepts the older Content candidate's option type.
+const legacyRoomSerialization: NonNullable<Parameters<typeof serializeMdcDocument>[1]> & { componentSyntax: 'colon' } = {
+  componentSyntax: 'colon',
+}
+
 const TABLE_SECTION_TAGS = new Set(['thead', 'tbody', 'tfoot'])
 
 /** Adapt one canonical parse result to the editor's lossless conversion tree. */
@@ -59,7 +67,7 @@ export async function stringifyMdc(
     frontmatter: {},
     meta: {},
     nodes: mdcNodesToComark(cleaned.children || [], options),
-  })
+  }, legacyRoomSerialization)
   if (!markdown.trim()) return ''
   return markdown.endsWith('\n') ? markdown : `${markdown}\n`
 }

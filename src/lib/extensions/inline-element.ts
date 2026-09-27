@@ -45,7 +45,7 @@ export const InlineElement = Node.create<InlineElementOptions>({
         ({ chain, state }) =>
           chain()
             .insertContentAt(state.selection.from, {
-              attrs: { tag },
+              attrs: { tag, props: { $: { syntax: 'angle', block: 0, sourceName: tag.charAt(0).toUpperCase() + tag.slice(1) } } },
               type: 'inline-element',
             })
             .run(),
@@ -56,7 +56,7 @@ export const InlineElement = Node.create<InlineElementOptions>({
     return [
       textInputRule({
         find: INLINE_ELEMENT_INPUT_RULE_FIND,
-        getAttributes: (match: string[]) => ({ tag: match[2] }),
+        getAttributes: (match: string[]) => ({ tag: match[2], props: { $: { syntax: 'colon', block: 0, sourceName: match[2] } } }),
         getText: (match: string[]) => match[3] ?? '',
         type: this.type,
       }),
