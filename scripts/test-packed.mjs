@@ -166,6 +166,7 @@ async function verifyVueConsumer(consumer) {
         '@tiptap/core': '3.31.3',
         '@tiptap/pm': '3.31.3',
         '@tiptap/vue-3': '3.31.3',
+        'reka-ui': pkg.dependencies['reka-ui'],
         vue: '3.5.42',
       },
       devDependencies: {
@@ -233,6 +234,7 @@ async function verifyNuxtConsumer(consumer) {
         '@tiptap/core': '3.31.3',
         '@tiptap/pm': '3.31.3',
         '@tiptap/vue-3': '3.31.3',
+        'reka-ui': pkg.dependencies['reka-ui'],
         nuxt: '4.5.2',
         vue: '3.5.42',
       },
