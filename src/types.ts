@@ -37,6 +37,7 @@ export interface AssetInfo {
 }
 
 export interface AssetProvider {
+  /** Replace this method on a reactive provider when display URLs become available. */
   buildUrl: (asset: Partial<AssetInfo>) => string
   parseUrl: (url: string) => Partial<AssetInfo> | null
 }

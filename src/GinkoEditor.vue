@@ -217,6 +217,8 @@ watch([() => props.disabled, binding.state, binding.invalidBinding], ([disabled]
 watch([
   () => props.imageDropTarget,
   () => props.assetProvider,
+  () => props.assetProvider?.buildUrl,
+  () => props.assetProvider?.parseUrl,
   () => props.enableImageMetadata,
   () => props.enableImages,
   () => props.placeholder,

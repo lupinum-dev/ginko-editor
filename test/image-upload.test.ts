@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { flushPromises, mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GinkoEditor from '../src/GinkoEditor.vue'
 import { insertImageNode } from './helpers/assets'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import type { AssetInfo, ImageUploadHandler } from '../src/types'
+import type { AssetInfo, AssetProvider, ImageUploadHandler } from '../src/types'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
@@ -110,6 +111,32 @@ describe('inline image uploads', () => {
     expect(editor.state.doc).toBe(uploaded)
     expect(editor.state.doc.child(1).attrs.props).toMatchObject({ id: '/stored-photo', alt: 'Keep this description' })
     editor.commands.undo(); expect(editor.state.doc.eq(before)).toBe(true)
+  })
+
+  it('repaints stable reactive provider methods without changing the document or canceling an upload', async () => {
+    const task = deferred(); let signal: AbortSignal | undefined
+    const wrapper = await mountEditor((_file, context) => { signal = context.signal; return task.promise })
+    const provider = reactive<AssetProvider>({ buildUrl: () => '', parseUrl: () => null })
+    await wrapper.setProps({ assetProvider: provider })
+    insertImageNode(wrapper, { id: '/stored-photo', alt: 'Stable asset' })
+    await flushPromises()
+    const image = wrapper.get('.ginko-image img').element
+    const editor = wrapper.vm.getEditor()!
+    await add(wrapper); await choose(wrapper)
+    const document = editor.state.doc
+    provider.buildUrl = () => '/late-display.png'
+    await flushPromises()
+    expect(wrapper.get('.ginko-image img').element).toBe(image)
+    expect(wrapper.get('.ginko-image img').attributes('src')).toBe('/late-display.png')
+    expect(editor.state.doc).toBe(document)
+    expect(signal?.aborted).toBe(false)
+    task.resolve({ id: '/uploaded-photo' }); await flushPromises()
+    expect(wrapper.find('.ginko-image-upload').exists()).toBe(false)
+    expect(await wrapper.vm.flush()).toMatchObject({ ok: true })
+    const source = wrapper.emitted('update:modelValue')?.at(-1)?.[0]
+    expect(source).toContain('/stored-photo')
+    expect(source).toContain('/uploaded-photo')
+    expect(source).not.toContain('/late-display.png')
   })
 
   it('validates dropped files and allows retry after a host failure', async () => {
