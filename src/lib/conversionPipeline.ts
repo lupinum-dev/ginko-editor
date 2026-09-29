@@ -351,10 +351,8 @@ function normalizeComarkNodes(nodes: unknown[]): unknown[] {
       // Component identity and inline/block placement carry the meaning.
       props.$ = { component: 1, block: metadata.block }
     }
-    if (tag === 'a' && props.target === '_blank' && props.rel === 'noopener noreferrer nofollow') {
-      delete props.target
-      delete props.rel
-    }
+    // The serializer omits the schema's default `rel`.
+    if (tag === 'a' && props.rel === 'noopener noreferrer nofollow') delete props.rel
     const normalizedChildren = normalizeComarkNodes(children)
     if (
       tag === 'p' &&
