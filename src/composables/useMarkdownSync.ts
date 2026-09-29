@@ -51,6 +51,8 @@ export function useMarkdownSync(options: MarkdownSyncOptions) {
   const rawContent = ref(options.getModelValue())
   const conversionError = ref<ConversionErrorPayload | null>(null)
   const hasPendingVisualChanges = ref(false)
+  /** False until the first source has been converted, or has failed to convert. */
+  const loaded = ref(false)
   let pendingEcho: string | undefined
   let revision = 0
   let syncTimer: ReturnType<typeof globalThis.setTimeout> | undefined
@@ -281,8 +283,11 @@ export function useMarkdownSync(options: MarkdownSyncOptions) {
   })
 
   onMounted(() => {
-    if (session && editor.value) scheduleVisualUpdate(editor.value)
-    else void loadSource(options.getModelValue(), { initial: true })
+    if (session && editor.value) {
+      scheduleVisualUpdate(editor.value)
+      loaded.value = true
+    }
+    else void loadSource(options.getModelValue(), { initial: true }).finally(() => { loaded.value = true })
   })
 
   onBeforeUnmount(() => {
@@ -295,6 +300,7 @@ export function useMarkdownSync(options: MarkdownSyncOptions) {
     rawContent,
     conversionError,
     hasPendingVisualChanges,
+    loaded,
     /** Changes whenever the canvas document is replaced or edited. */
     revision: () => revision,
     isDisposed: () => disposed,

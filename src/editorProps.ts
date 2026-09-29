@@ -2,12 +2,46 @@ import type { AuthoringKit } from './authoring'
 import type { EditorCollaborationSession } from './collaboration'
 import { defaultImageMaxBytes } from './lib/extensions/image-upload'
 import type { AssetProvider, ImagePicker, ImageUploadHandler } from './types'
+import type { EditorProfileName } from './lib/profiles'
 import type { EditorMessages, EditorShortcuts, EditorToolbarGroup } from './ui/commands'
 
 /** Props of the `GinkoEditor` component. All props except `collaboration` are reactive. */
 export interface GinkoEditorProps {
   /** The canonical Markdown (MDC) source. Use with `v-model`. */
   modelValue: string
+  /**
+   * `default` is a framed editor with a header. `inline` has no frame, header,
+   * or source switch and inherits the host's typography, for editing text in place.
+   */
+  variant?: 'default' | 'inline'
+  /** Shows the header with the insert button, mode switch, and status. Defaults to true for the default variant. */
+  header?: boolean
+  /** Shows the switch between visual editing and Markdown source. Defaults to true for the default variant. */
+  sourceToggle?: boolean
+  /**
+   * Where the formatting row appears. `top` is above the writing surface.
+   * `keyboard` docks it to the bottom of the visible viewport while the editor
+   * has focus, so it stays above an on-screen keyboard. `auto` uses `keyboard`
+   * on touch devices and otherwise `top` (default variant) or no row (inline
+   * variant). `false` shows no row. Defaults to `top` for the default variant
+   * and `auto` for the inline variant.
+   */
+  toolbarPlacement?: 'top' | 'keyboard' | 'auto' | false
+  /**
+   * The floating toolbar over selected text. `auto` shows it only on devices
+   * with a precise pointer, because touch devices show their own selection menu.
+   */
+  selectionToolbar?: 'auto' | 'always' | false
+  /** Groups of commands in the floating selection toolbar. */
+  selectionToolbarItems?: readonly EditorToolbarGroup[]
+  /**
+   * The content that writers can create: `plain`, `inline` (bold, italic,
+   * link), `article`, or `full`. It limits toolbar, shortcuts, slash menu,
+   * input rules, and paste. Read once when the editor mounts; remount the
+   * editor to use another profile. Content loaded from `modelValue` is not
+   * changed, so also enforce the profile where you store the document.
+   */
+  profile?: EditorProfileName
   /** Groups of built-in toolbar commands. */
   toolbarItems?: readonly EditorToolbarGroup[]
   /** Replacement interface text. Missing keys use the English defaults. */
@@ -66,6 +100,13 @@ export interface GinkoEditorProps {
 }
 
 export const editorPropDefaults = {
+  variant: 'default',
+  header: undefined,
+  sourceToggle: undefined,
+  toolbarPlacement: undefined,
+  selectionToolbar: 'auto',
+  selectionToolbarItems: undefined,
+  profile: 'full',
   codeBlockTheme: 'github-dark',
   toolbarItems: undefined,
   messages: undefined,
