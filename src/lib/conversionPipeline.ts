@@ -21,6 +21,7 @@ import type {
 } from './conversionTypes'
 import { adaptMdcDocument, stringifyMdc } from './markdown'
 import { mdcToTiptap } from './mdcToTiptap'
+import { profileExemptMeta } from './profiles'
 import type { TiptapToMDCOptions } from './tiptapToMdc'
 import { tiptapToMDC } from './tiptapToMdc'
 
@@ -467,6 +468,7 @@ export function applyTiptapDocToEditor(
     const tr = editor.state.tr
       .replaceWith(0, editor.state.doc.content.size, nextDoc.content)
       .setMeta('addToHistory', false)
+      .setMeta(profileExemptMeta, true)
     tr.setSelection(
       TextSelection.between(
         tr.doc.resolve(Math.min(from, tr.doc.content.size)),

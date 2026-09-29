@@ -27,6 +27,8 @@ interface DocumentExtensionOptions {
   resolveAsset?: (props: JsonRecord) => string | null | undefined
   showMarkdownMarkers?: boolean
   codeBlockTheme?: string
+  /** Levels that commands and input rules can create. The schema accepts all six. */
+  headingLevels?: readonly number[]
 }
 
 /** Schema-affecting definitions are shared by the canvas and server conversion. */
@@ -40,7 +42,7 @@ export function createDocumentExtensions(options: DocumentExtensionOptions = {})
       link: { HTMLAttributes: { target: null }, defaultProtocol: 'https', openOnClick: false },
     }),
     Heading.configure({
-      levels: [1, 2, 3, 4, 5, 6],
+      levels: [...(options.headingLevels ?? [1, 2, 3, 4, 5, 6])],
       showMarkers: options.showMarkdownMarkers ?? false,
     }),
     Table.extend({
