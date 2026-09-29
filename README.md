@@ -91,9 +91,24 @@ The editor does not import Nuxt, the CMS, Convex, or an application router.
 The component handle, from a template ref, has the type `GinkoEditorHandle`:
 `flush()`, `hasPendingChanges()`, `removeSelectedMedia()`, `focus(position?)`, and
 `getEditor()`. `getEditor()` returns the TipTap editor as an unstable escape hatch.
-All props are reactive except `collaboration`, which the editor reads once when it
-mounts. New inline callbacks and equal authoring kits do not cancel uploads or
+All props are reactive except `collaboration` and `profile`, which the editor reads
+once when it mounts. New inline callbacks and equal authoring kits do not cancel uploads or
 reload the document.
+
+## Edit text in place
+
+`variant="inline"` edits text where it appears on the page, with the host's
+typography and no frame, header, or source switch. `profile` limits what a
+writer can create: `plain`, `inline` (bold, italic, link), `article`, or `full`.
+It applies to the toolbar, shortcuts, the slash menu, Markdown input rules, and
+paste. On touch devices the formatting row docks above the on-screen keyboard
+and the floating selection toolbar is off. `germanMessages` is a complete German
+message set. See [Edit text in place](docs/content/docs/1.getting-started/8.in-place-editing.md).
+
+## Agent skill
+
+The package ships an agent skill in `skills/ginko-editor`. Point your coding
+agent at it to embed and configure the editor correctly.
 
 ## Writing and component previews
 
