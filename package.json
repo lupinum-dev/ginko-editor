@@ -1,6 +1,6 @@
 {
   "name": "@lupinum/ginko-editor",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "A portable Vue editor for Ginko content.",
   "type": "module",
   "sideEffects": [
@@ -72,7 +72,7 @@
     "@changesets/changelog-github": "0.7.0",
     "@changesets/cli": "2.31.0",
     "@eslint/js": "10.0.1",
-    "@lupinum/ginko-content": "1.0.0-beta.10",
+    "@lupinum/ginko-content": "1.0.0-beta.11",
     "@tiptap/core": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "@tiptap/vue-3": "3.31.4",
@@ -92,7 +92,7 @@
     "yaml": "2.9.0"
   },
   "peerDependencies": {
-    "@lupinum/ginko-content": ">=1.0.0-beta.10 <2",
+    "@lupinum/ginko-content": ">=1.0.0-beta.11 <2",
     "@tiptap/core": "^3.31.4",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/vue-3": "^3.31.4",

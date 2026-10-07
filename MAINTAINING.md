@@ -7,7 +7,7 @@ or a compatible published fix, whichever comes first. `pnpm audit:all`
 checks the raw audit against these paths and rejects every advisory in the
 Editor published dependency graph, regardless of severity. Other dev/build
 advisories still fail at high or critical severity. No package or severity
-is ignored. The content candidate remains unchanged until wave B.
+is ignored. Content uses the published npm beta.11 release.
 
 ### GHSA-86w9-cpqp-85rv (node-forge)
 
@@ -50,7 +50,9 @@ Expires: 2026-11-06T00:00:00Z. The advertised patched version is unpublished.
 - `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>micromatch>braces`
 - `.>@changesets/cli>@changesets/apply-release-plan>@changesets/git>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/git>micromatch>braces`
 - `.>@changesets/cli>@changesets/apply-release-plan>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/apply-release-plan>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/assemble-release-plan>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
@@ -59,6 +61,7 @@ Expires: 2026-11-06T00:00:00Z. The advertised patched version is unpublished.
 - `.>@changesets/cli>@changesets/config>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/config>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/config>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/config>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/assemble-release-plan>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/assemble-release-plan>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
@@ -66,28 +69,26 @@ Expires: 2026-11-06T00:00:00Z. The advertised patched version is unpublished.
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>@changesets/get-dependents-graph>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/pre>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@changesets/read>@changesets/git>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/get-release-plan>@changesets/read>@changesets/git>micromatch>braces`
 - `.>@changesets/cli>@changesets/get-release-plan>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/git>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/git>micromatch>braces`
 - `.>@changesets/cli>@changesets/pre>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@changesets/read>@changesets/git>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
+- `.>@changesets/cli>@changesets/read>@changesets/git>micromatch>braces`
 - `.>@changesets/cli>@changesets/should-skip-package>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
 - `.>@changesets/cli>@manypkg/get-packages>globby>fast-glob>micromatch>braces`
-- `.>@lupinum/ginko-content>globby>fast-glob>micromatch>braces`
-- `.>@lupinum/ginko-content>globby>micromatch>braces`
 - `.>@lupinum/ginko-content>nitropack>globby>fast-glob>micromatch>braces`
 - `.>@lupinum/ginko-content>nitropack>globby>micromatch>braces`
 - `.>@lupinum/ginko-content>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces`
 - `.>@lupinum/ginko-content>nuxt>@nuxt/nitro-server>nitropack>globby>micromatch>braces`
-- `docs>@lupinum/ginko-content>globby>fast-glob>micromatch>braces`
-- `docs>@lupinum/ginko-content>globby>micromatch>braces`
 - `docs>@lupinum/ginko-content>nitropack>globby>fast-glob>micromatch>braces`
 - `docs>@lupinum/ginko-content>nitropack>globby>micromatch>braces`
 - `docs>@lupinum/ginko-content>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces`
 - `docs>@lupinum/ginko-content>nuxt>@nuxt/nitro-server>nitropack>globby>micromatch>braces`
-- `docs>@lupinum/ginko-docs>@lupinum/ginko-content>globby>fast-glob>micromatch>braces`
-- `docs>@lupinum/ginko-docs>@lupinum/ginko-content>globby>micromatch>braces`
 - `docs>@lupinum/ginko-docs>@lupinum/ginko-content>nitropack>globby>fast-glob>micromatch>braces`
 - `docs>@lupinum/ginko-docs>@lupinum/ginko-content>nitropack>globby>micromatch>braces`
 - `docs>@lupinum/ginko-docs>@lupinum/ginko-content>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces`
@@ -116,14 +117,6 @@ Expires: 2026-11-06T00:00:00Z. The advertised patched version is unpublished.
 - `docs>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>globby>micromatch>braces`
 - `docs>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces`
 - `docs>nuxt>@nuxt/nitro-server>nitropack>globby>micromatch>braces`
-
-- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>micromatch>braces`
-- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/git>micromatch>braces`
-- `.>@changesets/cli>@changesets/config>micromatch>braces`
-- `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>micromatch>braces`
-- `.>@changesets/cli>@changesets/get-release-plan>@changesets/read>@changesets/git>micromatch>braces`
-- `.>@changesets/cli>@changesets/git>micromatch>braces`
-- `.>@changesets/cli>@changesets/read>@changesets/git>micromatch>braces`
 
 ### GHSA-x6jw-m9v5-85vh (simple-git)
 

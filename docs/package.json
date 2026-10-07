@@ -9,7 +9,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@lupinum/ginko-content": "1.0.0-beta.10",
+    "@lupinum/ginko-content": "1.0.0-beta.11",
     "@lupinum/ginko-docs": "0.4.0-rc.10",
     "@lupinum/ginko-editor": "workspace:*",
     "nuxt": "^4.5.2",

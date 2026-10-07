@@ -21,7 +21,7 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 - A bundler that resolves package `exports`, such as Vite or Nuxt, on Node.js 22.18 or later.
 - Vue 3.5.40 or later and TipTap 3.31.4 or a later 3.x version in the application.
   The root entry needs `vue` and `@tiptap/vue-3`.
-- `@lupinum/ginko-content` 1.0.0-beta.10 or a later 1.x version. It is a peer
+- `@lupinum/ginko-content` 1.0.0-beta.11 or a later 1.x version. It is a peer
   dependency and supplies the shared CMS contract.
 
 Repository development has separate requirements. Read [CONTRIBUTING.md](CONTRIBUTING.md).
