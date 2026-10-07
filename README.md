@@ -2,8 +2,8 @@
 <h1 align="center">Ginko Editor</h1>
 <p align="center">A portable Vue editor for Ginko content.</p>
 
-> [!WARNING]
-> This package is not published yet. The documented API is the current local release candidate.
+> [!NOTE]
+> Ginko Editor is before 1.0, so a minor release can change the API. Shared editing is experimental.
 
 ## Why use Ginko Editor?
 
