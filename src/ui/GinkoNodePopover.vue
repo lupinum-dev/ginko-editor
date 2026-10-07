@@ -2,17 +2,31 @@
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { ref, watch, type CSSProperties } from 'vue'
 
+interface NodePopoverState {
+  open: boolean
+  label: string
+  container: InstanceType<typeof globalThis.HTMLElement> | string
+  theme: CSSProperties
+  restoreFocus: boolean
+}
+
 const props = defineProps<{
   panel: InstanceType<typeof globalThis.HTMLDivElement>
-  state: { open: boolean; label: string; container: InstanceType<typeof globalThis.HTMLElement> | string; theme: CSSProperties; restoreFocus: boolean }
+  state: NodePopoverState
 }>()
 const emit = defineEmits<{ 'update:open': [open: boolean]; 'restore-focus': [restore: boolean] }>()
 const trigger = ref<InstanceType<typeof globalThis.HTMLButtonElement>>()
 const mountPoint = ref<InstanceType<typeof globalThis.HTMLDivElement>>()
-watch(mountPoint, element => { if (element) element.append(props.panel) }, { flush: 'post' })
+watch(mountPoint, (element) => {
+  if (element) element.append(props.panel)
+}, { flush: 'post' })
+
 function restoreFocus(event: InstanceType<typeof globalThis.Event>) {
   event.preventDefault()
-  if (props.state.restoreFocus && trigger.value?.isConnected) trigger.value.focus({ preventScroll: true })
+
+  if (props.state.restoreFocus && trigger.value?.isConnected) {
+    trigger.value.focus({ preventScroll: true })
+  }
 }
 </script>
 

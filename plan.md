@@ -1,3 +1,10 @@
+> **Shared editor implementation — 2026-09-22.** The current local implementation
+> and verification status is in [the handoff](./internals/editor-handoff.md).
+> It supersedes earlier implementation pauses and pending local CMS acceptance
+> below. Editor, CMS, Luis and ChiliSkills now have verified shared-editing paths.
+> Publication, registry-consumer release gates and production deployment remain
+> separate. The historical decisions and evidence below are retained for context.
+
 > **Scope change — 2026-09-13.** Matthias requested removal of block dragging and
 > block-order controls after trying the playground. This supersedes the movement
 > requirements and their earlier acceptance below. Remove handles, move menus,

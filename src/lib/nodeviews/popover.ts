@@ -8,13 +8,21 @@ let nextPopoverId = 0
 /** Reka owns placement and dismissal; callers retain their native form controls. */
 export function inlinePopover(label: string, symbol: IconName, controller?: EditorOverlayController) {
   const dom = document.createElement('div')
-  dom.className = 'ginko-popover'; dom.contentEditable = 'false'
+  dom.className = 'ginko-popover'
+  dom.contentEditable = 'false'
   const panel = document.createElement('div')
-  panel.className = 'ginko-popover__panel'; panel.setAttribute('role', 'group')
+  panel.className = 'ginko-popover__panel'
+  panel.setAttribute('role', 'group')
   panel.contentEditable = 'false'
   const owner = {}
   const listeners = new Set<(open: boolean) => void>()
-  const state = shallowReactive({ open: false, label, container: 'body' as HTMLElement | string, theme: {} as CSSProperties, restoreFocus: true })
+  const state = shallowReactive({
+    open: false,
+    label,
+    container: 'body' as HTMLElement | string,
+    theme: {} as CSSProperties,
+    restoreFocus: true,
+  })
   let destroyed = false
   let themeObserver: MutationObserver | undefined
   function position() {
@@ -59,22 +67,40 @@ export function inlinePopover(label: string, symbol: IconName, controller?: Edit
     state.restoreFocus = focus
     setOpen(false)
   }
-  const app = createApp(GinkoNodePopover, { panel, state, 'onUpdate:open': setOpen, onRestoreFocus: (restore: boolean) => { state.restoreFocus = restore } })
+  const app = createApp(GinkoNodePopover, {
+    panel,
+    state,
+    'onUpdate:open': setOpen,
+    onRestoreFocus: (restore: boolean) => {
+      state.restoreFocus = restore
+    },
+  })
   // Each node view is a small Vue root. Distinct prefixes keep Reka's generated
   // trigger/content IDs unique across nodes and editor instances.
   app.config.idPrefix = `ginko-node-${++nextPopoverId}`
   app.mount(dom)
   const toggle = dom.querySelector<HTMLButtonElement>('button')!
   toggle.append(icon(symbol))
-  const setLabel = (text: string) => { state.label = text; panel.setAttribute('aria-label', text) }
+  const setLabel = (text: string) => {
+    state.label = text
+    panel.setAttribute('aria-label', text)
+  }
   setLabel(label)
   return {
     dom, toggle, panel, close, position, setLabel,
     isOpen: () => state.open,
     contains: (target: globalThis.Node) => dom.contains(target) || panel.contains(target),
-    onOpenChange(listener: (open: boolean) => void) { listeners.add(listener); return () => listeners.delete(listener) },
+    onOpenChange(listener: (open: boolean) => void) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
     destroy() {
-      close(); destroyed = true; themeObserver?.disconnect(); controller?.release(owner); listeners.clear(); app.unmount()
+      close()
+      destroyed = true
+      themeObserver?.disconnect()
+      controller?.release(owner)
+      listeners.clear()
+      app.unmount()
     },
   }
 }

@@ -1,0 +1,16 @@
+import { applyCollaborationSteps, CollaborationError, type CollaborationSnapshot } from '@lupinum/ginko-editor/runtime'
+
+type IsAny<T> = 0 extends (1 & T) ? true : false
+type Typed<T extends false> = T
+export type CheckpointIsTyped = Typed<IsAny<Awaited<ReturnType<typeof applyCollaborationSteps>>>>
+export type SnapshotIsTyped = Typed<IsAny<CollaborationSnapshot>>
+
+export function readError(error: unknown): string {
+  if (error instanceof CollaborationError) return `${error.code}: ${error.message}`
+  return 'Unknown failure'
+}
+
+declare const snapshot: CollaborationSnapshot
+// @ts-expect-error A backend must not treat a numeric source as a document.
+const invalid: number = snapshot.document
+void invalid

@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 export type ConversionPhase =
   | 'parse_mdc'
@@ -10,8 +10,35 @@ export type ConversionPhase =
 
 export type ConversionSeverity = 'error' | 'warn'
 
+/** Every issue code that the conversion pipeline and editor validation can report. */
+export type ConversionIssueCode =
+  | 'authoring_kit_rejected'
+  | 'block_inside_paragraph'
+  | 'conversion_failed'
+  | 'empty_doc'
+  | 'inline_node_at_root'
+  | 'invalid_doc_root_type'
+  | 'invalid_doc_shape'
+  | 'invalid_node_shape'
+  | 'invalid_text_node'
+  | 'list_item_empty'
+  | 'list_item_first_child_not_paragraph'
+  | 'mdc_to_tiptap_failed'
+  | 'missing_doc_content'
+  | 'missing_node_type'
+  | 'parse_mdc_failed'
+  | 'set_content_failed'
+  | 'source_only_required'
+  | 'stringify_mdc_failed'
+  | 'text_node_has_children'
+  | 'tiptap_to_mdc_failed'
+  | 'unknown_mark_type'
+  | 'unknown_node_type'
+  | 'visual_compatibility_failed'
+  | 'visual_schema_unsupported'
+
 export interface ConversionIssue {
-  code: string
+  code: ConversionIssueCode
   severity: ConversionSeverity
   phase: ConversionPhase
   message: string
@@ -24,7 +51,7 @@ export interface ConversionTraceEvent {
   kind: 'finish' | 'issue' | 'phase' | 'start'
   phase?: ConversionPhase
   data?: Record<string, unknown>
-  issueCode?: string
+  issueCode?: ConversionIssueCode
   message?: string
   severity?: ConversionSeverity
 }
@@ -48,7 +75,7 @@ export interface ConversionHealthState {
 export interface ConversionErrorPayload {
   traceId: string
   phase: ConversionPhase
-  code: string
+  code: ConversionIssueCode
   message: string
   recoverable: boolean
   issues: ConversionIssue[]

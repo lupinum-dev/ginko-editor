@@ -23,8 +23,12 @@ export function checkDependencyPolicy(source, now = Date.now()) {
     const name = isScalar(item) ? item.value : undefined;
     // Exact npm semver only; ranges, tags, globs and version groups bypass review.
     const identifier = "(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)";
-    const version = `(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-${identifier}(?:\\.${identifier})*)?(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)?`;
-    if (typeof name !== "string" || !new RegExp(`^(?:@[a-z0-9._-]+/)?[a-z0-9._-]+@${version}$`).test(name)) {
+    const core = "(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)";
+    const preRelease = `(?:-${identifier}(?:\\.${identifier})*)?`;
+    const build = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)?";
+    const version = `${core}${preRelease}${build}`;
+    const pattern = `^(?:@[a-z0-9._-]+/)?[a-z0-9._-]+@${version}$`;
+    if (typeof name !== "string" || !new RegExp(pattern).test(name)) {
       failures.push("Each quarantine exclusion must name one exact package@version.");
       continue;
     }
