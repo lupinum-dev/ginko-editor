@@ -30,7 +30,7 @@ await writeFile(join(root, 'package.json'), JSON.stringify({
   name: 'ginko-editor-local-collaboration-verification', private: true, type: 'module',
   packageManager: 'pnpm@11.21.0',
   dependencies: { '@lupinum/ginko-editor': `file:${archive}`, '@lupinum/ginko-content': contentDependency,
-    '@tiptap/core': '3.31.3', '@tiptap/pm': '3.31.3', '@tiptap/vue-3': '3.31.3',
+    '@tiptap/core': '3.31.4', '@tiptap/pm': '3.31.4', '@tiptap/vue-3': '3.31.4',
     convex: '1.42.2', vue: '3.5.42' },
   devDependencies: { '@vitejs/plugin-vue': '6.0.6', vite: '8.1.5', typescript: '5.9.3', '@types/node': '26.1.1' },
 }, null, 2))
