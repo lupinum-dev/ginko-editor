@@ -129,7 +129,7 @@ async function verifyNodeRuntimeConsumer(consumer) {
     `${JSON.stringify({
       private: true,
       type: 'module',
-      dependencies: { ...contentPeer, '@tiptap/core': '3.31.3', '@tiptap/pm': '3.31.3' },
+      dependencies: { ...contentPeer, '@tiptap/core': '3.31.4', '@tiptap/pm': '3.31.4' },
     }, null, 2)}\n`,
   )
   await install(consumer, { runtimeOnly: true })
@@ -163,9 +163,9 @@ async function verifyVueConsumer(consumer) {
       scripts: { build: 'vite build', typecheck: 'vue-tsc --noEmit' },
       dependencies: {
         ...contentPeer,
-        '@tiptap/core': '3.31.3',
-        '@tiptap/pm': '3.31.3',
-        '@tiptap/vue-3': '3.31.3',
+        '@tiptap/core': '3.31.4',
+        '@tiptap/pm': '3.31.4',
+        '@tiptap/vue-3': '3.31.4',
         'reka-ui': pkg.dependencies['reka-ui'],
         vue: '3.5.42',
       },
@@ -231,9 +231,9 @@ async function verifyNuxtConsumer(consumer) {
       scripts: { build: 'nuxt build', prepare: 'nuxt prepare', typecheck: 'nuxt typecheck' },
       dependencies: {
         ...contentPeer,
-        '@tiptap/core': '3.31.3',
-        '@tiptap/pm': '3.31.3',
-        '@tiptap/vue-3': '3.31.3',
+        '@tiptap/core': '3.31.4',
+        '@tiptap/pm': '3.31.4',
+        '@tiptap/vue-3': '3.31.4',
         'reka-ui': pkg.dependencies['reka-ui'],
         nuxt: '4.5.2',
         vue: '3.5.42',
