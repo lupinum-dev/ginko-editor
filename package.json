@@ -1,6 +1,6 @@
 {
   "name": "@lupinum/ginko-editor",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A portable Vue editor for Ginko content.",
   "type": "module",
   "sideEffects": [

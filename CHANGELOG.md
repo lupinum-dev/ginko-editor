@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.0
+### Minor Changes
+
+
+
+- [#9](https://github.com/lupinum-dev/ginko-editor/pull/9) [`fac6d95`](https://github.com/lupinum-dev/ginko-editor/commit/fac6d95ebd10e44ebf350559f35cb84d66b6f7f7) Thanks [@Mat4m0](https://github.com/Mat4m0)! - Change new component command insertions to record angle syntax and explicit colon input to record colon syntax. Preserve the colon default for older persisted rooms without source-origin metadata when paired with Content's new angle default.
+  
+  Migration: update client and backend together. Existing room JSON and history stay intact. After old writers retire, hosts can reseed from accepted canonical Markdown in a new epoch, preserve pending recovery, and then retire the tracked legacy fallback.
+
+
+- [#10](https://github.com/lupinum-dev/ginko-editor/pull/10) [`8db99b5`](https://github.com/lupinum-dev/ginko-editor/commit/8db99b53ec8f666a3eb24888803ef8f3da5f68fc) Thanks [@Mat4m0](https://github.com/Mat4m0)! - Add editor profiles, in-place editing, an inline variant, keyboard-docked controls, German messages, and an installed agent skill.
+
+
+### Patch Changes
+
+
+
+- [#11](https://github.com/lupinum-dev/ginko-editor/pull/11) [`256c54b`](https://github.com/lupinum-dev/ginko-editor/commit/256c54bbe5d2f7d477b19c31b6c78fc2b72b1f6b) Thanks [@Mat4m0](https://github.com/Mat4m0)! - Change the Content peer floor to the published 1.0.0-beta.11 release.
+  
+  Migration: install Content 1.0.0-beta.11 or a later compatible 1.x version in the host.
+
+
+- [#9](https://github.com/lupinum-dev/ginko-editor/pull/9) [`c27be89`](https://github.com/lupinum-dev/ginko-editor/commit/c27be89dacc01f7d43b4ab4c47a0d8e9778edc0d) Thanks [@Mat4m0](https://github.com/Mat4m0)! - Fix native image controls and refresh resolved images when a host replaces asset provider methods.
+  
+  Preserve pending uploads and document identity while resolved image URLs change. Host migration guidance covers current transport imports, protocol metadata and stored-room recovery.
+  
+  Package version-matched documentation through the agent-docs export.
+
+
+- [#9](https://github.com/lupinum-dev/ginko-editor/pull/9) [`b7f83ef`](https://github.com/lupinum-dev/ginko-editor/commit/b7f83ef6c56f3ed09b5ee59f94d6ea4bb759c651) Thanks [@Mat4m0](https://github.com/Mat4m0)! - Fix clean installs by requiring the TipTap core version used by current table extensions.
+
 ## Unreleased
 
 - Refresh image URLs when a reactive asset provider replaces its URL methods,
