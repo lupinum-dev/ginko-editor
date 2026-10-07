@@ -74,9 +74,18 @@ jobs:
       # open Version packages PR. A manual run follows the same rule; it can re-offer a rejected
       # or failed publish of an already-versioned release, but never packs main while changesets
       # are pending.
+      # A skipped step's empty output loosely equals '0' in GitHub expressions.
+      # Check both prerequisites in Bash before offering publication.
       - id: check
-        if: steps.pr.outputs.open == '0'
-        run: node scripts/release.mjs check
+        env:
+          PENDING: ${{ steps.version.outputs.pending }}
+          OPEN_VERSION_PRS: ${{ steps.pr.outputs.open }}
+        run: |
+          if [[ "$PENDING" == false && "$OPEN_VERSION_PRS" == 0 ]]; then
+            node scripts/release.mjs check
+          else
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+          fi
 
   # Turns version.patch into the Version packages PR. Checks out main but installs and runs
   # nothing from the repository, so no dependency code holds this write token.

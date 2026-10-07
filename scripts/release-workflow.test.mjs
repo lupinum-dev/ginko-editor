@@ -71,3 +71,16 @@ test('publication accepts only a confirmed absent npm version', () => {
     })
   }
 })
+
+// Catch GitHub's loose equality treating a skipped step's empty output as zero.
+test('pending changesets or an open version PR never offer publication', () => {
+  const offer = workflow.jobs['version-prepare'].steps.find(step => step.id === 'check').run
+  for (const [pending, open] of [['true', ''], ['false', '1']]) {
+    fixture(({ root, shell }) => {
+      const output = join(root, 'output')
+      const result = shell(offer, { PENDING: pending, OPEN_VERSION_PRS: open, GITHUB_OUTPUT: output })
+      assert.equal(result.status, 0, result.stderr)
+      assert.equal(readFileSync(output, 'utf8'), 'publish=false\n')
+    })
+  }
+})
