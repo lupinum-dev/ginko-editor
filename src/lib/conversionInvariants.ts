@@ -1,10 +1,8 @@
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
-import type { ConversionIssue, ConversionPhase } from './conversionTypes'
+import type { ConversionIssue, ConversionIssueCode, ConversionPhase } from './conversionTypes'
 
 const INLINE_NODE_TYPES = new Set([
-  'binding',
-  'emoji',
   'hardBreak',
   'inline-element',
   'span-style',
@@ -35,7 +33,7 @@ const BLOCK_NODE_TYPES = new Set([
 const SUPPORTED_MARKS = new Set(['bold', 'code', 'italic', 'strike', 'link'])
 
 function issue(
-  code: string,
+  code: ConversionIssueCode,
   message: string,
   context?: Record<string, unknown>,
   severity: 'error' | 'warn' = 'error',

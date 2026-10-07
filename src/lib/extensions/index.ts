@@ -1,6 +1,4 @@
-export { Binding } from './binding'
 export { CodeBlock } from './code-block'
-export { EditorDebug } from './debug'
 export { Element } from './element'
 export { File } from './file'
 export { Heading } from './heading'

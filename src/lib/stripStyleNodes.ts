@@ -1,12 +1,9 @@
-import { editorDebug } from './debug'
 import type { MDCNode, MDCRoot } from './mdcTypes'
 
-export function stripStyleNodes(root: MDCRoot, source?: string): MDCRoot {
-  let removed = 0
+export function stripStyleNodes(root: MDCRoot): MDCRoot {
 
   const walk = (node: MDCNode | MDCRoot): MDCNode | MDCRoot | null => {
     if (node.type === 'element' && node.tag === 'style') {
-      removed += 1
       return null
     }
 
@@ -27,9 +24,5 @@ export function stripStyleNodes(root: MDCRoot, source?: string): MDCRoot {
     return node
   }
 
-  const cleaned = walk(root) as MDCRoot
-  if (removed > 0) {
-    editorDebug.warn('Removed style nodes', { removed, source })
-  }
-  return cleaned
+  return walk(root) as MDCRoot
 }

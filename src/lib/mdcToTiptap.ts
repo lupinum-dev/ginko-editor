@@ -4,10 +4,10 @@
  * Main entry point that combines categorized converters:
  * - marks.ts: Text formatting (bold, italic, link, code, strike)
  * - nodes.ts: Document structure (headings, lists, tables, paragraphs)
- * - component-converters.ts: Custom components (binding, file, image, video)
+ * - component-converters.ts: Custom components (file, image, video)
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 import {
   classifyPortableMarkdownElement,
   type PortableComponentPolicy,
@@ -16,7 +16,6 @@ import {
 import type { JsonRecord, JsonValue } from '../types'
 // Import categorized converters
 import {
-  createBindingNode,
   createBlockquoteNode,
   createBrNode,
   createCommentNode,
@@ -37,9 +36,6 @@ import {
   createUlNode,
   createVideoNode,
 } from './component-converters'
-import { validateTiptapDocShape } from './conversionInvariants'
-import { isDebugEnabled, editorDebug } from './debug'
-import { summarizeMdc, summarizeTableMdc } from './markdown'
 import { createMark, tagToMark } from './marks'
 import type { MDCElement, MDCNode, MDCRoot } from './mdcTypes'
 import {
@@ -85,7 +81,6 @@ function createMdcToTiptapMap(
     ...Object.fromEntries(markMapEntries),
 
     // Components (custom elements)
-    binding: (node: MDCNode) => createBindingNode(node, createNode),
     blockquote: (node: MDCNode) => createBlockquoteNode(node, createNode),
     br: (node: MDCNode) => createBrNode(node, createNode),
     comment: (node: MDCNode) => createCommentNode(node, createNode),
@@ -217,10 +212,6 @@ function removeEmptyTextNodes(content: JSONContent | JSONContent[]): JSONContent
     const filtered = content.filter((node) => {
       // Remove empty text nodes
       if (node?.type === 'text' && (!node.text || node.text === '')) {
-        editorDebug.log('removeEmptyTextNodes: filtering out empty text node', {
-          hasMarks: !!node.marks?.length,
-          marks: node.marks,
-        })
         return false
       }
       return true
@@ -278,15 +269,6 @@ function convertMdcNode(
     return createParagraphNode(node as MDCElement, convert, { allowImageLift: false })
   }
 
-  if (type === 'code' && node.type === 'element') {
-    editorDebug.log('mdcNodeToTiptap: code element from MDC', {
-      children: (node as MDCElement).children,
-      childrenCount: (node as MDCElement).children?.length || 0,
-      parent: (parent as MDCElement)?.tag || parent?.type,
-      props: (node as MDCElement).props,
-      tag: type,
-    })
-  }
 
   const classification = node.type === 'element'
     ? classifyPortableMarkdownElement(node, policy ?? { components: {} })
@@ -296,22 +278,9 @@ function convertMdcNode(
   // A policy-selected component keeps its authored identity even if its name
   // collides with a native Markdown element handled by the built-in map.
   if (!policyComponent && converterMap[type]) {
-    if (node.type === 'element' && ['table', 'td', 'th', 'tr'].includes(type)) {
-      editorDebug.log('mdcNodeToTiptap table element', {
-        children: (node as MDCElement).children?.length || 0,
-        props: (node as MDCElement).props,
-        tag: type,
-      })
-    }
     return converterMap[type](node)
   }
 
-  if (node.type === 'element') {
-    editorDebug.log('mdcToTiptap custom element', {
-      parent: (parent as MDCElement)?.tag || parent?.type,
-      tag: type,
-    })
-  }
 
   const authoredInline = classification?.kind === 'component' && classification.form === 'inline'
   if ((parent as MDCElement)?.tag === 'p' || authoredInline) {
@@ -352,12 +321,7 @@ export function mdcToTiptap(
   // Remove invalid text node which added by table syntax
   cleanedBody.children = (cleanedBody.children || []).filter((child) => child.type !== 'text')
 
-  editorDebug.log('mdcToTiptap input', summarizeMdc(cleanedBody))
-  editorDebug.log('mdcToTiptap table summary', summarizeTableMdc(cleanedBody))
 
-  editorDebug.log('mdcToTiptap full MDC body', {
-    body: structuredClone(cleanedBody),
-  })
 
   const tree = createMdcToTiptapConverter(policy)(cleanedBody)
 
@@ -376,16 +340,6 @@ export function mdcToTiptap(
 
   // Final cleanup: remove any empty text nodes that may have been created
   const cleanedDoc = removeEmptyTextNodes(doc)
-
-  if (isDebugEnabled()) {
-    const issues = validateTiptapDocShape(cleanedDoc)
-    if (issues.length > 0) {
-      editorDebug.warn('mdcToTiptap invariant issues detected', {
-        count: issues.length,
-        issues,
-      })
-    }
-  }
 
   return cleanedDoc
 }

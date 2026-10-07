@@ -12,7 +12,11 @@ import type { AssetInfo, EditorImage, ImagePicker, ImageUploadHandler } from '..
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const cleanups: Array<() => void> = []
 afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); document.body.innerHTML = '' })
@@ -27,7 +31,17 @@ function setup(picker: ImagePicker, upload?: ImageUploadHandler) {
   const editor: Editor = new Editor({ element, content: '<p>First</p><p>Second</p>', extensions: [
     StarterKit, Image, ImageUpload.configure({ picker: () => picker, upload: () => upload,
       onPendingChange: count => { pending = count },
-      insert: (asset: Partial<AssetInfo>, from: number, size = 0) => editor.chain().command(({ tr }) => { closeHistory(tr); return true }).insertContentAt({ from, to: from + size }, { type: 'image', attrs: { props: { ...asset, src: asset.id || asset.url } } }, { updateSelection: false }).run(),
+      insert: (asset: Partial<AssetInfo>, from: number, size = 0) => editor.chain()
+        .command(({ tr }) => {
+          closeHistory(tr)
+          return true
+        })
+        .insertContentAt(
+          { from, to: from + size },
+          { type: 'image', attrs: { props: { ...asset, src: asset.id || asset.url } } },
+          { updateSelection: false },
+        )
+        .run(),
     }),
   ] })
   cleanups.push(() => editor.destroy())
@@ -44,7 +58,12 @@ describe('mapped image picker operation', () => {
     expect(element.querySelector<HTMLButtonElement>('[aria-label="Upload image"]')!.hidden).toBe(true)
     expect(pending()).toBe(1)
     const drop = new Event('drop', { bubbles: true, cancelable: true })
-    Object.defineProperty(drop, 'dataTransfer', { value: { types: ['Files'], files: [new File(['image'], 'photo.png', { type: 'image/png' })] } })
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: {
+        types: ['Files'],
+        files: [new File(['image'], 'photo.png', { type: 'image/png' })],
+      },
+    })
     browse().dispatchEvent(drop)
     expect(drop.defaultPrevented).toBe(false)
     expect(element.querySelector<HTMLDivElement>('.ginko-image-upload__confirmation')!.hidden).toBe(true)
@@ -81,7 +100,10 @@ describe('mapped image picker operation', () => {
   it('passes replacement metadata and cancels without changing the original image', async () => {
     const task = deferred(), picker = vi.fn<ImagePicker>(() => task.promise)
     const { editor, browse, pending } = setup(picker)
-    editor.commands.insertContentAt(0, { type: 'image', attrs: { props: { id: 'existing', src: 'existing', alt: 'Original', focalX: .25 } } })
+    editor.commands.insertContentAt(0, {
+      type: 'image',
+      attrs: { props: { id: 'existing', src: 'existing', alt: 'Original', focalX: .25 } },
+    })
     editor.commands.setNodeSelection(0); editor.commands.insertImageUpload(); browse().click()
     expect(picker.mock.calls[0]?.[0].current).toEqual({ id: 'existing', alt: 'Original', focalX: .25 })
     task.resolve(null); await flushPromises()
@@ -102,7 +124,9 @@ describe('mapped image picker operation', () => {
   })
 
   it('rejects invalid image metadata, aborts abandoned attempts, and permits retry', async () => {
-    const picker = vi.fn<ImagePicker>().mockResolvedValueOnce({ url: '/bad.png', width: Infinity }).mockResolvedValueOnce({ url: '/good.png' })
+    const picker = vi.fn<ImagePicker>()
+      .mockResolvedValueOnce({ url: '/bad.png', width: Infinity })
+      .mockResolvedValueOnce({ url: '/good.png' })
     const { editor, browse, element, pending } = setup(picker)
     editor.commands.insertImageUpload(); browse().click(); await flushPromises()
     expect(element.textContent).toContain('finite number')
@@ -116,7 +140,10 @@ describe('mapped image picker operation', () => {
   })
 
   it('rejects an empty result and aborts an in-flight picker when the entry is cleared', async () => {
-    const task = deferred(), picker = vi.fn<ImagePicker>().mockResolvedValueOnce({ url: '' }).mockReturnValueOnce(task.promise)
+    const task = deferred()
+    const picker = vi.fn<ImagePicker>()
+      .mockResolvedValueOnce({ url: '' })
+      .mockReturnValueOnce(task.promise)
     const { editor, browse, element } = setup(picker)
     editor.commands.insertImageUpload(); browse().click(); await flushPromises()
     expect(element.textContent).toContain('stored id or URL')
@@ -131,14 +158,23 @@ describe('mapped image picker operation', () => {
 describe('controlled image library', () => {
   it('leaves search, pagination and uploads to the host and emits the exact selected image', async () => {
     const image: EditorImage = { id: 'asset-one', alt: 'Mountain' }
-    const wrapper = mount(GinkoImagePicker, { attachTo: document.body, props: { open: true, images: [{ key: 'one', label: 'Mountain.jpg', image, thumbnailUrl: '/mountain.jpg' }], hasMore: true, enableUpload: true } })
+    const wrapper = mount(GinkoImagePicker, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        images: [{ key: 'one', label: 'Mountain.jpg', image, thumbnailUrl: '/mountain.jpg' }],
+        hasMore: true,
+        enableUpload: true,
+      },
+    })
     cleanups.push(() => wrapper.unmount()); await flushPromises()
     const search = document.querySelector<HTMLInputElement>('[aria-label="Search images"]')!
     expect(document.activeElement).toBe(search)
     search.value = 'forest'; search.dispatchEvent(new Event('input', { bubbles: true }))
     expect(wrapper.emitted('update:query')?.at(-1)).toEqual(['forest'])
     expect(document.querySelector('[aria-label="Choose Mountain.jpg"]')).not.toBeNull()
-    const button = (text: string) => [...document.querySelectorAll('button')].find(element => element.textContent?.trim() === text)!
+    const button = (text: string) =>
+      [...document.querySelectorAll('button')].find(element => element.textContent?.trim() === text)!
     button('Load more').click(); button('Upload').click()
     expect(wrapper.emitted('load-more')).toHaveLength(1); expect(wrapper.emitted('upload')).toHaveLength(1)
     document.querySelector<HTMLButtonElement>('[aria-label="Choose Mountain.jpg"]')!.click()
@@ -147,7 +183,21 @@ describe('controlled image library', () => {
   })
 
   it('makes unsafe thumbnails inert and exposes host errors without hiding cancel', async () => {
-    const wrapper = mount(GinkoImagePicker, { attachTo: document.body, props: { open: true, images: [{ key: 'one', label: 'Unavailable', image: { id: 'one' }, thumbnailUrl: 'javascript:unsafe' }], error: 'Could not refresh images.' } })
+    const wrapper = mount(GinkoImagePicker, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        images: [
+          {
+            key: 'one',
+            label: 'Unavailable',
+            image: { id: 'one' },
+            thumbnailUrl: 'javascript:unsafe',
+          },
+        ],
+        error: 'Could not refresh images.',
+      },
+    })
     cleanups.push(() => wrapper.unmount()); await flushPromises()
     expect(document.querySelector('.ginko-image-picker img')).toBeNull()
     expect(document.querySelector('[role="alert"]')?.textContent).toBe('Could not refresh images.')

@@ -1,10 +1,9 @@
 # Active migrations
 
-## Local Content and Docs candidates for the playground
+## Local Content 1.0.0-beta.10 candidate
 
-- Why: Step 4 needs the accepted Content parser contract and Docs authoring/component-kit exports before either package is available from the registry.
-- Introduced: Gate B2, 2026-09-12.
-- Depends on it: `scripts/prepare-docs-candidates.mjs`, the Editor docs build/dev scripts, and the local aliases in `docs/nuxt.config.ts`.
-- Local inputs: set `GINKO_CONTENT_CANDIDATE` to a built Content package directory and `GINKO_DOCS_CANDIDATE` to the Docs layer directory. The current sibling Docs checkout and installed Content package are defaults, but the script rejects a stale registry Content package with a corrective error.
-- Removal condition: publish Content with the accepted strict parser contract and Docs with the accepted `authoring` and `component-kit` exports; update the docs manifest to those versions; remove candidate copying, symlink setup, aliases, and this entry together.
-- Tracking: `plan.md`, Step 4 / Gate B2.
+- Why: the Editor needs Content fixes that are not published yet: MDC text escaping, verbatim code, parser-aligned heading ids (`createHeadingIdGenerator`), no bare-domain links, `isSafePublicLinkUrl`, and auto-close that skips fenced code.
+- Introduced: 2026-09-25. Source: `ginko-content` branch `fix/mdc-roundtrip-contract` at `0000675`, packed with version `1.0.0-beta.10`.
+- Archive: `internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz`, SHA-256 `7185d72961d8a96c4ce290c4952a5a6cfe2eae6e5461bc99063d5ec605fa62a5`.
+- Depends on it: the `@lupinum/ginko-content` override in `pnpm-workspace.yaml`, the default archive in `scripts/verify-packed-consumer.mjs` and `scripts/prepare-collaboration-fixture.mjs`, and the `>=1.0.0-beta.10` peer range.
+- Removal condition: publish Content `1.0.0-beta.10` from that branch through the Content release workflow. Then remove the override, the archive, the script defaults, and this entry together, and run `pnpm release:verify`.

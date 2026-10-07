@@ -1,19 +1,16 @@
-import { parseMdcDocument, serializeMdcDocument } from '@lupinum/ginko-content/cms-contract'
+import {
+  createHeadingIdGenerator,
+  headingSlugText,
+  parseMdcDocument,
+  serializeMdcDocument,
+} from '@lupinum/ginko-content/cms-contract'
 
 import type { JsonRecord, JsonValue } from '../types'
-import { editorDebug } from './debug'
-import type { MDCElement, MDCNode, MDCRoot } from './mdcTypes'
+import type { MDCNode, MDCRoot } from './mdcTypes'
 import { stripStyleNodes } from './stripStyleNodes'
-
-export interface ParseMdcOptions {
-  strict?: boolean
-  onError?: (error: unknown) => void
-}
 
 export interface StringifyMdcOptions {
   videoOutput?: 'html' | 'mdc'
-  strict?: boolean
-  onError?: (error: unknown) => void
 }
 
 type ComarkElementNode = [string, Record<string, unknown>, ...ComarkNode[]]
@@ -21,88 +18,29 @@ type ComarkCommentNode = [null, Record<string, unknown>, string]
 type ComarkNode = string | ComarkElementNode | ComarkCommentNode
 
 const TABLE_SECTION_TAGS = new Set(['thead', 'tbody', 'tfoot'])
-const STANDARD_TAGS = new Set([
-  'a',
-  'binding',
-  'blockquote',
-  'br',
-  'code',
-  'del',
-  'em',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'hr',
-  'img',
-  'li',
-  'ol',
-  'p',
-  'pre',
-  'slot',
-  'span',
-  'strong',
-  'style',
-  'table',
-  'td',
-  'template',
-  'th',
-  'tr',
-  'ul',
-  'video',
-])
-
-/**
- * Parse MDC-compatible markdown to the Studio's current MDC object tree.
- *
- * Comark is the only markdown parser used here. The object tree is a local
- * adapter for the existing TipTap converters, not a separate parsing model.
- */
-export async function parseMdc(content: string, options: ParseMdcOptions = {}): Promise<MDCRoot> {
-  if (!content || !content.trim()) {
-    return emptyRoot()
-  }
-
-  try {
-    editorDebug.log('parseMdc input', {
-      length: content.length,
-      preview: content.slice(0, 200),
-    })
-
-    const tree = await parseMdcDocument(content, { autoClose: options.strict === false })
-    const cleaned = adaptMdcDocument(tree)
-    editorDebug.log('comark mdc', collectMdcStats(cleaned))
-    return cleaned
-  } catch (error) {
-    options.onError?.(error)
-    editorDebug.error('Failed to parse MDC with Comark:', error)
-    if (options.strict !== false) {
-      throw error instanceof Error ? error : new Error(String(error))
-    }
-    return {
-      children: [
-        {
-          children: [{ type: 'text', value: content }],
-          props: {},
-          tag: 'p',
-          type: 'element',
-        },
-      ],
-      type: 'root',
-    }
-  }
-}
 
 /** Adapt one canonical parse result to the editor's lossless conversion tree. */
 export function adaptMdcDocument(
   tree: Awaited<ReturnType<typeof parseMdcDocument>>,
 ): MDCRoot {
+  const nextHeadingId = createHeadingIdGenerator()
   return stripStyleNodes({
-    children: comarkNodesToMdc(tree.nodes),
+    children: comarkNodesToMdc(tree.nodes, nextHeadingId),
     type: 'root',
-  }, 'parseMdc')
+  })
+}
+
+const HEADING_TAG = /^h([1-6])$/
+
+/** Keep a heading id only when it differs from the id the parser generates. */
+function headingProps(tag: string, props: JsonRecord, children: ComarkNode[], nextHeadingId: HeadingIds): JsonRecord {
+  const level = HEADING_TAG.exec(tag)?.[1]
+  if (!level) return props
+  const generated = nextHeadingId(headingSlugText(children), Number(level))
+  if (props.id !== generated) return props
+  const rest = { ...props }
+  delete rest.id
+  return rest
 }
 
 /**
@@ -115,42 +53,26 @@ export async function stringifyMdc(
   if (!ast || !ast.children?.length) {
     return ''
   }
-
-  try {
-    editorDebug.log('stringifyMdc input', collectMdcStats(ast))
-    const cleaned = stripStyleNodes(ast, 'stringifyMdc')
-    const tree = {
-      frontmatter: {},
-      meta: {},
-      nodes: mdcNodesToComark(cleaned.children || [], options),
-    }
-    const markdown = await serializeMdcDocument(tree)
-    if (!markdown.trim()) return ''
-    return markdown.endsWith('\n') ? markdown : `${markdown}\n`
-  } catch (error) {
-    options.onError?.(error)
-    editorDebug.error('Failed to stringify MDC with Comark:', error)
-    if (options.strict !== false) {
-      throw error instanceof Error ? error : new Error(String(error))
-    }
-    return ''
-  }
+  // Serializer errors reach the caller. An empty document is never a fallback.
+  const cleaned = stripStyleNodes(ast)
+  const markdown = await serializeMdcDocument({
+    frontmatter: {},
+    meta: {},
+    nodes: mdcNodesToComark(cleaned.children || [], options),
+  })
+  if (!markdown.trim()) return ''
+  return markdown.endsWith('\n') ? markdown : `${markdown}\n`
 }
 
-function emptyRoot(): MDCRoot {
-  return {
-    children: [],
-    type: 'root',
-  }
+type HeadingIds = ReturnType<typeof createHeadingIdGenerator>
+
+function comarkNodesToMdc(nodes: ComarkNode[], nextHeadingId: HeadingIds): MDCNode[] {
+  return nodes.flatMap((node) => comarkNodeToMdc(node, nextHeadingId))
 }
 
-function comarkNodesToMdc(nodes: ComarkNode[]): MDCNode[] {
-  return nodes.flatMap((node) => comarkNodeToMdc(node))
-}
-
-function comarkNodeToMdc(node: ComarkNode): MDCNode[] {
+function comarkNodeToMdc(node: ComarkNode, nextHeadingId: HeadingIds): MDCNode[] {
   if (typeof node === 'string') {
-    return textToMdcNodes(node)
+    return node ? [{ type: 'text', value: node }] : []
   }
 
   const [tag, rawProps, ...children] = node as ComarkElementNode | ComarkCommentNode
@@ -159,11 +81,12 @@ function comarkNodeToMdc(node: ComarkNode): MDCNode[] {
   }
 
   if (TABLE_SECTION_TAGS.has(tag)) {
-    return comarkNodesToMdc(children)
+    return comarkNodesToMdc(children, nextHeadingId)
   }
 
-  const props = cleanComarkProps(rawProps)
-  const childNodes = comarkNodesToMdc(children)
+  // Heading ids are assigned in document order, before nested headings.
+  const props = headingProps(tag, cleanComarkProps(rawProps), children, nextHeadingId)
+  const childNodes = comarkNodesToMdc(children, nextHeadingId)
   return [
     {
       children: childNodes,
@@ -172,43 +95,6 @@ function comarkNodeToMdc(node: ComarkNode): MDCNode[] {
       type: 'element',
     },
   ]
-}
-
-function textToMdcNodes(value: string): MDCNode[] {
-  if (!value) return []
-  const nodes: MDCNode[] = []
-  let cursor = 0
-  while (cursor < value.length) {
-    const start = value.indexOf('{{', cursor)
-    if (start === -1) {
-      nodes.push({ type: 'text', value: value.slice(cursor) })
-      break
-    }
-    if (start > cursor) {
-      nodes.push({ type: 'text', value: value.slice(cursor, start) })
-    }
-    const end = value.indexOf('}}', start + 2)
-    if (end === -1) {
-      nodes.push({ type: 'text', value: value.slice(start) })
-      break
-    }
-    const expression = value.slice(start + 2, end).trim()
-    const separator = expression.indexOf('||')
-    const bindingValue =
-      separator === -1 ? expression.trim() : expression.slice(0, separator).trim()
-    const defaultValue = separator === -1 ? '' : expression.slice(separator + 2).trim()
-    nodes.push({
-      children: [],
-      props: {
-        ...(bindingValue ? { value: bindingValue } : {}),
-        ...(defaultValue ? { defaultValue } : {}),
-      },
-      tag: 'binding',
-      type: 'element',
-    })
-    cursor = end + 2
-  }
-  return nodes
 }
 
 function cleanComarkProps(rawProps: Record<string, unknown> = {}): JsonRecord {
@@ -274,64 +160,3 @@ function cleanMdcProps(rawProps: JsonRecord): Record<string, unknown> {
   return props
 }
 
-/**
- * Summarize MDC AST structure for debugging.
- */
-export function summarizeMdc(root: MDCRoot) {
-  const stats = {
-    codeBlocks: 0,
-    components: [] as string[],
-    elements: 0,
-    nodes: 0,
-    styleNodes: 0,
-  }
-
-  const walk = (node: MDCNode | MDCRoot) => {
-    stats.nodes += 1
-    if (node.type === 'element') {
-      stats.elements += 1
-      if (node.tag === 'pre') stats.codeBlocks += 1
-      if (node.tag === 'style') stats.styleNodes += 1
-      if (node.tag && !STANDARD_TAGS.has(node.tag)) stats.components.push(node.tag)
-    }
-    const children = (node as MDCElement).children || []
-    children.forEach((child) => walk(child))
-  }
-
-  walk(root)
-
-  return {
-    ...stats,
-    components: [...new Set(stats.components)],
-  }
-}
-
-/**
- * Summarize table structure in MDC AST for debugging.
- */
-export function summarizeTableMdc(root: MDCRoot) {
-  const stats = {
-    cells: 0,
-    headers: 0,
-    rows: 0,
-    tables: 0,
-  }
-
-  const walk = (node: MDCNode | MDCRoot) => {
-    if (node.type === 'element') {
-      if (node.tag === 'table') stats.tables += 1
-      if (node.tag === 'tr') stats.rows += 1
-      if (node.tag === 'th') stats.headers += 1
-      if (node.tag === 'td') stats.cells += 1
-    }
-    const children = (node as MDCElement).children || []
-    children.forEach((child) => walk(child))
-  }
-
-  walk(root)
-  return stats
-}
-
-function collectMdcStats(root: MDCRoot) {
-  return summarizeMdc(root)
-}

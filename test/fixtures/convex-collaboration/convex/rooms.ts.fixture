@@ -1,0 +1,266 @@
+import { v, ConvexError } from 'convex/values'
+import { internalMutation, mutation, query, type QueryCtx } from './_generated/server'
+import { internal } from './_generated/api'
+import type { Doc, Id } from './_generated/dataModel'
+import { applyCollaborationSteps, createCollaborationSnapshot, collaborationLimits, CollaborationError, fenceMismatch,
+  readCollaborationPresence, type CollaborationHead, type CollaborationPresenceUpdate, type CollaborationReply } from '@lupinum/ginko-editor/runtime'
+import { policy } from '../shared/policy'
+// Clients send protocolVersion 1 with pull and push. Replies may omit it.
+const headArgs = { epoch: v.string(), schemaRevision: v.string(), policyRevision: v.string(), version: v.number(),
+  protocolVersion: v.optional(v.literal(1)) }
+const roomArgs = { roomId: v.id('rooms'), ...headArgs }
+const headValidator = v.object(headArgs)
+const snapshotValidator = v.object({ ...headArgs, document: v.string() })
+const replyValidator = v.union(
+  v.object({ status: v.literal('ok'), update: v.object({ ...headArgs, fromVersion: v.number(), steps: v.array(v.string()), clientIds: v.array(v.string()) }) }),
+  v.object({ status: v.literal('stale'), head: headValidator,
+    reason: v.union(v.literal('epoch'), v.literal('schema'), v.literal('policy'), v.literal('history')) }),
+)
+
+export const whoami = query({ args: {}, returns: v.union(v.string(), v.null()),
+  handler: async ctx => (await ctx.auth.getUserIdentity())?.tokenIdentifier ?? null,
+})
+
+export const resolveRoom = query({ args: { value: v.string() }, returns: v.id('rooms'),
+  handler: async (ctx, args) => {
+    const roomId = ctx.db.normalizeId('rooms', args.value)
+    if (!roomId) invalid('Invalid room reference.')
+    await access(ctx, roomId)
+    return roomId
+  },
+})
+
+function head(room: Doc<'rooms'>): CollaborationHead {
+  return { epoch: room.epoch, schemaRevision: room.schemaRevision, policyRevision: room.policyRevision, version: room.version }
+}
+function snapshot(room: Doc<'rooms'>) { return { ...head(room), document: room.document } }
+function invalid(message: string): never { throw new ConvexError({ code: 'invalid', message }) }
+function version(value: number) { if (!Number.isSafeInteger(value) || value < 0) invalid('Invalid editor version.') }
+
+async function access(ctx: QueryCtx, roomId: Id<'rooms'>, write = false, owner = false) {
+  const identity = await ctx.auth.getUserIdentity()
+  if (!identity) throw new ConvexError({ code: 'unauthenticated', message: 'Sign in to open this document.' })
+  const member = await ctx.db.query('members').withIndex('by_room_identity', q => q.eq('roomId', roomId).eq('identity', identity.tokenIdentifier)).unique()
+  if (!member || (write && member.role === 'reader') || (owner && member.role !== 'owner')) {
+    throw new ConvexError({ code: 'forbidden', message: 'You do not have access to this operation.' })
+  }
+  const room = await ctx.db.get(roomId)
+  if (!room) throw new ConvexError({ code: 'missing', message: 'This document is unavailable.' })
+  return { room, member }
+}
+
+async function history(ctx: QueryCtx, room: Doc<'rooms'>, requested: CollaborationHead): Promise<CollaborationReply> {
+  version(requested.version)
+  const mismatch = fenceMismatch(room, requested)
+  if (mismatch) return { status: 'stale', head: head(room), reason: mismatch }
+  if (requested.version > room.version) invalid('The requested version is ahead of this document.')
+  if (requested.version < room.minimumVersion) return { status: 'stale', head: head(room), reason: 'history' }
+  // Each row is capped at 256 KiB on write. Eight rows bound database reads to
+  // about 2 MiB, even after a long disconnection. The response is capped too.
+  const rows = await ctx.db.query('steps').withIndex('by_room_epoch_version', q =>
+    q.eq('roomId', room._id).eq('epoch', room.epoch).gt('version', requested.version)).take(8)
+  const steps: string[] = [], clientIds: string[] = []
+  let cursor = requested.version, bytes = 0
+  const encoder = new TextEncoder()
+  for (const row of rows) {
+    const start = row.version - row.steps.length
+    if (start > cursor) throw new Error('Collaborative history has a gap.')
+    for (const step of row.steps.slice(cursor - start)) {
+      const size = encoder.encode(step).byteLength
+      if (steps.length === collaborationLimits.stepsPerBatch || bytes + size > collaborationLimits.batchBytes) {
+        return { status: 'ok', update: { ...head(room), fromVersion: requested.version, version: cursor, steps, clientIds } }
+      }
+      steps.push(step); clientIds.push(row.clientId); bytes += size; cursor++
+    }
+  }
+  return { status: 'ok', update: { ...head(room), fromVersion: requested.version, version: cursor, steps, clientIds } }
+}
+
+function ownClientId(member: Doc<'members'>, clientId: string) {
+  const prefix = member._id + '/'
+  if (!clientId.startsWith(prefix) || !/^[A-Za-z0-9_-]{8,80}$/.test(clientId.slice(prefix.length))) {
+    throw new ConvexError({ code: 'forbidden', message: 'This client ID belongs to another editing session.' })
+  }
+}
+
+function checked<T>(work: () => Promise<T>): Promise<T> {
+  return work().catch(error => {
+    if (error instanceof CollaborationError) throw new ConvexError({ code: error.code, message: error.message })
+    throw error
+  })
+}
+
+export const create = mutation({
+  args: { source: v.string() }, returns: v.id('rooms'),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new ConvexError({ code: 'unauthenticated', message: 'Sign in to create a document.' })
+    const checkpoint = await checked(() => createCollaborationSnapshot(args.source, { epoch: '1', policyRevision: 'notes-1', policy }))
+    const documentId = await ctx.db.insert('documents', { markdown: checkpoint.markdown, epoch: '1', version: 0 })
+    const roomId = await ctx.db.insert('rooms', { ...checkpoint.snapshot, documentId, generation: 1, minimumVersion: 0 })
+    await ctx.db.insert('members', { roomId, identity: identity.tokenIdentifier, role: 'owner' })
+    return roomId
+  },
+})
+
+export const open = query({
+  args: { roomId: v.id('rooms') },
+  returns: v.object({ snapshot: snapshotValidator, clientPrefix: v.string(), canWrite: v.boolean() }),
+  handler: async (ctx, args) => {
+    const { room, member } = await access(ctx, args.roomId)
+    return { snapshot: snapshot(room), clientPrefix: member._id + '/', canWrite: member.role !== 'reader' }
+  },
+})
+export const currentHead = query({
+  args: { roomId: v.id('rooms') }, returns: headValidator,
+  handler: async (ctx, args) => head((await access(ctx, args.roomId)).room),
+})
+export const pull = query({
+  args: roomArgs, returns: replyValidator,
+  handler: async (ctx, args) => history(ctx, (await access(ctx, args.roomId)).room, args),
+})
+export const push = mutation({
+  args: { ...roomArgs, clientId: v.string(), steps: v.array(v.string()) }, returns: replyValidator,
+  handler: async (ctx, args) => {
+    const { room, member } = await access(ctx, args.roomId, true)
+    ownClientId(member, args.clientId)
+    version(args.version)
+    if (fenceMismatch(room, args) || args.version !== room.version) return history(ctx, room, args)
+    const checkpoint = await checked(() => applyCollaborationSteps(snapshot(room), args, { policy }))
+    await ctx.db.patch(room._id, { document: checkpoint.snapshot.document, version: checkpoint.snapshot.version })
+    await ctx.db.patch(room.documentId, { markdown: checkpoint.markdown, epoch: room.epoch, version: checkpoint.snapshot.version })
+    await ctx.db.insert('steps', { roomId: room._id, epoch: room.epoch, version: checkpoint.snapshot.version, clientId: args.clientId, steps: args.steps })
+    return { status: 'ok' as const, update: { ...head(room), fromVersion: room.version, version: checkpoint.snapshot.version,
+      steps: args.steps, clientIds: args.steps.map(() => args.clientId) } }
+  },
+})
+
+export const grant = mutation({
+  args: { roomId: v.id('rooms'), identity: v.string(), role: v.union(v.literal('editor'), v.literal('reader'), v.literal('none')) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    await access(ctx, args.roomId, true, true)
+    const existing = await ctx.db.query('members').withIndex('by_room_identity', q => q.eq('roomId', args.roomId).eq('identity', args.identity)).unique()
+    if (existing?.role === 'owner') invalid('The owner cannot be removed by this operation.')
+    if (args.role === 'none') { if (existing) await ctx.db.delete(existing._id); return }
+    if (existing) await ctx.db.patch(existing._id, { role: args.role })
+    else await ctx.db.insert('members', { roomId: args.roomId, identity: args.identity, role: args.role })
+  },
+})
+
+export const replace = mutation({
+  args: { ...roomArgs, source: v.string() }, returns: snapshotValidator,
+  handler: async (ctx, args) => {
+    const { room } = await access(ctx, args.roomId, true, true)
+    version(args.version)
+    if (fenceMismatch(room, args) || args.version !== room.version) invalid('The document changed before replacement.')
+    const generation = room.generation + 1
+    const checkpoint = await checked(() => createCollaborationSnapshot(args.source, { epoch: String(generation), policyRevision: room.policyRevision, policy }))
+    await ctx.db.patch(room._id, { ...checkpoint.snapshot, generation, minimumVersion: 0 })
+    await ctx.db.patch(room.documentId, { markdown: checkpoint.markdown, epoch: checkpoint.snapshot.epoch, version: 0 })
+    return checkpoint.snapshot
+  },
+})
+
+export const publish = mutation({
+  args: roomArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room } = await access(ctx, args.roomId, true, true)
+    version(args.version)
+    if (fenceMismatch(room, args) || args.version !== room.version) invalid('The document changed before publication.')
+    const source = await ctx.db.get(room.documentId)
+    if (!source || source.epoch !== room.epoch || source.version !== room.version) throw new Error('Checkpoint does not match accepted document.')
+    await ctx.db.patch(source._id, { published: source.markdown, publishedEpoch: source.epoch, publishedVersion: source.version })
+  },
+})
+export const content = query({
+  args: { roomId: v.id('rooms') },
+  returns: v.object({ markdown: v.string(), epoch: v.string(), version: v.number(), published: v.optional(v.string()), publishedEpoch: v.optional(v.string()), publishedVersion: v.optional(v.number()) }),
+  handler: async (ctx, args) => {
+    const { room } = await access(ctx, args.roomId)
+    const source = await ctx.db.get(room.documentId)
+    if (!source) throw new Error('Checkpoint is missing.')
+    return { markdown: source.markdown, epoch: source.epoch, version: source.version,
+      ...(source.published !== undefined ? { published: source.published, publishedEpoch: source.publishedEpoch, publishedVersion: source.publishedVersion } : {}) }
+  },
+})
+
+export const prune = mutation({
+  args: { roomId: v.id('rooms'), throughVersion: v.number() }, returns: v.number(),
+  handler: async (ctx, args) => {
+    const { room } = await access(ctx, args.roomId, true, true)
+    version(args.throughVersion)
+    if (args.throughVersion > room.version) invalid('Cannot prune future history.')
+    const rows = await ctx.db.query('steps').withIndex('by_room_epoch_version', q =>
+      q.eq('roomId', room._id).eq('epoch', room.epoch).lte('version', args.throughVersion)).take(32)
+    for (const row of rows) await ctx.db.delete(row._id)
+    if (rows.length) await ctx.db.patch(room._id, { minimumVersion: rows.at(-1)!.version })
+    return rows.length
+  },
+})
+
+// Presence: short-lived records, readable and writable by every member,
+// including readers. Records expire after 30 seconds without a heartbeat.
+const presenceLifetime = 30_000
+const presenceUpdate = v.object({ protocolVersion: v.literal(1), clientId: v.string(),
+  user: v.object({ id: v.optional(v.string()), name: v.string(), color: v.optional(v.string()) }),
+  epoch: v.string(), version: v.number(), selection: v.union(v.null(), v.object({ anchor: v.number(), head: v.number() })), updatedAt: v.number() })
+
+export const publishPresence = mutation({
+  args: { roomId: v.id('rooms'), update: presenceUpdate }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room, member } = await access(ctx, args.roomId)
+    const update = readCollaborationPresence(args.update)
+    if (!update) invalid('Invalid presence record.')
+    ownClientId(member, update.clientId)
+    if (update.epoch !== room.epoch) return null
+    if (update.version > room.version) invalid('The presence version is ahead of this document.')
+    const identity = await ctx.auth.getUserIdentity()
+    // Take the display name from the authenticated account, not from the browser.
+    const now = Date.now()
+    const record = { roomId: room._id, clientId: update.clientId, memberId: member._id, name: identity?.name ?? update.user.name,
+      color: update.user.color, epoch: update.epoch, version: update.version, selection: update.selection,
+      updatedAt: now, expiresAt: now + presenceLifetime }
+    const existing = await ctx.db.query('presence').withIndex('by_room_client', q => q.eq('roomId', room._id).eq('clientId', update.clientId)).unique()
+    if (existing) await ctx.db.patch(existing._id, record)
+    else {
+      const id = await ctx.db.insert('presence', record)
+      await ctx.scheduler.runAfter(presenceLifetime, internal.rooms.expirePresence, { presenceId: id })
+    }
+    return null
+  },
+})
+
+export const leavePresence = mutation({
+  args: { roomId: v.id('rooms'), clientId: v.string() }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const { room, member } = await access(ctx, args.roomId)
+    ownClientId(member, args.clientId)
+    const existing = await ctx.db.query('presence').withIndex('by_room_client', q => q.eq('roomId', room._id).eq('clientId', args.clientId)).unique()
+    if (existing) await ctx.db.delete(existing._id)
+    return null
+  },
+})
+
+/** TTL cleanup: delete an expired record, or check again when it would expire. */
+export const expirePresence = internalMutation({
+  args: { presenceId: v.id('presence') }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.presenceId)
+    if (!record) return null
+    if (record.expiresAt <= Date.now()) await ctx.db.delete(record._id)
+    else await ctx.scheduler.runAt(record.expiresAt, internal.rooms.expirePresence, { presenceId: record._id })
+    return null
+  },
+})
+
+export const presence = query({
+  args: { roomId: v.id('rooms') }, returns: v.array(presenceUpdate),
+  handler: async (ctx, args) => {
+    const { room } = await access(ctx, args.roomId)
+    // Reactive queries do not rerun as time passes; clients also expire silent peers.
+    const records = await ctx.db.query('presence').withIndex('by_room_expiry', q => q.eq('roomId', room._id).gt('expiresAt', Date.now())).take(64)
+    return records.map((record): CollaborationPresenceUpdate => ({ protocolVersion: 1, clientId: record.clientId,
+      user: { id: record.memberId, name: record.name, ...(record.color ? { color: record.color } : {}) },
+      epoch: record.epoch, version: record.version, selection: record.selection, updatedAt: record.updatedAt }))
+  },
+})

@@ -1,35 +1,14 @@
 /**
  * Component converters for MDC to TipTap transformation
  *
- * Handles custom components: binding, file, image, video, template, comment, etc.
+ * Handles custom components: file, image, video, template, comment, etc.
  */
 
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 
 import type { JsonRecord } from '../types'
-import { EMOJI_REGEXP, getEmojiUnicode } from './emoji'
 import type { MDCElement, MDCNode } from './mdcTypes'
 import { normalizeBlockChildren } from './nodes'
-
-/**
- * Creates a binding node for data binding expressions
- */
-export function createBindingNode(
-  node: MDCNode,
-  createTipTapNodeFn: (
-    node: MDCElement,
-    type: string,
-    extra?: { attrs?: JsonRecord; children?: MDCNode[] },
-  ) => JSONContent,
-): JSONContent {
-  const element = node as MDCElement
-  return createTipTapNodeFn(element, 'binding', {
-    attrs: {
-      defaultValue: element.props?.defaultValue,
-      value: element.props?.value,
-    },
-  })
-}
 
 /**
  * Creates a file node
@@ -281,68 +260,8 @@ export function createTemplateNodeWrapper(
 }
 
 /**
- * Creates a text node with emoji support
+ * Creates a text node. Text is kept verbatim; MDC syntax is handled by the parser.
  */
-export function createTextNodeWrapper(node: MDCNode): JSONContent | JSONContent[] {
-  return createTextNode(node as { value: string })
-}
-
-/**
- * Creates a text node with emoji support
- */
-export function createTextNode(node: { value: string }): JSONContent | JSONContent[] {
-  const text = node.value
-  const nodes: JSONContent[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  // Use exec to find all matches without replacing
-  const regex = new RegExp(EMOJI_REGEXP.source, EMOJI_REGEXP.flags)
-  match = regex.exec(text)
-  while (match !== null) {
-    const offset = match.index
-    const matchedText = match[0]
-
-    // Add text before the emoji
-    if (lastIndex < offset) {
-      const textSlice = text.slice(lastIndex, offset)
-      if (textSlice) {
-        nodes.push({
-          text: textSlice,
-          type: 'text',
-        })
-      }
-    }
-
-    // Add the emoji (or original if not found)
-    const emojiName = matchedText.substring(1, matchedText.length - 1)
-    const emojiUnicode = getEmojiUnicode(emojiName)
-    const emojiText = emojiUnicode || matchedText
-    if (emojiText) {
-      nodes.push({
-        text: emojiText,
-        type: 'text',
-      })
-    }
-
-    lastIndex = offset + matchedText.length
-    match = regex.exec(text)
-  }
-
-  // Add remaining text after last match
-  if (lastIndex < text.length) {
-    const remainingText = text.slice(lastIndex)
-    if (remainingText) {
-      nodes.push({
-        text: remainingText,
-        type: 'text',
-      })
-    }
-  }
-
-  if (nodes.length === 0) {
-    return { text, type: 'text' }
-  }
-
-  return nodes
+export function createTextNodeWrapper(node: MDCNode): JSONContent {
+  return { text: (node as { value: string }).value, type: 'text' }
 }

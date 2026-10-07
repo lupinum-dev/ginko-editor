@@ -1,31 +1,19 @@
-import type { JSONContent } from '@tiptap/vue-3'
-import Slugger from 'github-slugger'
+import type { JSONContent } from '@tiptap/core'
 
 import type { JsonRecord, JsonValue } from '../types'
-import { validateTiptapDocShape } from './conversionInvariants'
-import { isDebugEnabled, editorDebug } from './debug'
-import { getEmojiUnicode } from './emoji'
-import { summarizeMdc, summarizeTableMdc } from './markdown'
 import type { MDCComment, MDCElement, MDCNode, MDCRoot, MDCText } from './mdcTypes'
 import { cleanSpanProps, normalizeProps } from './props'
 import { stripStyleNodes } from './stripStyleNodes'
-
-export interface SyntaxHighlightTheme {
-  dark?: string
-  default: string
-}
+import { imageProperties } from './image-properties'
 
 export interface TiptapToMDCOptions {
-  enableDebug?: boolean
   fileOutput?: 'markdown' | 'mdc'
-  highlightTheme?: SyntaxHighlightTheme
   imageOutput?: 'markdown' | 'mdc'
   videoOutput?: 'html' | 'mdc'
 }
 
 interface TiptapToMDCContext {
   options: TiptapToMDCOptions
-  slugs: Slugger
 }
 
 type TiptapToMDCMap = Record<
@@ -33,9 +21,6 @@ type TiptapToMDCMap = Record<
   (node: JSONContent, context: TiptapToMDCContext) => MDCNode | MDCNode[] | MDCRoot
 >
 
-const RE_SLUG_MULTI_DASH = /-+/g
-const RE_SLUG_TRIM_DASH = /^-|-$/g
-const RE_SLUG_LEADING_DIGIT = /^(\d)/
 const RE_TEXT_LEADING_SPACE = /^\s+/
 const RE_TEXT_TRAILING_SPACE = /\s+$/
 
@@ -80,13 +65,6 @@ function sanitizeNumberish(value: unknown): null | number | string {
     return null
   }
   return normalized
-}
-
-function createBindingElement(node: JSONContent): MDCElement {
-  const attrs = node.attrs as JsonRecord | undefined
-  const defaultValue = attrs?.defaultValue as string
-  const value = attrs?.value as string
-  return { children: [], props: { defaultValue, value }, tag: 'binding', type: 'element' }
 }
 
 function createBlockquoteElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
@@ -191,7 +169,6 @@ function createVideoElementWrapper(node: JSONContent, context: TiptapToMDCContex
 }
 
 const tiptapToMDCMap: TiptapToMDCMap = {
-  binding: createBindingElement,
   blockquote: createBlockquoteElement,
   bold: createBoldElement,
   br: createBrElement,
@@ -237,31 +214,10 @@ export function tiptapNodeToMDC(
   }
 
   if (node.type && tiptapToMDCMap[node.type]) {
-    if (node.type.startsWith('table')) {
-      editorDebug.log('tiptapNodeToMDC table node', {
-        attrs: node.attrs,
-        hasContent: !!node.content?.length,
-        type: node.type,
-      })
-    }
     return tiptapToMDCMap[node.type]!(node, context)
   }
 
-  if (node.type === 'emoji') {
-    return { type: 'text', value: getEmojiUnicode(node.attrs?.name || '') }
-  }
-
-  return {
-    children: [
-      {
-        type: 'text',
-        value: `--- Unknown node: ${node.type} ---`,
-      },
-    ],
-    props: {},
-    tag: 'p',
-    type: 'element',
-  }
+  throw new Error(`Cannot convert unknown editor node: ${String(node.type)}`)
 }
 
 /**
@@ -273,41 +229,19 @@ export async function tiptapToMDC(
 ): Promise<MDCRoot> {
   const cleaned = createMdcBodyFromTiptap(node, options)
 
-  if (isDebugEnabled()) {
-    editorDebug.log('tiptapToMDC output', summarizeMdc(cleaned))
-    editorDebug.log('tiptapToMDC table summary', summarizeTableMdc(cleaned))
-  }
-
   return cleaned
 }
 
 function createMdcBodyFromTiptap(node: JSONContent, options?: TiptapToMDCOptions): MDCRoot {
   const context: TiptapToMDCContext = {
     options: options || {},
-    slugs: new Slugger(),
   }
 
   const nodeCopy = structuredClone(node)
 
-  if (isDebugEnabled()) {
-    const issues = validateTiptapDocShape(nodeCopy)
-    if (issues.length > 0) {
-      editorDebug.warn('tiptapToMDC invariant issues detected before conversion', {
-        count: issues.length,
-        issues,
-      })
-    }
-  }
-
   const body = tiptapNodeToMDC(nodeCopy, context) as MDCRoot
 
-  if (isDebugEnabled()) {
-    editorDebug.log('tiptapToMDC input', summarizeTiptap(node))
-    editorDebug.log('tiptapToMDC output before highlight', summarizeMdc(body))
-    editorDebug.log('tiptapToMDC table summary', summarizeTableMdc(body))
-  }
-
-  const cleaned = stripStyleNodes(body, 'tiptapToMDC')
+  const cleaned = stripStyleNodes(body)
 
   return cleaned
 }
@@ -513,15 +447,9 @@ function createFileElement(node: JSONContent, context: TiptapToMDCContext): MDCE
 function createHeadingElement(node: JSONContent, context: TiptapToMDCContext): MDCElement {
   const level = node.attrs?.level || 1
   const mdcNode = createElement(node, context, `h${level}`)
-  const content = getNodeContent(node) || ''
-
-  const slug = context.slugs
-    .slug(content)
-    .replace(RE_SLUG_MULTI_DASH, '-')
-    .replace(RE_SLUG_TRIM_DASH, '')
-    .replace(RE_SLUG_LEADING_DIGIT, '_$1')
-
-  mdcNode.props!.id = slug
+  const id = node.attrs?.id
+  if (typeof id === 'string' && id) mdcNode.props!.id = id
+  else delete mdcNode.props!.id
   return mdcNode
 }
 
@@ -531,33 +459,15 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
   const imageOutput = context.options.imageOutput ?? 'mdc'
 
   const imageProps: JsonRecord = {}
-  if (props.id) imageProps.id = props.id
-  if (props.filename) imageProps.filename = props.filename
-  if (isMeaningfulPropValue(src)) imageProps.src = src
-  const alt = props.alt || node.attrs?.alt
-  if (isMeaningfulPropValue(alt)) imageProps.alt = alt
-  if (isMeaningfulPropValue(props.title)) imageProps.title = props.title
-  const width = sanitizeNumberish(props.width)
-  if (width !== null) imageProps.width = width
-  const height = sanitizeNumberish(props.height)
-  if (height !== null) imageProps.height = height
-  if (isMeaningfulPropValue(props.fit)) imageProps.fit = props.fit
-  const quality = sanitizeNumberish(props.quality)
-  if (quality !== null) imageProps.quality = quality
-  if (isMeaningfulPropValue(props.format)) imageProps.format = props.format
-  const focalX = sanitizeNumberish(props.focalX)
-  if (focalX !== null) imageProps.focalX = focalX
-  const focalY = sanitizeNumberish(props.focalY)
-  if (focalY !== null) imageProps.focalY = focalY
-  const cropX = sanitizeNumberish(props.cropX)
-  if (cropX !== null) imageProps.cropX = cropX
-  const cropY = sanitizeNumberish(props.cropY)
-  if (cropY !== null) imageProps.cropY = cropY
-  const cropWidth = sanitizeNumberish(props.cropWidth)
-  if (cropWidth !== null) imageProps.cropWidth = cropWidth
-  const cropHeight = sanitizeNumberish(props.cropHeight)
-  if (cropHeight !== null) imageProps.cropHeight = cropHeight
-  if (isMeaningfulPropValue(props.class)) imageProps.class = props.class
+  for (const [key, kind] of Object.entries(imageProperties)) {
+    const value = key === 'src' ? src : key === 'alt' ? props.alt || node.attrs?.alt : props[key]
+    if (kind === 'number') {
+      const number = sanitizeNumberish(value)
+      if (number !== null) imageProps[key] = number
+    } else if (key === 'id' || key === 'filename' ? !!value : isMeaningfulPropValue(value)) {
+      imageProps[key] = value
+    }
+  }
 
   const transformKeys = [
     'fit',
@@ -737,26 +647,6 @@ function mergeSiblingsWithSameTag(children: MDCNode[], allowedTags: string[]): M
   }
 
   return merged
-}
-
-function summarizeTiptap(node: JSONContent) {
-  const stats = {
-    nodes: 0,
-    nodeTypes: [] as string[],
-  }
-
-  const walk = (current: JSONContent) => {
-    stats.nodes += 1
-    if (current.type) stats.nodeTypes.push(current.type)
-    ;(current.content || []).forEach((child) => walk(child))
-  }
-
-  walk(node)
-
-  return {
-    ...stats,
-    nodeTypes: [...new Set(stats.nodeTypes)],
-  }
 }
 
 function unwrapDefaultSlot(content: JSONContent[]): JSONContent[] {

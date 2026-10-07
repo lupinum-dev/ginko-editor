@@ -8,10 +8,22 @@ import type { NodeView } from '@tiptap/pm/view'
 import { blockSettings } from './settings'
 import { icon } from './icons'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import type { AuthoringKitV1 } from '../../authoring'
+import type { AuthoringKit } from '../../authoring'
+import { SetNodePropertyStep } from '../property-step'
+import { createPropertyInput } from '../property-input'
+import { handleHistoryKeydown, observeNodeViewRefresh } from './lifecycle'
+import { containerControls } from './items'
+import { containerItemsKey, isItemCollapsed, toggleContainerItem } from '../extensions/container-items'
+import { itemsConfig } from '../container-items'
 
-export function componentView({ node: initial, editor, getPos }: NodeViewRendererProps, getKit: () => AuthoringKitV1 | undefined, getOutputOptions: () => TiptapToMDCOptions, overlay?: EditorOverlayController): NodeView {
+export function componentView(
+  { node: initial, editor, getPos }: NodeViewRendererProps,
+  getKit: () => AuthoringKit | undefined,
+  getOutputOptions: () => TiptapToMDCOptions,
+  overlay?: EditorOverlayController,
+): NodeView {
   const text = overlay?.text ?? createEditorText()
+  const titleInput = createPropertyInput(editor)
   let node = initial
   const dom = document.createElement('div')
   dom.className = 'ginko-block'
@@ -35,27 +47,68 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
   divider.tabIndex = 0
   const symbol = document.createElement('span')
   symbol.className = 'ginko-block__symbol'
-  header.append(label, symbol, title)
+  const collapse = document.createElement('button')
+  collapse.type = 'button'
+  collapse.className = 'ginko-icon-button ginko-block__collapse'
+  collapse.append(icon('chevron'))
+  collapse.hidden = true
+  header.append(collapse, label, symbol, title)
   const body = document.createElement('div')
   body.className = 'ginko-block__body'
   body.append(contentDOM, divider)
-  dom.append(header, body)
+  const items = containerControls(editor, () => node, () => position(), getKit, text, contentDOM)
+  dom.append(header, items.strip, body, items.footer)
   let dragging: { pointerId: number; ratio: number } | undefined
   let destroyed = false
   let previousKit = getKit()
   const position = () => destroyed ? undefined : getPos()
   const metadata = () => getKit()?.authoring[node.attrs.tag]
   const columns = () => metadata()?.canvas?.columns
-  const paired = () => { const config = columns(); return config ? columnChildren(node, config.childTag) : [] }
+  const paired = () => {
+    const config = columns()
+    return config ? columnChildren(node, config.childTag) : []
+  }
   const presetIndex = () => {
     const config = columns(), children = paired()
-    return config?.presets.findIndex(preset => children.length === 2 && preset.values.every((value, i) => (children[i].node.attrs.props[config.sizeProp] ?? getKit()?.implementation[config.childTag]?.props[config.sizeProp]?.default) === value)) ?? -1
+    return config?.presets.findIndex(preset => children.length === 2
+      && preset.values.every((value, i) => (children[i].node.attrs.props[config.sizeProp]
+        ?? getKit()?.implementation[config.childTag]?.props[config.sizeProp]?.default) === value)) ?? -1
   }
-  const parentColumns = () => { const pos = position(); return pos === undefined ? undefined : parentColumnConfig(editor.state.doc, pos, getKit()) }
-  const settings = blockSettings(editor, () => node, position, getKit, getOutputOptions, () => !!parentColumns(), overlay)
+  /** The accordion that contains this item, if any. View state only. */
+  const inAccordion = () => {
+    const pos = position()
+    if (pos === undefined) return false
+    const resolved = editor.state.doc.resolve(pos)
+    for (let depth = resolved.depth; depth > 0; depth--) {
+      const parent = resolved.node(depth)
+      if (parent.type.name === 'slot') continue
+      const config = itemsConfig(getKit(), parent.attrs.tag)
+      return config?.presentation === 'accordion' && config.childTag === node.attrs.tag
+    }
+    return false
+  }
+  collapse.addEventListener('click', () => {
+    const pos = position()
+    if (pos !== undefined) editor.view.dispatch(toggleContainerItem(editor.state.tr, pos))
+  })
+  const parentColumns = () => {
+    const pos = position()
+    return pos === undefined ? undefined : parentColumnConfig(editor.state.doc, pos, getKit())
+  }
+  const settings = blockSettings(
+    editor,
+    () => node,
+    position,
+    getKit,
+    getOutputOptions,
+    () => !!parentColumns(),
+    overlay,
+  )
   header.append(settings.dom)
   let paintedTone = ''
-  const paintRatio = (ratio: number) => { dom.style.setProperty('--column-ratio', `${ratio * 100}%`) }
+  const paintRatio = (ratio: number) => {
+    dom.style.setProperty('--column-ratio', `${ratio * 100}%`)
+  }
   const cancelDrag = () => {
     const drag = dragging
     dragging = undefined
@@ -72,26 +125,45 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     cancelDrag()
     if (index === presetIndex()) return
     const tr = closeHistory(editor.state.tr)
-    children.forEach((child, i) => tr.setNodeMarkup(pos + child.offset, undefined, { ...child.node.attrs, props: { ...child.node.attrs.props, [config.sizeProp]: preset.values[i] } }))
+    children.forEach((child, i) => tr.step(new SetNodePropertyStep(pos + child.offset, config.sizeProp, preset.values[i])))
     editor.view.dispatch(tr)
   }
-  title.addEventListener('focus', () => { const pos = position(); if (pos !== undefined && editor.isEditable) editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos + 1)))) })
+  title.addEventListener('focus', () => {
+    titleInput.reset()
+    const pos = position()
+    if (pos !== undefined && editor.isEditable) {
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos + 1))))
+    }
+  })
+  title.addEventListener('blur', () => titleInput.reset())
   title.addEventListener('input', () => {
     const prop = metadata()?.canvas?.titleProp, pos = position()
     if (!prop || pos === undefined || !editor.isEditable) return
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, props: { ...node.attrs.props, [prop]: title.value } }))
+    editor.view.dispatch(titleInput.transaction(pos, prop, title.value))
   })
   title.addEventListener('keydown', event => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) editor.commands.redo(); else editor.commands.undo() }
-    if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); editor.view.focus() }
+    if (event.isComposing) return
+    handleHistoryKeydown(editor, event, titleInput.reset)
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.preventDefault()
+      editor.view.focus()
+    }
   })
   divider.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { cancelDrag(); event.preventDefault(); return }
+    if (event.key === 'Escape') {
+      cancelDrag()
+      event.preventDefault()
+      return
+    }
     const presets = columns()?.presets
     if (!presets || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     const index = Math.max(0, presetIndex())
-    choosePreset(event.key === 'Home' ? 0 : event.key === 'End' ? presets.length - 1 : Math.max(0, Math.min(presets.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1))))
+    choosePreset(event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? presets.length - 1
+        : Math.max(0, Math.min(presets.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1))))
   })
   divider.addEventListener('pointerdown', event => {
     if (!editor.isEditable || event.button !== 0 || dragging) return
@@ -104,8 +176,16 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     if (!dragging || dragging.pointerId !== event.pointerId) return
     const bounds = contentDOM.getBoundingClientRect(), presets = columns()?.presets
     if (!presets || bounds.width === 0) return
-    dragging.ratio = Math.max(presets[0].ratio, Math.min(presets[presets.length - 1].ratio, (event.clientX - bounds.left) / bounds.width))
-    const nearest = presets.reduce((best, preset) => Math.abs(preset.ratio - dragging!.ratio) < Math.abs(best.ratio - dragging!.ratio) ? preset : best, presets[0])
+    dragging.ratio = Math.max(
+      presets[0].ratio,
+      Math.min(presets[presets.length - 1].ratio, (event.clientX - bounds.left) / bounds.width),
+    )
+    const nearest = presets.reduce(
+      (best, preset) => Math.abs(preset.ratio - dragging!.ratio) < Math.abs(best.ratio - dragging!.ratio)
+        ? preset
+        : best,
+      presets[0],
+    )
     paintRatio(nearest.ratio)
     divider.setAttribute('aria-valuetext', nearest.label)
     divider.setAttribute('aria-valuenow', String(Math.round(nearest.ratio * 100)))
@@ -114,37 +194,73 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
     if (!dragging || dragging.pointerId !== event.pointerId) return
     const ratio = dragging.ratio, presets = columns()?.presets
     cancelDrag()
-    if (presets) choosePreset(presets.reduce((best, preset, index) => Math.abs(preset.ratio - ratio) < Math.abs(presets[best].ratio - ratio) ? index : best, 0))
+    if (presets) {
+      choosePreset(presets.reduce(
+        (best, preset, index) => Math.abs(preset.ratio - ratio) < Math.abs(presets[best].ratio - ratio)
+          ? index
+          : best,
+        0,
+      ))
+    }
   })
   divider.addEventListener('pointercancel', cancelDrag)
   divider.addEventListener('lostpointercapture', cancelDrag)
+  function relabel() {
+    title.placeholder = text('addTitle')
+    divider.setAttribute('aria-label', text('columnWidths'))
+  }
   function render() {
     if ((!editor.isEditable || getKit() !== previousKit) && dragging) cancelDrag()
     previousKit = getKit()
     const meta = metadata(), config = columns(), children = paired()
     const isPair = !!config && children.length === 2
     const prop = meta?.canvas?.titleProp
-    const titleSlot = prop && node.content.content.some(child => child.type.name === 'slot' && child.attrs.name === prop && child.content.size > 0)
+    const titleSlot = prop
+      && node.content.content.some(child => child.type.name === 'slot'
+        && child.attrs.name === prop
+        && child.content.size > 0)
     dom.dataset.label = meta?.label ?? node.attrs.tag
     dom.setAttribute('tag', node.attrs.tag)
     const parentConfig = parentColumns()
-    label.textContent = isPair ? text('resizeColumns') : parentConfig ? text('columnSize', { label: meta?.label ?? node.attrs.tag, size: String(node.attrs.props[parentConfig.sizeProp] ?? getKit()?.implementation[node.attrs.tag]?.props[parentConfig.sizeProp]?.default ?? 'md') }) : meta?.label ?? node.attrs.tag
+    label.textContent = isPair
+      ? text('resizeColumns')
+      : parentConfig
+        ? text('columnSize', {
+          label: meta?.label ?? node.attrs.tag,
+          size: String(node.attrs.props[parentConfig.sizeProp]
+            ?? getKit()?.implementation[node.attrs.tag]?.props[parentConfig.sizeProp]?.default
+            ?? 'md'),
+        })
+        : meta?.label ?? node.attrs.tag
     label.hidden = !!prop && !isPair
     dom.dataset.tone = meta?.canvas?.tone ?? 'neutral'
     dom.dataset.callout = String(!!meta?.canvas?.switchGroup)
-    dom.dataset.appearance = typeof node.attrs.props.appearance === 'string' ? node.attrs.props.appearance : 'tint'
+    dom.dataset.appearance = typeof node.attrs.props.appearance === 'string'
+      ? node.attrs.props.appearance
+      : 'tint'
     dom.dataset.column = String(!!parentConfig)
     symbol.hidden = !meta?.canvas?.tone
     if (paintedTone !== dom.dataset.tone) {
       paintedTone = dom.dataset.tone
-      symbol.replaceChildren(icon(paintedTone === 'warning' || paintedTone === 'danger' ? 'warning' : paintedTone === 'success' ? 'check' : paintedTone === 'idea' ? 'idea' : 'info'))
+      symbol.replaceChildren(icon(
+        paintedTone === 'warning' || paintedTone === 'danger'
+          ? 'warning'
+          : paintedTone === 'success'
+            ? 'check'
+            : paintedTone === 'idea'
+              ? 'idea'
+              : 'info',
+      ))
     }
-    const titleValue = prop ? String(node.attrs.props[prop] ?? getKit()?.implementation[node.attrs.tag]?.props[prop]?.default ?? '') : ''
+    const titleValue = prop
+      ? String(node.attrs.props[prop] ?? getKit()?.implementation[node.attrs.tag]?.props[prop]?.default ?? '')
+      : ''
     title.hidden = !prop || !!titleSlot
     title.disabled = !editor.isEditable
-    title.setAttribute('aria-label', text('componentTitle', { label: meta?.label ?? node.attrs.tag, field: prop ? meta?.props?.[prop]?.label ?? prop : text('title') }))
-    title.placeholder = text('addTitle')
-    divider.setAttribute('aria-label', text('columnWidths'))
+    title.setAttribute('aria-label', text('componentTitle', {
+      label: meta?.label ?? node.attrs.tag,
+      field: prop ? meta?.props?.[prop]?.label ?? prop : text('title'),
+    }))
     if (title.value !== titleValue) title.value = titleValue
     dom.dataset.columns = String(isPair)
     const selected = presetIndex()
@@ -158,18 +274,59 @@ export function componentView({ node: initial, editor, getPos }: NodeViewRendere
       divider.title = text('resizeColumnsHint', { label: config.presets[selected]?.label ?? text('customWidths') })
 
     }
+    const accordionItem = inAccordion()
+    const pos = position()
+    const collapsed = accordionItem && pos !== undefined && isItemCollapsed(editor.state, pos)
+    collapse.hidden = !accordionItem
+    collapse.setAttribute('aria-expanded', String(!collapsed))
+    collapse.setAttribute('aria-controls', contentDOM.id || '')
+    const itemName = titleValue || meta?.label || node.attrs.tag
+    collapse.setAttribute('aria-label', text(collapsed ? 'expandItem' : 'collapseItem', { label: itemName }))
+    collapse.title = collapse.getAttribute('aria-label') ?? ''
+    dom.dataset.items = itemsConfig(getKit(), node.attrs.tag)?.presentation ?? ''
+    items.render()
     settings.render()
   }
-  const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => { if (transaction.docChanged && dragging) cancelDrag(); render() }
-  const onUpdate = ({ transaction }: { transaction: { docChanged: boolean } }) => { if (!transaction.docChanged) render() }
-  editor.on('transaction', onTransaction)
-  editor.on('update', onUpdate)
-  render()
+  let itemsState = containerItemsKey.getState(editor.state)
+  const followItems = () => {
+    const next = containerItemsKey.getState(editor.state)
+    if (next === itemsState) return
+    itemsState = next
+    refresh.refresh(true)
+  }
+  editor.on('transaction', followItems)
+  const cancelDragOnChange = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+    if (transaction.docChanged && dragging) cancelDrag()
+  }
+  editor.on('transaction', cancelDragOnChange)
+  // Column labels read the parent component, so a change elsewhere can matter.
+  const refresh = observeNodeViewRefresh({ editor, overlay, render, relabel, onDocumentChange: true })
+  refresh.refresh(true)
   return {
     dom, contentDOM,
-    update(next) { if (next.type !== node.type) return false; node = next; render(); return true },
-    stopEvent(event) { return event.target instanceof globalThis.Node && (header.contains(event.target) || divider.contains(event.target) || settings.contains(event.target)) },
-    ignoreMutation(mutation) { return mutation.type !== 'selection' && !contentDOM.contains(mutation.target) },
-    destroy() { destroyed = true; cancelDrag(); settings.destroy(); editor.off('transaction', onTransaction); editor.off('update', onUpdate) },
+    update(next) {
+      if (next.type !== node.type) return false
+      node = next
+      refresh.refresh(true)
+      return true
+    },
+    stopEvent(event) {
+      return event.target instanceof globalThis.Node
+        && (header.contains(event.target) || divider.contains(event.target) || settings.contains(event.target)
+          || items.contains(event.target))
+    },
+    ignoreMutation(mutation) {
+      // Container controls set view attributes on the content element itself.
+      if (mutation.type === 'attributes' && mutation.target === contentDOM) return true
+      return mutation.type !== 'selection' && !contentDOM.contains(mutation.target)
+    },
+    destroy() {
+      destroyed = true
+      cancelDrag()
+      settings.destroy()
+      editor.off('transaction', cancelDragOnChange)
+      editor.off('transaction', followItems)
+      refresh.destroy()
+    },
   }
 }
