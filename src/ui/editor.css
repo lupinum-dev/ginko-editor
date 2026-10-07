@@ -35,30 +35,67 @@
   }
 
   .ginko-editor__header {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: .5rem;
     border-bottom: 1px solid var(--ginko-border);
-    padding: .45rem .55rem;
+    padding: .5rem .6rem;
   }
 
   .ginko-editor__insert-trigger {
-    justify-self: start;
     display: inline-flex;
     align-items: center;
-    gap: .35rem;
-    font-weight: 650;
+    gap: .45rem;
+    margin-inline-end: auto;
+    font-weight: 600;
   }
 
   .ginko-editor__insert-trigger span[aria-hidden='true'] {
-    font-size: 1.2rem;
+    display: inline-grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: var(--ginko-primary);
+    color: var(--ginko-primary-foreground);
+    font-size: 1rem;
     line-height: 1;
+    transition: transform 160ms cubic-bezier(.2, 0, 0, 1);
   }
 
+  .ginko-editor__insert-trigger[aria-expanded='true'] span[aria-hidden='true'] {
+    transform: rotate(45deg);
+  }
+
+  /* A segmented control: the pressed mode sits on a raised surface. */
   .ginko-editor__modes {
     display: flex;
-    gap: .2rem;
+    gap: 2px;
+    border-radius: calc(var(--ginko-radius) - 1px);
+    background: var(--ginko-muted);
+    padding: 3px;
+  }
+
+  .ginko-editor__header .ginko-editor__modes button {
+    min-height: 1.9rem;
+    border-radius: calc(var(--ginko-radius) - 3px);
+    color: var(--ginko-muted-foreground);
+    font-size: .8rem;
+    font-weight: 550;
+    transition: background-color 140ms, color 140ms, box-shadow 140ms;
+  }
+
+  .ginko-editor__header .ginko-editor__modes button:hover {
+    background: transparent;
+    color: var(--ginko-foreground);
+  }
+
+  .ginko-editor__header .ginko-editor__modes button[aria-pressed='true'] {
+    background: var(--ginko-background);
+    color: var(--ginko-foreground);
+    box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px color-mix(in srgb, var(--ginko-border) 70%, transparent);
   }
 
   .ginko-editor__peers {
@@ -97,6 +134,19 @@
     color: var(--ginko-muted-foreground);
     font-size: .78rem;
     white-space: nowrap;
+  }
+
+  /* Visual order: insert, then status, people, and mode at the end. */
+  .ginko-editor__header .ginko-editor__status {
+    order: 1;
+  }
+
+  .ginko-editor__header .ginko-editor__peers {
+    order: 2;
+  }
+
+  .ginko-editor__header .ginko-editor__modes {
+    order: 3;
   }
 
   .ginko-editor__sr-only {
@@ -339,11 +389,11 @@
     font-size: .85rem;
   }
 
-  .ginko-editor__surface {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface {
     padding: clamp(1rem, 3vw, 1.75rem);
   }
 
-  .ginko-editor__surface .ProseMirror {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror {
     max-width: 46rem;
     min-height: 22rem;
     margin-inline: auto;
@@ -360,55 +410,53 @@
     color: var(--ginko-muted-foreground);
   }
 
-  .ginko-editor__surface .ProseMirror h1 {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror h1 {
     font-size: 2rem;
     font-weight: 650;
   }
 
-  .ginko-editor__surface .ProseMirror h2 {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror h2 {
     font-size: 1.5rem;
     font-weight: 650;
   }
 
-  .ginko-editor__surface .ProseMirror h3 {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror h3 {
     font-size: 1.2rem;
     font-weight: 650;
   }
 
-  .ginko-editor__surface .ProseMirror ul {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror ul {
     list-style: disc;
     padding-inline-start: 1.5rem;
   }
 
-  .ginko-editor__surface .ProseMirror ol {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror ol {
     list-style: decimal;
     padding-inline-start: 1.5rem;
   }
 
-  .ginko-editor__surface .ProseMirror blockquote {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror blockquote {
     border-inline-start: 3px solid var(--ginko-foreground);
     padding-inline-start: 1rem;
     margin-inline: 0;
   }
 
-  .ginko-editor__surface .ProseMirror pre {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror pre {
     background: var(--ginko-muted);
     border-radius: .5rem;
     padding: 1rem;
     overflow-x: auto;
   }
 
-  .ginko-editor__surface .ProseMirror > :first-child {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror > :first-child {
     margin-top: 0;
   }
 
-  .ginko-editor__surface .ProseMirror > * + * {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror > * + * {
     margin-block-start: 1em;
   }
 
-  .ginko-editor__surface .ProseMirror h1,
-  .ginko-editor__surface .ProseMirror h2,
-  .ginko-editor__surface .ProseMirror h3 {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror :is(h1, h2, h3) {
     line-height: 1.2;
     letter-spacing: -.02em;
   }
@@ -438,12 +486,12 @@
     height: auto;
   }
 
-  .ginko-editor__surface table {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface table {
     width: 100%;
     border-collapse: collapse;
   }
 
-  .ginko-editor__surface td, .ginko-editor__surface th {
+  .ginko-editor[data-variant='default'] .ginko-editor__surface td, .ginko-editor__surface th {
     border: 1px solid var(--ginko-border);
     padding: .5rem;
   }
@@ -466,19 +514,111 @@
     :is(.ginko-editor__header, .ginko-editor__warning, .ginko-editor__insert-menu) button {
       min-height: 2.75rem;
     }
-    .ginko-editor__header {
-      grid-template-columns: 1fr auto;
-    }
-    .ginko-editor__status {
-      grid-column: 1 / -1;
-      grid-row: 2;
+    .ginko-editor__header .ginko-editor__status {
+      order: 4;
+      flex-basis: 100%;
       padding-inline: .65rem;
     }
-    .ginko-editor__surface {
+    .ginko-editor[data-variant='default'] .ginko-editor__surface {
       padding: 1rem;
     }
-    .ginko-editor__surface .ProseMirror {
+    .ginko-editor[data-variant='default'] .ginko-editor__surface .ProseMirror {
       min-height: 18rem;
+    }
+  }
+
+  /* The top formatting row stays reachable while a long document scrolls. */
+  .ginko-editor[data-variant='default'] > .ginko-toolbar {
+    position: sticky;
+    top: var(--ginko-sticky-top, 0px);
+    z-index: 5;
+    background: color-mix(in srgb, var(--ginko-background) 92%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+  }
+
+  /*
+   * Inline variant: no frame and no typography of its own. The host's styles
+   * for paragraphs, headings, and lists apply, so text looks as it will on the page.
+   */
+  .ginko-editor[data-variant='inline'] {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .ginko-editor[data-variant='inline'] .ginko-editor__surface .ProseMirror {
+    outline: none;
+    min-height: 1lh;
+  }
+
+  .ginko-editor[data-variant='inline']:focus-within {
+    outline: var(--ginko-inline-focus-outline, 2px solid color-mix(in srgb, var(--ginko-ring) 55%, transparent));
+    outline-offset: var(--ginko-inline-focus-offset, 6px);
+    border-radius: var(--ginko-inline-focus-radius, 4px);
+  }
+
+  .ginko-editor[data-variant='inline'] .ginko-editor__surface .ProseMirror p.mdc-editor-empty:first-child::before {
+    color: currentcolor;
+    opacity: .45;
+  }
+
+  /* Formatting row docked above the on-screen keyboard. */
+  .ginko-keyboard-dock {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: var(--ginko-z-floating);
+    transform: translateY(calc(-1 * var(--ginko-keyboard-inset, 0px)));
+    border-top: 1px solid var(--ginko-border);
+    padding: .25rem max(.5rem, env(safe-area-inset-right)) calc(.25rem + env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--ginko-popover) 90%, transparent);
+    color: var(--ginko-popover-foreground);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / .08);
+    backdrop-filter: saturate(1.6) blur(14px);
+  }
+
+  /* The keyboard covers the home indicator, so its safe area needs no padding. */
+  .ginko-keyboard-dock[data-keyboard='open'] {
+    padding-bottom: .25rem;
+  }
+
+  .ginko-keyboard-dock .ginko-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .ginko-keyboard-dock .ginko-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ginko-keyboard-dock .ginko-control {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ginko-keyboard-dock-enter-active,
+  .ginko-keyboard-dock-leave-active {
+    transition: opacity 160ms ease-out, translate 200ms cubic-bezier(.2, 0, 0, 1);
+  }
+
+  .ginko-keyboard-dock-enter-from,
+  .ginko-keyboard-dock-leave-to {
+    opacity: 0;
+    translate: 0 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ginko-keyboard-dock-enter-active,
+    .ginko-keyboard-dock-leave-active {
+      transition: none;
+    }
+    .ginko-editor__insert-trigger span[aria-hidden='true'] {
+      transition: none;
     }
   }
 }

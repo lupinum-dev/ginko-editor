@@ -3,6 +3,7 @@ import type { Node } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { ReplaceStep, Transform, type Step } from '@tiptap/pm/transform'
 import { collab, getVersion, receiveTransaction, sendableSteps } from 'prosemirror-collab'
+import { profileExemptMeta } from '../profiles'
 import { decodeCollaborationDocument, decodeCollaborationSteps, stableJson } from './validation'
 import {
   assertCollaborationHead, collaborationLimits, collaborationProtocolVersion, CollaborationError, fenceMismatch,
@@ -435,7 +436,7 @@ export class EditorCollaborationSession {
       this.restoring = true
       let index = 0
       for (const count of recovery.groups) {
-        const transaction = editor.state.tr.setMeta(remoteChange, true)
+        const transaction = editor.state.tr.setMeta(remoteChange, true).setMeta(profileExemptMeta, true)
         for (const step of decodeCollaborationSteps(recovery.steps.slice(index, index + count), editor.schema)) transaction.step(step)
         editor.view.dispatch(transaction)
         index += count
@@ -608,7 +609,7 @@ export class EditorCollaborationSession {
     const confirmed = new Transform(this.confirmed)
     for (const step of steps) confirmed.step(step)
     confirmed.doc.check()
-    const transaction = receiveTransaction(editor.state, steps, clientIds, { mapSelectionBackward: true }).setMeta(remoteChange, true)
+    const transaction = receiveTransaction(editor.state, steps, clientIds, { mapSelectionBackward: true }).setMeta(remoteChange, true).setMeta(profileExemptMeta, true)
     this.history.append(update.fromVersion, confirmed.mapping.maps)
     this.confirmed = confirmed.doc
     editor.view.dispatch(transaction)
@@ -712,7 +713,7 @@ export class EditorCollaborationSession {
       const collabState: CollabStateShape = { version: getVersion(editor.state), unconfirmed: [] }
       this.orphanOwnSteps = true
       editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, this.confirmed.content)
-        .setMeta(remoteChange, true).setMeta('addToHistory', false).setMeta(this.collabPlugin, collabState))
+        .setMeta(remoteChange, true).setMeta(profileExemptMeta, true).setMeta('addToHistory', false).setMeta(this.collabPlugin, collabState))
     }
     this.recoveryDirty = true
     this.flushRecovery()

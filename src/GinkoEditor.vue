@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, provide, ref, watch, type ComputedRef } from
 
 import { useAssetRequests } from './composables/useAssetRequests'
 import { useCollaborationBinding } from './composables/useCollaborationBinding'
+import { useTouchDevice } from './composables/useDevice'
 import { useInsertMenu } from './composables/useInsertMenu'
 import { useMarkdownSync } from './composables/useMarkdownSync'
 import { useStableAuthoringKit } from './composables/useStableAuthoringKit'
@@ -12,11 +13,13 @@ import { createEditorExtensions } from './lib/config/editorConfig'
 import type { ConversionErrorPayload, ConversionRecoveredPayload } from './lib/conversionPipeline'
 import { observeEditorOperations, type EditorOperationContext } from './lib/editor-operations'
 import { refreshNodeViews } from './lib/nodeviews/lifecycle'
+import { profileAllowsBlocks, profileRuleExtensions, resolveEditorProfile } from './lib/profiles'
 import type { EditorAssetRequest, EditorFile, EditorImage, EditorVideo, GinkoEditorHandle } from './types'
 import { useEditorActions, type EditorActions } from './ui/commands'
 import { createEditorOverlayController, editorOverlayKey } from './ui/context'
 import { routeEditorKeydown } from './ui/editor-keyboard'
 import GinkoInsertMenu from './ui/GinkoInsertMenu.vue'
+import GinkoKeyboardDock from './ui/GinkoKeyboardDock.vue'
 import GinkoSelectionToolbar from './ui/GinkoSelectionToolbar.vue'
 import GinkoToolbar from './ui/GinkoToolbar.vue'
 import { SlashCommands } from './ui/slash-command'
@@ -35,6 +38,26 @@ const emit = defineEmits<{
   'request-video': [request: EditorAssetRequest<EditorVideo>]
   'update:modelValue': [value: string]
 }>()
+
+/** Fixed for the editor's lifetime, like its schema rules. */
+const profile = resolveEditorProfile(props.profile)
+const allowsBlocks = profileAllowsBlocks(profile)
+const ruleExtensions = profileRuleExtensions(profile)
+const touch = useTouchDevice()
+const inline = computed(() => props.variant === 'inline')
+const showHeader = computed(() => props.header ?? !inline.value)
+const showSourceToggle = computed(() => props.sourceToggle ?? !inline.value)
+const toolbarPlacement = computed<'top' | 'keyboard' | false>(() => {
+  const placement = props.toolbarPlacement ?? (inline.value ? 'auto' : 'top')
+  if (placement !== 'auto') return placement
+  if (touch.value) return 'keyboard'
+  return inline.value ? false : 'top'
+})
+const showSelectionToolbar = computed(() =>
+  props.selectionToolbar === 'always' || (props.selectionToolbar === 'auto' && !touch.value))
+const editorFocused = ref(false)
+const dockFocused = ref(false)
+const dockMenuOpen = ref(false)
 
 const binding = useCollaborationBinding(() => props.collaboration)
 const authoring = useStableAuthoringKit(() => props.authoringKit)
@@ -63,9 +86,12 @@ const label = computed(() => props.ariaLabel ?? text('contentLabel'))
 const editor = useEditor({
   content: binding.session?.initialDocument ?? { content: [{ type: 'paragraph' }], type: 'doc' },
   editable: !props.disabled && binding.canEdit(),
+  enableInputRules: ruleExtensions,
+  enablePasteRules: ruleExtensions,
   editorProps: { attributes: { 'aria-label': label.value, role: 'textbox', 'aria-multiline': 'true' } },
   extensions: [...createEditorExtensions({
     overlay: overlays,
+    profile,
     getMessages: () => props.messages,
     assetProvider: {
       buildUrl: asset => assets.resolvedAssetProvider.value.buildUrl(asset),
@@ -101,7 +127,7 @@ const editor = useEditor({
           : undefined,
       }
     },
-  }), SlashCommands.configure({ enabled: () => !sync.isApplyingDocument() && canMutate() }),
+  }), SlashCommands.configure({ enabled: () => allowsBlocks && !sync.isApplyingDocument() && canMutate() }),
   ...binding.extensions],
   onTransaction: ({ editor: instance }) => { insertMenu.syncSlash(instance) },
   onUpdate: ({ editor: instance, transaction }) => {
@@ -110,6 +136,8 @@ const editor = useEditor({
     if (!sync.isApplyingDocument() && transaction.docChanged) sync.scheduleVisualUpdate(instance)
   },
   onSelectionUpdate: () => { selectionRevision.value += 1 },
+  onFocus: () => { editorFocused.value = true },
+  onBlur: () => { editorFocused.value = false },
 })
 
 const sync = useMarkdownSync({
@@ -178,6 +206,7 @@ const insertMenu = useInsertMenu({
   isDisposed: sync.isDisposed,
   operationContext,
   requestImage: range => assets.requestImage(range),
+  profile,
 })
 const actions: ComputedRef<EditorActions> = useEditorActions(editor, {
   enabled: () => canMutate(),
@@ -189,6 +218,7 @@ const actions: ComputedRef<EditorActions> = useEditorActions(editor, {
   insert: () => { void insertMenu.show('button') },
   mediaEnabled: kind => kind === 'image' ? props.enableImages : kind === 'file' ? props.enableFiles : props.enableVideo,
   context: operationContext,
+  profile,
 })
 
 const hasPendingChanges = computed(() =>
@@ -201,12 +231,18 @@ watch(editor, (instance, _, cleanup) => {
   if (instance) cleanup(observeEditorOperations(instance, (count) => { pendingCommands.value = count }))
 }, { immediate: true, flush: 'sync' })
 
+const writable = computed(() => !props.disabled && !binding.invalidBinding.value && binding.canEdit())
+const dockVisible = computed(() =>
+  toolbarPlacement.value === 'keyboard' && writable.value
+  && (editorFocused.value || dockFocused.value || dockMenuOpen.value))
 const editorAttributes = computed(() => ({
   'aria-label': label.value,
   ...insertMenu.editorAttributes.value,
 }))
-watch([editor, editorAttributes], ([instance, attributes]) => {
-  instance?.setOptions({ editorProps: { attributes } })
+// Keep the caret clear of the docked formatting row when the browser scrolls it into view.
+const scrollMargin = computed(() => toolbarPlacement.value === 'keyboard' ? { top: 5, right: 5, bottom: 72, left: 5 } : 5)
+watch([editor, editorAttributes, scrollMargin], ([instance, attributes, margin]) => {
+  instance?.setOptions({ editorProps: { attributes, scrollMargin: margin, scrollThreshold: margin } })
 })
 watch([() => props.disabled, binding.state, binding.invalidBinding], ([disabled]) => {
   const editable = !disabled && !binding.invalidBinding.value && binding.canEdit()
@@ -287,12 +323,17 @@ defineExpose<GinkoEditorHandle>({
   <div
     ref="editorRoot"
     class="ginko-editor"
+    :data-variant="variant"
+    :data-profile="profile.name"
     :data-mode="viewMode"
     :data-invalid="conversionError ? 'true' : undefined"
   >
-    <div class="ginko-editor__header">
+    <div
+      v-if="showHeader"
+      class="ginko-editor__header"
+    >
       <button
-        v-if="viewMode === 'visual'"
+        v-if="viewMode === 'visual' && allowsBlocks"
         class="ginko-editor__insert-trigger"
         type="button"
         :aria-controls="insertMenu.open.value ? insertMenu.id : undefined"
@@ -305,6 +346,7 @@ defineExpose<GinkoEditorHandle>({
         <span>{{ actions.text('insertShort') }}</span>
       </button>
       <div
+        v-if="showSourceToggle"
         class="ginko-editor__modes"
         role="group"
         :aria-label="actions.text('editingMode')"
@@ -349,11 +391,11 @@ defineExpose<GinkoEditorHandle>({
         </li>
       </ul>
       <span class="ginko-editor__status">{{ statusLabel }}</span>
-      <span
-        class="ginko-editor__sr-only"
-        role="status"
-      >{{ announcement }}</span>
     </div>
+    <span
+      class="ginko-editor__sr-only"
+      role="status"
+    >{{ announcement }}</span>
     <slot
       v-if="binding.session"
       name="collaboration"
@@ -439,7 +481,7 @@ defineExpose<GinkoEditorHandle>({
     </p>
     <template v-if="viewMode === 'visual' && editor">
       <slot
-        v-if="!disabled"
+        v-if="!disabled && toolbarPlacement === 'top'"
         name="toolbar"
         :actions="actions"
       >
@@ -448,10 +490,19 @@ defineExpose<GinkoEditorHandle>({
           :items="toolbarItems"
         />
       </slot>
+      <GinkoKeyboardDock
+        v-if="!disabled && toolbarPlacement === 'keyboard'"
+        :actions="actions"
+        :items="toolbarItems"
+        :visible="dockVisible"
+        @focus-change="dockFocused = $event"
+        @open-change="dockMenuOpen = $event"
+      />
       <GinkoSelectionToolbar
-        v-if="!disabled"
+        v-if="!disabled && showSelectionToolbar"
         :editor="editor"
         :actions="actions"
+        :items="selectionToolbarItems"
       />
       <div
         class="ginko-editor__surface-frame"
@@ -466,8 +517,9 @@ defineExpose<GinkoEditorHandle>({
         />
       </div>
     </template>
+    <!-- Without a source switch, the Markdown appears only when visual editing is unavailable. -->
     <textarea
-      v-else
+      v-else-if="showSourceToggle || sync.loaded.value"
       ref="sourceInput"
       class="ginko-editor__source"
       :aria-label="text('markdownSourceLabel', { label })"

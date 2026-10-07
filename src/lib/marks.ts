@@ -31,15 +31,6 @@ export function createMark(
 ): JSONContent[] {
   const attrs = { ...(node as MDCElement).props }
 
-  if (mark === 'link' && attrs.href) {
-    const href = String(attrs.href)
-    const isExternal = href.startsWith('http://') || href.startsWith('https://')
-    if (isExternal) {
-      attrs.target = attrs.target || '_blank'
-      attrs.rel = attrs.rel || 'noopener noreferrer nofollow'
-    }
-  }
-
   const marks = [...accumulatedMarks, { attrs, type: mark }]
 
   if (node.type === 'element' && node.tag === 'code') {

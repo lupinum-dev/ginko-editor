@@ -522,6 +522,8 @@ function createImageElement(node: JSONContent, context: TiptapToMDCContext): MDC
   })
 }
 
+const defaultLinkRel = 'noopener noreferrer nofollow'
+
 function createLinkElement(node: JSONContent): MDCElement {
   const attrs = node.attrs || {}
   const { class: className, href, rel, target, ...otherAttrs } = attrs
@@ -529,7 +531,8 @@ function createLinkElement(node: JSONContent): MDCElement {
 
   if (href) linkProps.href = href
   if (target) linkProps.target = target
-  if (rel) linkProps.rel = rel
+  // The schema's default `rel` is a rendering choice, not content the author wrote.
+  if (rel && rel !== defaultLinkRel) linkProps.rel = rel
   if (className) linkProps.class = className
 
   for (const [key, value] of Object.entries(otherAttrs)) {

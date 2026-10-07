@@ -11,6 +11,7 @@ import {
 } from '../conversionPipeline'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { createEditorText, type EditorText } from '../../ui/messages'
+import { isRestrictedProfile, sanitizeFragment, type EditorProfile } from '../profiles'
 
 export interface MarkdownClipboardOptions extends TiptapToMDCOptions {
   enabled: boolean
@@ -18,6 +19,8 @@ export interface MarkdownClipboardOptions extends TiptapToMDCOptions {
   text?: EditorText
   getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
+  /** Pasted Markdown is reduced to this profile before it is inserted. */
+  profile?: EditorProfile
   canPaste?: () => boolean
   onPasteError?: (message: string | undefined) => void
   onCopyError?: (message: string | undefined) => void
@@ -297,7 +300,11 @@ async function applyMarkdownPaste(
 
     const content = result.value.content ?? [{ type: 'paragraph' }]
     const fragment = Fragment.fromArray(content.map(node => editor.schema.nodeFromJSON(node)))
-    const transaction = before.tr.replaceSelection(new Slice(fragment, 0, 0))
+    // A restricted profile joins pasted text with the current paragraph, like plain text paste.
+    const slice = options.profile && isRestrictedProfile(options.profile)
+      ? Slice.maxOpen(sanitizeFragment(fragment, editor.schema, options.profile))
+      : new Slice(fragment, 0, 0)
+    const transaction = before.tr.replaceSelection(slice)
     if (authoringKit) {
       const candidate = await convertTiptapDocToMarkdown(transaction.doc.toJSON(), outputOptions)
       if (!candidate.ok || candidate.value === undefined) {

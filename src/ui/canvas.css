@@ -954,11 +954,31 @@
   .ginko-selection-toolbar {
     position: fixed;
     z-index: var(--ginko-z-floating);
-    border: 1px solid var(--ginko-border);
-    border-radius: var(--ginko-radius);
+    border: 1px solid color-mix(in srgb, var(--ginko-border) 80%, transparent);
+    border-radius: calc(var(--ginko-radius) + 2px);
     background: var(--ginko-popover);
     color: var(--ginko-popover-foreground);
-    box-shadow: var(--ginko-shadow-sm);
+    box-shadow: var(--ginko-shadow-md);
+    transform-origin: bottom center;
+    animation: ginko-selection-in 140ms cubic-bezier(.2, 0, 0, 1);
+  }
+
+  .ginko-selection-toolbar[data-side='bottom'] {
+    --ginko-selection-shift: -4px;
+    transform-origin: top center;
+  }
+
+  @keyframes ginko-selection-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--ginko-selection-shift, 4px)) scale(.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ginko-selection-toolbar {
+      animation: none;
+    }
   }
 
   .ginko-table__row-handle, .ginko-table__column-handle {

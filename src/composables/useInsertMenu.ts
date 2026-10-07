@@ -17,7 +17,8 @@ import type { AuthoringKit, AuthoringRecipe } from '../authoring'
 import { addContainerItem, containerAt } from '../lib/container-items'
 import type { EditorOperationContext } from '../lib/editor-operations'
 import type { EditorOverlayController } from '../ui/context'
-import { runRecipeCommand } from '../ui/recipe-command'
+import { editorProfiles, type EditorProfile } from '../lib/profiles'
+import { profileAllowsRecipe, runRecipeCommand } from '../ui/recipe-command'
 import { groupMatches, rankRecipes, type RecipeGroup, type RecipeMatch } from '../ui/recipe-search'
 import { slashKey } from '../ui/slash-command'
 import { isImageRecipe, recipeCopy, writingRecipes } from '../ui/writingRecipes'
@@ -42,6 +43,8 @@ export interface InsertMenuOptions {
   isDisposed: () => boolean
   operationContext: EditorOperationContext
   requestImage: (range?: { from: number; to: number }) => void
+  /** The content profile. Recipes outside it are not offered. */
+  profile?: EditorProfile
 }
 
 /** The most recent recipes that one editor keeps in memory. */
@@ -78,10 +81,11 @@ export function useInsertMenu(options: InsertMenuOptions) {
   const menuElement = () => options.menu.value?.root
 
   // Native writing blocks come first within a group; kit recipes follow in kit order.
+  const profile = options.profile ?? editorProfiles.full
   const available = computed(() => [
     ...writingRecipes.filter(recipe => options.enableImages() || !isImageRecipe(recipe)),
     ...(options.kit.value?.recipes ?? []),
-  ])
+  ].filter(recipe => profileAllowsRecipe(profile, recipe)))
   const copy = (recipe: AuthoringRecipe) => recipeCopy(recipe, overlays.text)
   /** Menu groups in display order. Context actions come first, then recent recipes. */
   const groups = computed<RecipeGroup[]>(() => {

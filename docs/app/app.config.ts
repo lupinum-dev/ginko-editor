@@ -13,6 +13,7 @@ export default defineAppConfig({
     nav: {
       links: [
         { label: { en: 'Playground' }, to: { en: '/playground' } },
+        { label: { en: 'In place' }, to: { en: '/in-place' } },
         { label: { en: 'Docs' }, to: { en: '/docs' } },
       ],
       socialIcons: true,

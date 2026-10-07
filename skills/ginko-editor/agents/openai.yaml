@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ginko Editor"
+  short_description: "Agent guide for apps that embed Ginko Editor"
+  default_prompt: "Use $ginko-editor to embed, configure, or validate Ginko Editor in this Vue or Nuxt app."
