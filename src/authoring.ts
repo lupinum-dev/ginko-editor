@@ -7,25 +7,28 @@ import {
   type PortableComponentPolicyV2,
 } from '@lupinum/ginko-content/cms-contract'
 
+import { ginkoLayoutKitSource } from './layout-kit'
 import type { JsonValue } from './types'
 
-export type AuthoringControl = 'number' | 'select' | 'text' | 'toggle'
+export { ginkoLayoutKitSource, ginkoLayoutComponentNames, ginkoLayoutComponentPolicy } from './layout-kit'
+
+export type AuthoringControl = 'json' | 'number' | 'select' | 'text' | 'toggle'
 export type ImplementationPropType = 'boolean' | 'complex' | 'number' | 'object' | 'string'
 
-export interface ComponentImplementationPropV1 {
+export interface ComponentImplementationProp {
   default?: JsonValue
   options?: readonly (boolean | number | string)[]
   required: boolean
   types: readonly ImplementationPropType[]
 }
 
-export interface ComponentImplementationMetadataV1 {
+export interface ComponentImplementationMetadata {
   componentName: string
-  props: Readonly<Record<string, ComponentImplementationPropV1>>
+  props: Readonly<Record<string, ComponentImplementationProp>>
   slots: readonly string[]
 }
 
-export interface ComponentAuthoringFieldV1 {
+export interface ComponentAuthoringField {
   control: AuthoringControl
   help?: string
   label: string
@@ -33,7 +36,34 @@ export interface ComponentAuthoringFieldV1 {
 
 type ComponentPolicy = PortableComponentPolicyV2['components'][string]
 
-export type ComponentAuthoringMetadataV1<
+/** How the canvas shows the repeated children of a container component. */
+export type ComponentItemsPresentation = 'accordion' | 'grid' | 'stack' | 'steps' | 'tabs' | 'timeline'
+
+/**
+ * Repeated children of a container component. Set exactly one of `childTag`
+ * or `childNode`. The canvas adds, removes, renames, and selects items with
+ * normal document steps. The selected tab and collapsed items are view state.
+ */
+export interface ComponentCanvasItems {
+  /** Each item is a component with this tag. */
+  childTag?: string
+  /**
+   * Each item is a built-in node. `codeBlock` items are code blocks.
+   * `heading` items start at a heading with the template's heading level.
+   */
+  childNode?: 'codeBlock' | 'heading'
+  presentation: ComponentItemsPresentation
+  /** A text property of the child component that names each item. */
+  labelProp?: string
+  /** A property of this component that sets the number of grid columns. */
+  columnsProp?: string
+  /** The label of the add control, for example "Add tab". */
+  addLabel?: string
+  /** MDC source for one new item. */
+  template: string
+}
+
+export type ComponentAuthoringMetadata<
   Definition extends ComponentPolicy = ComponentPolicy,
 > = {
   /** Canvas interactions reference the same properties as the content policy. */
@@ -46,16 +76,24 @@ export type ComponentAuthoringMetadataV1<
       sizeProp: string
       presets: readonly { label: string; values: readonly [string, string]; ratio: number }[]
     }
+    items?: ComponentCanvasItems
   }
   description?: string
   label: string
-  props?: Partial<Record<keyof Definition['props'] & string, ComponentAuthoringFieldV1>>
+  props?: Partial<Record<keyof Definition['props'] & string, ComponentAuthoringField>>
   slots?: Partial<Record<Definition['slots'][number], { label: string }>>
 }
 
-export interface AuthoringRecipeV1 {
+export interface AuthoringRecipe {
   /** Short explanation shown while choosing a block. */
   description?: string
+  /**
+   * The menu group. Built-in groups are `text`, `lists`, `media`, `layout`,
+   * `callouts`, and `advanced`. Other values show as their own group heading.
+   */
+  group?: string
+  /** A Lucide icon name in kebab-case, for example `panel-top`. */
+  icon?: string
   id: string
   keywords?: readonly string[]
   label: string
@@ -64,21 +102,39 @@ export interface AuthoringRecipeV1 {
 
 type ComponentMap = PortableComponentPolicyV2['components']
 
-export type AuthoringKitSourceV1<Components extends ComponentMap = ComponentMap> = {
+export type AuthoringKitSource<Components extends ComponentMap = ComponentMap> = {
   authoring: {
-    [Tag in keyof Components]: ComponentAuthoringMetadataV1<Components[Tag]>
+    [Tag in keyof Components]: ComponentAuthoringMetadata<Components[Tag]>
   }
-  implementation: { [Tag in keyof Components]: ComponentImplementationMetadataV1 }
+  implementation: { [Tag in keyof Components]: ComponentImplementationMetadata }
   policy: { version: 2; components: Components }
-  recipes: readonly AuthoringRecipeV1[]
+  recipes: readonly AuthoringRecipe[]
   version: 1
 }
 
-export type AuthoringKitV1<Components extends ComponentMap = ComponentMap> = Readonly<
-  AuthoringKitSourceV1<Components>
+export type AuthoringKit<Components extends ComponentMap = ComponentMap> = Readonly<
+  AuthoringKitSource<Components>
 >
 
+/** @deprecated Use `ComponentImplementationProp`. */
+export type ComponentImplementationPropV1 = ComponentImplementationProp
+/** @deprecated Use `ComponentImplementationMetadata`. */
+export type ComponentImplementationMetadataV1 = ComponentImplementationMetadata
+/** @deprecated Use `ComponentAuthoringField`. */
+export type ComponentAuthoringFieldV1 = ComponentAuthoringField
+/** @deprecated Use `ComponentAuthoringMetadata`. */
+export type ComponentAuthoringMetadataV1<
+  Definition extends ComponentPolicy = ComponentPolicy,
+> = ComponentAuthoringMetadata<Definition>
+/** @deprecated Use `AuthoringRecipe`. */
+export type AuthoringRecipeV1 = AuthoringRecipe
+/** @deprecated Use `AuthoringKitSource`. */
+export type AuthoringKitSourceV1<Components extends ComponentMap = ComponentMap> = AuthoringKitSource<Components>
+/** @deprecated Use `AuthoringKit`. */
+export type AuthoringKitV1<Components extends ComponentMap = ComponentMap> = AuthoringKit<Components>
+
 const controlTypes: Record<AuthoringControl, readonly ImplementationPropType[]> = {
+  json: ['boolean', 'number', 'object', 'string'],
   number: ['number'],
   select: ['boolean', 'number', 'string'],
   text: ['string'],
@@ -137,8 +193,8 @@ function expectedImplementationTypes(types: ComponentPolicy['props'][string]['ty
 function validateComponent(
   tag: string,
   policy: ComponentPolicy,
-  implementation: ComponentImplementationMetadataV1,
-  authoring: ComponentAuthoringMetadataV1,
+  implementation: ComponentImplementationMetadata,
+  authoring: ComponentAuthoringMetadata,
 ): void {
   if (!/^[a-z][a-z0-9-]*$/.test(tag)) fail(`component tag "${tag}" is not canonical kebab-case.`)
   if (!implementation.componentName.trim()) fail(`${tag}.implementation.componentName is empty.`)
@@ -153,7 +209,11 @@ function validateComponent(
     if (implemented.types.every((type) => type === 'complex')) {
       fail(`${tag}.implementation.props.${prop} has an unsupported complex type.`)
     }
-    const missing = expected.filter(type => !implemented.types.includes(type))
+    // A policy `json` value is free-form data. The component must accept at
+    // least one of its value types and normalize the others itself.
+    const missing = definition.types.includes('json')
+      ? expected.some(type => implemented.types.includes(type)) ? [] : expected
+      : expected.filter(type => !implemented.types.includes(type))
     if (missing.length > 0) {
       fail(`${tag}.policy.props.${prop} expects ${missing.join(' | ')}, not ${implemented.types.join(' | ')}.`)
     }
@@ -190,15 +250,102 @@ function validateComponent(
     if (field.control === 'select' && !policy.props[prop].allowedValues?.length) {
       fail(`${tag}.authoring.props.${prop} requires policy allowedValues.`)
     }
+    if (field.control === 'json' && !policy.props[prop].types.includes('json')) {
+      fail(`${tag}.authoring.props.${prop} uses a json control without a policy json type.`)
+    }
   }
-  if (authoring.canvas?.switchGroup !== undefined && !authoring.canvas.switchGroup.trim()) fail(`${tag}.canvas.switchGroup must not be empty.`)
-  if (authoring.canvas?.tone && !['neutral', 'info', 'warning', 'danger', 'success', 'idea'].includes(authoring.canvas.tone)) fail(`${tag}.canvas.tone is unsupported.`)
+  if (authoring.canvas?.switchGroup !== undefined && !authoring.canvas.switchGroup.trim()) {
+    fail(`${tag}.canvas.switchGroup must not be empty.`)
+  }
+  if (
+    authoring.canvas?.tone
+    && !['neutral', 'info', 'warning', 'danger', 'success', 'idea'].includes(authoring.canvas.tone)
+  ) {
+    fail(`${tag}.canvas.tone is unsupported.`)
+  }
   const titleProp = authoring.canvas?.titleProp
-  if (titleProp && (!policy.props[titleProp]?.types.includes('string') || authoring.props?.[titleProp]?.control !== 'text')) {
+  if (
+    titleProp
+    && (!policy.props[titleProp]?.types.includes('string') || authoring.props?.[titleProp]?.control !== 'text')
+  ) {
     fail(`${tag}.canvas.titleProp must reference an authored text property.`)
   }
   for (const slot of Object.keys(authoring.slots ?? {})) {
     if (!policy.slots.includes(slot)) fail(`${tag}.authoring slot "${slot}" is not allowed by policy.`)
+  }
+}
+
+const itemPresentations: readonly ComponentItemsPresentation[] = [
+  'accordion', 'grid', 'stack', 'steps', 'tabs', 'timeline',
+]
+
+function validateItems(tag: string, source: AuthoringKitSource) {
+  const items = (source.authoring[tag] as ComponentAuthoringMetadata).canvas?.items
+  if (!items) return
+  const path = `${tag}.canvas.items`
+  const parent = source.policy.components[tag]
+  if (parent.kind !== 'block' || !parent.slots.includes('default')) {
+    fail(`${path} requires a block component with a default slot.`)
+  }
+  if (!itemPresentations.includes(items.presentation)) fail(`${path}.presentation is unsupported.`)
+  if ((items.childTag === undefined) === (items.childNode === undefined)) {
+    fail(`${path} must set exactly one of childTag or childNode.`)
+  }
+  if (items.childNode !== undefined && !['codeBlock', 'heading'].includes(items.childNode)) {
+    fail(`${path}.childNode is unsupported.`)
+  }
+  if (items.childTag !== undefined) {
+    const child = source.policy.components[items.childTag]
+    if (!child || child.kind !== 'block') fail(`${path}.childTag must reference a block component.`)
+    if (
+      (parent.allowedChildren && !parent.allowedChildren.includes(items.childTag))
+      || (child.allowedParents && !child.allowedParents.includes(tag))
+    ) {
+      fail(`${path} must respect parent and child placement policy.`)
+    }
+    if (items.labelProp !== undefined && !child.props[items.labelProp]?.types.includes('string')) {
+      fail(`${path}.labelProp must be a declared text property of "${items.childTag}".`)
+    }
+  } else if (items.labelProp !== undefined) {
+    fail(`${path}.labelProp requires childTag.`)
+  }
+  if (items.columnsProp !== undefined) {
+    const types = parent.props[items.columnsProp]?.types
+    if (!types?.some(type => type === 'string' || type === 'number')) {
+      fail(`${path}.columnsProp must be a declared text or number property of "${tag}".`)
+    }
+  }
+  if (items.addLabel !== undefined && !items.addLabel.trim()) fail(`${path}.addLabel must not be empty.`)
+  if (typeof items.template !== 'string' || !items.template.trim()) fail(`${path}.template must not be empty.`)
+}
+
+type ParsedNode = { type?: string; tag?: string; props?: Record<string, unknown>; children?: ParsedNode[] }
+
+async function validateItemTemplate(tag: string, items: ComponentCanvasItems, source: AuthoringKitSource) {
+  const path = `${tag}.canvas.items.template`
+  const { body } = await parseMdcBody(items.template, { autoClose: false })
+  const nodes = ((body as ParsedNode).children ?? []).filter(node => node.type === 'element')
+  const isNative = (node: ParsedNode) => (node.props?.$ as { html?: number } | undefined)?.html === 1
+  const level = (node: ParsedNode | undefined) => /^h([1-6])$/.exec(node?.tag ?? '')?.[1]
+  if (items.childTag !== undefined) {
+    if (nodes.length !== 1 || nodes[0].tag !== items.childTag || isNative(nodes[0])) {
+      fail(`${path} must contain exactly one "${items.childTag}" component.`)
+    }
+  } else if (items.childNode === 'codeBlock') {
+    if (nodes.length !== 1 || nodes[0].tag !== 'pre') fail(`${path} must contain exactly one code block.`)
+  } else {
+    const first = Number(level(nodes[0]))
+    if (!first || nodes.slice(1).some(node => Number(level(node) ?? 7) <= first)) {
+      fail(`${path} must start with the only heading of its level.`)
+    }
+  }
+  // Placement inside the container is checked above. Check the item content alone.
+  const components = { ...source.policy.components }
+  if (items.childTag) components[items.childTag] = { ...components[items.childTag], allowedParents: null }
+  const validation = validatePublicMarkdownAst(body, { version: 2, components })
+  if (!validation.ok) {
+    const issue = validation.issues[0]
+    fail(`${path} is outside policy (${issue.code} at ${issue.path.join('.')}).`)
   }
 }
 
@@ -211,8 +358,8 @@ function freezeJson<T>(value: T): T {
 }
 
 export async function createAuthoringKit<const Components extends ComponentMap>(
-  source: AuthoringKitSourceV1<Components>,
-): Promise<AuthoringKitV1<Components>> {
+  source: AuthoringKitSource<Components>,
+): Promise<AuthoringKit<Components>> {
   assertJsonValue(source, 'source')
   if (source.version !== 1) fail('version must be 1.')
   try {
@@ -242,22 +389,38 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
   }
 
   for (const tag of policyTags) {
-    const metadata: ComponentAuthoringMetadataV1 = source.authoring[tag]
+    const metadata: ComponentAuthoringMetadata = source.authoring[tag]
     const columns = metadata.canvas?.columns
     if (!columns) continue
     const child = source.policy.components[columns.childTag]
     const allowed = child?.props[columns.sizeProp]?.allowedValues
-    if (source.policy.components[tag].kind !== 'block' || child?.kind !== 'block' || !allowed?.length || columns.presets.length < 2) {
+    if (
+      source.policy.components[tag].kind !== 'block'
+      || child?.kind !== 'block'
+      || !allowed?.length
+      || columns.presets.length < 2
+    ) {
       fail(`${tag}.canvas.columns must reference a block child with discrete sizes and at least two presets.`)
     }
     const parent = source.policy.components[tag]
-    if ((parent.allowedChildren && !parent.allowedChildren.includes(columns.childTag)) || (child.allowedParents && !child.allowedParents.includes(tag))) {
+    if (
+      (parent.allowedChildren && !parent.allowedChildren.includes(columns.childTag))
+      || (child.allowedParents && !child.allowedParents.includes(tag))
+    ) {
       fail(`${tag}.canvas.columns must respect parent and child placement policy.`)
     }
     let lastRatio = 0
     const pairs = new Set<string>()
     for (const preset of columns.presets) {
-      if (!Number.isFinite(preset.ratio) || pairs.has(JSON.stringify(preset.values)) || !preset.label.trim() || preset.values.length !== 2 || preset.values.some(value => !allowed.includes(value)) || preset.ratio <= lastRatio || preset.ratio >= 1) {
+      if (
+        !Number.isFinite(preset.ratio)
+        || pairs.has(JSON.stringify(preset.values))
+        || !preset.label.trim()
+        || preset.values.length !== 2
+        || preset.values.some(value => !allowed.includes(value))
+        || preset.ratio <= lastRatio
+        || preset.ratio >= 1
+      ) {
         fail(`${tag}.canvas.columns presets must use allowed size pairs and increasing ratios between zero and one.`)
       }
       pairs.add(JSON.stringify(preset.values))
@@ -265,13 +428,25 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
     }
   }
 
+  for (const tag of policyTags) validateItems(tag, source)
+
   assertUnique(source.recipes.map(({ id }) => id), 'recipes')
   // Validation crosses an async parser boundary. Consume the input now so
   // callers cannot change the contract while its recipes are being checked.
   freezeJson(source)
+  for (const tag of policyTags) {
+    const items = (source.authoring[tag] as ComponentAuthoringMetadata).canvas?.items
+    if (items) await validateItemTemplate(tag, items, source)
+  }
   for (const recipe of source.recipes) {
     if (!recipe.label.trim()) fail(`recipe "${recipe.id}" has an empty label.`)
     if (recipe.keywords) assertUnique(recipe.keywords, `recipe "${recipe.id}".keywords`)
+    if (recipe.group !== undefined && (!recipe.group.trim() || recipe.group.length > 40)) {
+      fail(`recipe "${recipe.id}".group must be a short, non-empty name.`)
+    }
+    if (recipe.icon !== undefined && !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(recipe.icon)) {
+      fail(`recipe "${recipe.id}".icon must be a kebab-case Lucide icon name.`)
+    }
     await parsePublicRecipeSource(recipe.source, source, `recipe "${recipe.id}"`)
   }
 
@@ -280,7 +455,7 @@ export async function createAuthoringKit<const Components extends ComponentMap>(
 
 export async function parseAuthoringSource(
   markdown: string,
-  kit: AuthoringKitSourceV1,
+  kit: AuthoringKitSource,
   label = 'source',
 ): Promise<ParseMdcBodyResult['body']> {
   const { body } = await parseMdcBody(markdown, { autoClose: false })
@@ -294,7 +469,7 @@ export async function parseAuthoringSource(
 
 async function parsePublicRecipeSource(
   markdown: string,
-  kit: AuthoringKitSourceV1,
+  kit: AuthoringKitSource,
   label: string,
 ): Promise<ParseMdcBodyResult['body']> {
   const { body } = await parseMdcBody(markdown, { autoClose: false })
@@ -307,12 +482,12 @@ async function parsePublicRecipeSource(
 }
 
 export async function composeAuthoringKits(
-  ...sources: readonly AuthoringKitSourceV1[]
-): Promise<AuthoringKitV1> {
-  const implementation: Record<string, ComponentImplementationMetadataV1> = {}
+  ...sources: readonly AuthoringKitSource[]
+): Promise<AuthoringKit> {
+  const implementation: Record<string, ComponentImplementationMetadata> = {}
   const components: ComponentMap = {}
-  const authoring: Record<string, ComponentAuthoringMetadataV1> = {}
-  const recipes: AuthoringRecipeV1[] = []
+  const authoring: Record<string, ComponentAuthoringMetadata> = {}
+  const recipes: AuthoringRecipe[] = []
   const recipeIds = new Set<string>()
 
   for (const source of sources) {
@@ -329,5 +504,16 @@ export async function composeAuthoringKits(
     }
   }
 
-  return await createAuthoringKit({ authoring, implementation, policy: { version: 2, components }, recipes, version: 1 })
+  return await createAuthoringKit({
+    authoring,
+    implementation,
+    policy: { version: 2, components },
+    recipes,
+    version: 1,
+  })
+}
+
+/** Create the built-in layout kit alone. Compose its source to add host components. */
+export async function createGinkoLayoutKit(): Promise<AuthoringKit<typeof ginkoLayoutKitSource.policy.components>> {
+  return await createAuthoringKit(ginkoLayoutKitSource)
 }

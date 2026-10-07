@@ -20,12 +20,23 @@ const shasum = createHash('sha1').update(bytes).digest('hex')
 const distTag = packageJson.version.includes('-') ? 'next' : 'latest'
 const source = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
 const sourceSha = source.stdout.trim()
-if (source.status !== 0 || !/^[0-9a-f]{40}$/.test(sourceSha)) throw new Error(source.stderr || 'Cannot resolve the source commit.')
-if (process.env.GITHUB_SHA && sourceSha !== process.env.GITHUB_SHA) throw new Error('The release source differs from GITHUB_SHA.')
+if (source.status !== 0 || !/^[0-9a-f]{40}$/.test(sourceSha)) {
+  throw new Error(source.stderr || 'Cannot resolve the source commit.')
+}
+// GitHub resets built-in GITHUB_* variables; a pull-request preview names its checked-out head separately.
+const expectedSha = process.env.RELEASE_SOURCE_SHA || process.env.GITHUB_SHA
+if (expectedSha && sourceSha !== expectedSha) {
+  throw new Error('The release source differs from the expected commit.')
+}
 const changelog = await readFile('CHANGELOG.md', 'utf8')
 const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const matches = [...changelog.matchAll(new RegExp(`^##\\s+v?${escapedVersion}(?:\\s|$)[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`, 'gm'))]
-if (matches.length !== 1 || !matches[0][1].trim()) throw new Error(`CHANGELOG.md must contain exactly one non-empty ${packageJson.version} release.`)
+const releasePattern = `^##\\s+v?${escapedVersion}(?:\\s|$)[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`
+const matches = [...changelog.matchAll(new RegExp(releasePattern, 'gm'))]
+if (matches.length !== 1 || !matches[0][1].trim()) {
+  throw new Error(
+    `CHANGELOG.md must contain exactly one non-empty ${packageJson.version} release.`,
+  )
+}
 await copyFile('CHANGELOG.md', `${directory}/CHANGELOG.md`)
 await writeFile(`${directory}/release-notes.md`, `${matches[0][1].trim()}\n`)
 const changelogBytes = await readFile(`${directory}/CHANGELOG.md`)
@@ -35,6 +46,27 @@ await writeFile(`${directory}/SHA256SUMS`, [
   `${createHash('sha256').update(changelogBytes).digest('hex')}  CHANGELOG.md`,
   `${createHash('sha256').update(notesBytes).digest('hex')}  release-notes.md`,
 ].join('\n') + '\n')
-await writeFile(`${directory}/release.json`, `${JSON.stringify({ name: packageJson.name, version: packageJson.version, filename, sha256, shasum, distTag, sourceSha, packages: [{ name: packageJson.name, version: packageJson.version, filename, sha256, shasum }] }, null, 2)}\n`)
-if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\nmanifest=${directory}/release.json\n`)
+const manifest = {
+  name: packageJson.name,
+  version: packageJson.version,
+  filename,
+  sha256,
+  shasum,
+  distTag,
+  sourceSha,
+  packages: [{
+    name: packageJson.name,
+    version: packageJson.version,
+    filename,
+    sha256,
+    shasum,
+  }],
+}
+await writeFile(`${directory}/release.json`, `${JSON.stringify(manifest, null, 2)}\n`)
+if (process.env.GITHUB_OUTPUT) {
+  await appendFile(
+    process.env.GITHUB_OUTPUT,
+    `directory=${directory}\nmanifest=${directory}/release.json\n`,
+  )
+}
 console.log(JSON.stringify({ directory, filename, name: packageJson.name, sha256 }))

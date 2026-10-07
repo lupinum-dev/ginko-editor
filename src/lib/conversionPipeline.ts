@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Schema } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
-import type { JSONContent } from '@tiptap/vue-3'
+import type { JSONContent } from '@tiptap/core'
 import {
   parseMdcDocument,
   projectMdcDocument,
@@ -9,11 +9,12 @@ import {
   type PortableComponentPolicy,
 } from '@lupinum/ginko-content/cms-contract'
 
-import type { AuthoringKitV1 } from '../authoring'
+import type { AuthoringKit } from '../authoring'
 import { validateTiptapDocShape } from './conversionInvariants'
 import { finishTrace, logIssue, logPhase, startTrace } from './conversionLogger'
 import type {
   ConversionIssue,
+  ConversionIssueCode,
   ConversionPhase,
   ConversionResult,
   ConversionSeverity,
@@ -27,6 +28,7 @@ export type {
   ConversionErrorPayload,
   ConversionHealthState,
   ConversionIssue,
+  ConversionIssueCode,
   ConversionPhase,
   ConversionRecoveredPayload,
   ConversionResult,
@@ -36,7 +38,7 @@ export type {
 
 function buildIssue(
   phase: ConversionPhase,
-  code: string,
+  code: ConversionIssueCode,
   message: string,
   detail?: unknown,
   context?: Record<string, unknown>,
@@ -92,7 +94,7 @@ function splitIssues(issues: ConversionIssue[]) {
 
 export async function validateMarkdownForAuthoring(
   markdown: string,
-  authoringKit: AuthoringKitV1,
+  authoringKit: Pick<AuthoringKit, 'policy'>,
 ): Promise<ConversionIssue | undefined> {
   try {
     const sourceDocument = await parseMdcDocument(markdown, { autoClose: false })
@@ -109,7 +111,7 @@ export async function validateMarkdownForAuthoring(
 
 function validateParsedDocumentForAuthoring(
   sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>,
-  authoringKit: AuthoringKitV1,
+  authoringKit: Pick<AuthoringKit, 'policy'>,
 ): ConversionIssue | undefined {
   const validation = validateStoredPortableMarkdownAst(
     projectMdcDocument(sourceDocument).body,
@@ -220,7 +222,7 @@ export async function prepareMarkdownForVisualEditing(
   markdown: string,
   options?: TiptapToMDCOptions,
   schema?: Schema,
-  authoringKit?: AuthoringKitV1,
+  authoringKit?: Pick<AuthoringKit, 'policy'>,
   context: 'document' | 'fragment' = 'document',
 ): Promise<ConversionResult<JSONContent>> {
   let sourceDocument: Awaited<ReturnType<typeof parseMdcDocument>>
@@ -338,7 +340,13 @@ function normalizeComarkNodes(nodes: unknown[]): unknown[] {
     const [tag, rawProps, ...children] = node
     const props = { ...((rawProps && typeof rawProps === 'object' ? rawProps : {}) as Record<string, unknown>) }
     const metadata = props.$
-    if (metadata && typeof metadata === 'object' && 'syntax' in metadata && (metadata.syntax === 'angle' || metadata.syntax === 'colon') && 'block' in metadata) {
+    if (
+      metadata
+      && typeof metadata === 'object'
+      && 'syntax' in metadata
+      && (metadata.syntax === 'angle' || metadata.syntax === 'colon')
+      && 'block' in metadata
+    ) {
       // Content may change delimiters to preserve edited property values.
       // Component identity and inline/block placement carry the meaning.
       props.$ = { component: 1, block: metadata.block }
@@ -401,10 +409,7 @@ export async function convertTiptapDocToMarkdown(
   logPhase(trace, 'stringify_mdc')
   let markdown: string
   try {
-    markdown = await stringifyMdc(ast, {
-      strict: true,
-      videoOutput: options?.videoOutput,
-    })
+    markdown = await stringifyMdc(ast, { videoOutput: options?.videoOutput })
   } catch (error) {
     const issue = buildIssue(
       'stringify_mdc',
@@ -487,35 +492,4 @@ export function applyTiptapDocToEditor(
   }
 
   return success(trace.traceId, issues, finishTrace(trace, { status: 'ok' }), doc)
-}
-
-export async function applyMarkdownToEditor(
-  editor: Editor,
-  markdown: string,
-): Promise<ConversionResult<JSONContent>> {
-  const conversion = await convertMarkdownToTiptapDoc(markdown)
-  if (!conversion.ok || !conversion.value) {
-    return conversion
-  }
-
-  const applyResult = applyTiptapDocToEditor(editor, conversion.value)
-  const merged = {
-    fallbackUsed: conversion.fallbackUsed || applyResult.fallbackUsed,
-    issues: [...conversion.issues, ...applyResult.issues],
-    timeline: [...conversion.timeline, ...applyResult.timeline],
-    traceId: conversion.traceId,
-  }
-
-  if (!applyResult.ok) {
-    return {
-      ...merged,
-      ok: false,
-    }
-  }
-
-  return {
-    ...merged,
-    ok: true,
-    value: conversion.value,
-  }
 }

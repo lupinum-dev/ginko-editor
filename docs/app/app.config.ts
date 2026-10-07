@@ -17,8 +17,15 @@ export default defineAppConfig({
       ],
       socialIcons: true,
     },
-    social: { github: 'https://github.com/lupinum-dev/ginko-editor', discord: 'https://discord.gg/RPH6SeA36N' },
-    repository: { url: 'https://github.com/lupinum-dev/ginko-editor', branch: 'main', contentDirectory: 'docs/content' },
+    social: {
+      github: 'https://github.com/lupinum-dev/ginko-editor',
+      discord: 'https://discord.gg/RPH6SeA36N',
+    },
+    repository: {
+      url: 'https://github.com/lupinum-dev/ginko-editor',
+      branch: 'main',
+      contentDirectory: 'docs/content',
+    },
     analytics: { plausible: { scriptId: '' } },
     feedback: { enabled: false },
     landing: {

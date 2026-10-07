@@ -59,7 +59,9 @@ export function sanitizeResolvedImageUrl(url: string): null | string {
 }
 
 /** Preserve canonical media metadata across native rich-text clipboard HTML. */
-export function readStoredMediaProps(element: { getAttribute: (name: string) => string | null }): JsonRecord | undefined {
+export function readStoredMediaProps(
+  element: { getAttribute: (name: string) => string | null },
+): JsonRecord | undefined {
   const source = element.getAttribute('data-ginko-props')
   if (!source) return undefined
   try {

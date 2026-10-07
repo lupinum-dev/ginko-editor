@@ -1,0 +1,19 @@
+import { defineSchema, defineTable } from 'convex/server'
+import { v } from 'convex/values'
+
+export default defineSchema({
+  documents: defineTable({ markdown: v.string(), epoch: v.string(), version: v.number(),
+    published: v.optional(v.string()), publishedEpoch: v.optional(v.string()), publishedVersion: v.optional(v.number()) }),
+  rooms: defineTable({ documentId: v.id('documents'), document: v.string(), epoch: v.string(), generation: v.number(),
+    schemaRevision: v.string(), policyRevision: v.string(), version: v.number(), minimumVersion: v.number() }),
+  members: defineTable({ roomId: v.id('rooms'), identity: v.string(), role: v.union(v.literal('owner'), v.literal('editor'), v.literal('reader')) })
+    .index('by_room_identity', ['roomId', 'identity']),
+  steps: defineTable({ roomId: v.id('rooms'), epoch: v.string(), version: v.number(), clientId: v.string(), steps: v.array(v.string()) })
+    .index('by_room_epoch_version', ['roomId', 'epoch', 'version']),
+  // Ephemeral cursor records. They never become part of the document or its history.
+  presence: defineTable({ roomId: v.id('rooms'), clientId: v.string(), memberId: v.id('members'), name: v.string(),
+    color: v.optional(v.string()), epoch: v.string(), version: v.number(),
+    selection: v.union(v.null(), v.object({ anchor: v.number(), head: v.number() })), updatedAt: v.number(), expiresAt: v.number() })
+    .index('by_room_expiry', ['roomId', 'expiresAt'])
+    .index('by_room_client', ['roomId', 'clientId']),
+})

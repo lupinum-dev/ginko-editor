@@ -63,6 +63,14 @@ jobs:
           test "$(tar -xOf "$tarball" package/package.json | node -e "let input='';process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>process.stdout.write(JSON.parse(input).version))")" = "$RELEASE_VERSION"
           channel=latest; [[ "$RELEASE_VERSION" == *-* ]] && channel=next
           test "$(node -p "require('./release.json').distTag")" = "$channel"
+          # Local candidate overrides only serve verification. Every peer must install from the registry.
+          tar -xOf "$tarball" package/package.json > published-package.json
+          node -e "for (const [name, range] of Object.entries(require('./published-package.json').peerDependencies ?? {})) console.log(name + '@' + range)" > peers.txt
+          rm published-package.json
+          while read -r peer; do
+            test -n "$(npm view "$peer" version 2>/dev/null)" || { echo "Peer $peer is not available on the registry."; exit 1; }
+          done < peers.txt
+          rm peers.txt
       - name: Derive registry state
         id: registry
         working-directory: release-artifacts

@@ -1,0 +1,1239 @@
+{
+  "policy": {
+    "components": {
+      "accordion": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "type": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "collapsible": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "defaultValue": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "accordion-item": {
+        "kind": "block",
+        "props": {
+          "value": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "content": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default",
+          "title",
+          "content"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "api": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "method": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "path": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "groups": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "aside": {
+        "kind": "block",
+        "props": {
+          "label": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "card": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "description": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "footer": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "to": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "target": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "iconColor": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "img": {
+            "types": [
+              "asset"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "showLinkIcon": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "horizontal": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default",
+          "title",
+          "description",
+          "footer"
+        ],
+        "media": {
+          "sourceProp": "img",
+          "altProp": null,
+          "titleProp": null,
+          "filenameProp": null
+        },
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "cards": {
+        "kind": "block",
+        "props": {
+          "cols": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "center": {
+        "kind": "block",
+        "props": {
+          "size": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "max": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "type": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "code-group": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "code-tree": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "defaultValue": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "expandAll": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "collapse": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "column": {
+        "kind": "block",
+        "props": {
+          "size": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": [
+              "sm",
+              "md",
+              "lg"
+            ]
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": [
+          "layout"
+        ],
+        "allowedChildren": null
+      },
+      "dropcap": {
+        "kind": "block",
+        "props": {
+          "lines": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "error": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "excerpt": {
+        "kind": "block",
+        "props": {
+          "label": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "source": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "figure": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "src": {
+            "types": [
+              "asset"
+            ],
+            "required": true,
+            "allowedValues": null
+          },
+          "alt": {
+            "types": [
+              "string"
+            ],
+            "required": true,
+            "allowedValues": null
+          },
+          "caption": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "width": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "height": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "bleed": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "aspect": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "fit": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "zoom": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": {
+          "sourceProp": "src",
+          "altProp": "alt",
+          "titleProp": null,
+          "filenameProp": null
+        },
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "files": {
+        "kind": "block",
+        "props": {
+          "active": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "annotations": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "idea": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "info": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": [
+              "quiet",
+              "tint"
+            ]
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "kbd": {
+        "kind": "inline",
+        "props": {},
+        "slots": [
+          "default"
+        ],
+        "allowedParents": null,
+        "allowedChildren": null,
+        "media": null
+      },
+      "layout": {
+        "kind": "block",
+        "props": {
+          "type": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": [
+              "default",
+              "card",
+              "border",
+              "border-dashed",
+              "outline",
+              "outline-dashed"
+            ]
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": [
+          "column"
+        ]
+      },
+      "note": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "quiz": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "description": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "questionLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "backLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "nextLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "resultsLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "correctSummaryLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "perfectLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "retryPrompt": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "resetLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "quiz-question": {
+        "kind": "block",
+        "props": {
+          "question": {
+            "types": [
+              "string"
+            ],
+            "required": true,
+            "allowedValues": null
+          },
+          "type": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "explanation": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "options": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": true,
+            "allowedValues": null
+          },
+          "checkLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "correctLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "incorrectLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "resetLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "multipleChoiceLabel": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "read-more": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "links": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": true,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "steps": {
+        "kind": "block",
+        "props": {
+          "mode": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "success": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "tab": {
+        "kind": "block",
+        "props": {
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "label": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "tabs": {
+        "kind": "block",
+        "props": {
+          "layout": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "padded": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "timeline": {
+        "kind": "block",
+        "props": {
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "timeline-item": {
+        "kind": "block",
+        "props": {
+          "date": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "label": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "active": {
+            "types": [
+              "boolean"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "toc": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "depth": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "open": {
+            "types": [
+              "string",
+              "number",
+              "boolean",
+              "json"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      },
+      "warning": {
+        "kind": "block",
+        "props": {
+          "title": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "icon": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          },
+          "appearance": {
+            "types": [
+              "string"
+            ],
+            "required": false,
+            "allowedValues": null
+          }
+        },
+        "slots": [
+          "default"
+        ],
+        "media": null,
+        "allowedParents": null,
+        "allowedChildren": null
+      }
+    },
+    "version": 2
+  },
+  "tags": {
+    "accordion": "MdcAccordion",
+    "accordion-item": "MdcAccordionItem",
+    "api": "MdcApi",
+    "aside": "MdcAside",
+    "card": "MdcCard",
+    "cards": "MdcCards",
+    "center": "MdcCenter",
+    "code-group": "MdcCodeGroup",
+    "code-tree": "MdcCodeTree",
+    "collapse": "MdcCollapse",
+    "column": "MdcColumn",
+    "dropcap": "MdcDropcap",
+    "error": "MdcError",
+    "excerpt": "MdcExcerpt",
+    "figure": "MdcFigure",
+    "files": "MdcFiles",
+    "idea": "MdcIdea",
+    "img": "ProseImg",
+    "info": "MdcInfo",
+    "kbd": "MdcKbd",
+    "layout": "MdcLayout",
+    "note": "MdcNote",
+    "quiz": "MdcQuiz",
+    "quiz-question": "MdcQuizQuestion",
+    "read-more": "MdcReadMore",
+    "steps": "MdcSteps",
+    "success": "MdcSuccess",
+    "tab": "MdcTab",
+    "tabs": "MdcTabs",
+    "timeline": "MdcTimeline",
+    "timeline-item": "MdcTimelineItem",
+    "toc": "MdcInlineToc",
+    "warning": "MdcWarning"
+  }
+}
