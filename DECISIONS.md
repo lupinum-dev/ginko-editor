@@ -35,7 +35,9 @@
   publication is changed by this source work. Do not reuse pre-cutover workflow
   runs for release approval. Local workflow tests do not prove live scheduling,
   environment approval or OIDC behavior.
-- **2026-09-28 — Reject stale approved releases.** Publication is serialized and
-  checks current main after approval immediately before npm. Stale runs fail and
-  must restart from current main. Registry lookup failures must fail closed;
-  only a confirmed JSON E404 means the package version is absent.
+- **2026-10-07 — Use the current OSS release starter verbatim.** The workflow
+  requires successful CI on the released commit and rejects a version older
+  than the current npm dist-tag. Pending Changesets or an open version PR do
+  not offer publication. Release helpers follow the same starter. The local
+  workflow tests exercise its CI and registry boundaries; starter tests own
+  the shared workflow's pending-version condition.
