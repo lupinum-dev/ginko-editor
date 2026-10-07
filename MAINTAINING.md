@@ -117,6 +117,14 @@ Expires: 2026-11-06T00:00:00Z. The advertised patched version is unpublished.
 - `docs>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces`
 - `docs>nuxt>@nuxt/nitro-server>nitropack>globby>micromatch>braces`
 
+- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/config>micromatch>braces`
+- `.>@changesets/cli>@changesets/apply-release-plan>@changesets/git>micromatch>braces`
+- `.>@changesets/cli>@changesets/config>micromatch>braces`
+- `.>@changesets/cli>@changesets/get-release-plan>@changesets/config>micromatch>braces`
+- `.>@changesets/cli>@changesets/get-release-plan>@changesets/read>@changesets/git>micromatch>braces`
+- `.>@changesets/cli>@changesets/git>micromatch>braces`
+- `.>@changesets/cli>@changesets/read>@changesets/git>micromatch>braces`
+
 ### GHSA-x6jw-m9v5-85vh (simple-git)
 
 Expires: 2026-11-06T00:00:00Z. Published 4.x removes the default export used by Nuxt DevTools; 3.36.1 is unpublished.
