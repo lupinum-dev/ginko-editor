@@ -18,16 +18,32 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 
 ## Requirements
 
-- Node.js 22.18 or later, Node.js 24.11 or later, or Node.js 26 or later.
-- pnpm 11 for repository development.
-- Vue 3.5.40 or later and TipTap 3.31.3 in the consuming application.
-- `@lupinum/ginko-content` 1.0.0-beta.7 or later for the shared CMS contract.
+- A bundler that resolves package `exports`, such as Vite or Nuxt, on Node.js 22.18 or later.
+- Vue 3.5.40 or later and TipTap 3.31.3 or a later 3.x version in the application.
+  The root entry needs `vue` and `@tiptap/vue-3`.
+- `@lupinum/ginko-content` 1.0.0-beta.9 or a later 1.x version. It is a peer
+  dependency and supplies the shared CMS contract.
+
+Repository development has separate requirements. Read [MAINTAINING.md](MAINTAINING.md).
 
 ## Installation
 
 ```bash
-pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm @tiptap/vue-3
+pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm @tiptap/vue-3 vue
 ```
+
+Import `@lupinum/ginko-editor/style.css` one time in the application. The
+JavaScript entries do not import CSS.
+
+The `@lupinum/ginko-editor/runtime` entry converts and validates documents
+without Vue views or browser globals. Server code needs only these packages:
+
+```bash
+pnpm add @lupinum/ginko-editor @lupinum/ginko-content @tiptap/core @tiptap/pm
+```
+
+The runtime entry does not import Vue. A package manager can still install Vue
+because other packages declare it as a peer dependency.
 
 ## Quick start
 
@@ -64,17 +80,45 @@ should not replay older editor emissions as intentional replacements.
 Before closing the editor or replacing its document, await the exposed `flush()`
 method. Continue only when it returns `{ ok: true }`. A `{ ok: false, error }`
 result means conversion failed or an image operation is unfinished: keep the editor
-open so the user can correct the document, finish the image operation, or remove it. A failed flush blocks switching to Markdown, which
+open so the user can correct the document, finish the image operation, or remove it. The `error` is a
+`ConversionErrorPayload`, or `{ code, message }` with code `image_upload_pending`,
+`collaboration_pending`, or `not_ready`. A failed flush blocks switching to Markdown, which
 would otherwise replace pending visual edits with older source. `flush()` emits
 the latest converted source but does
 not persist it; the host still owns and must await its save operation.
 The editor does not import Nuxt, the CMS, Convex, or an application router.
 
+The component handle, from a template ref, has the type `GinkoEditorHandle`:
+`flush()`, `hasPendingChanges()`, `removeSelectedMedia()`, `focus(position?)`, and
+`getEditor()`. `getEditor()` returns the TipTap editor as an unstable escape hatch.
+All props are reactive except `collaboration`, which the editor reads once when it
+mounts. New inline callbacks and equal authoring kits do not cancel uploads or
+reload the document.
+
 ## Writing and component previews
 
 Type `/` on a new paragraph or use **Insert** to search writing blocks. Native
 Markdown blocks work without an authoring kit; host kits add component recipes.
-Recipes can include a short `description` and search `keywords`.
+Recipes can include a short `description`, search `keywords`, a menu `group`,
+and a Lucide `icon` name. The menu groups results, shows recent blocks first, and
+offers "Add tab" or "Add item" when the caret is inside a container.
+
+### Built-in layout blocks
+
+The editor includes a layout kit with the Ginko Docs components: callouts, tabs,
+accordions, steps, cards, timelines, columns, code groups, figures, quizzes, and
+more. Its policy is the Ginko Docs policy, so the documents render on a Docs site.
+Compose it with your own kit:
+
+```ts
+import { composeAuthoringKits, ginkoLayoutKitSource } from '@lupinum/ginko-editor/authoring'
+
+const kit = await composeAuthoringKits(ginkoLayoutKitSource, hostKitSource)
+```
+
+`createGinkoLayoutKit()` returns the layout kit alone. See
+[Layout blocks](docs/content/docs/1.getting-started/4.layout-blocks.md) for what
+each block can edit.
 
 The optional `recipe-preview` slot receives `{ recipe }`. Hosts render its source
 with Ginko Content and their own components. The menu handles selection, focus,
@@ -93,8 +137,9 @@ of the configuration.
 ## Images: upload and browse
 
 Provide one callback to enable an upload placeholder for **Add image**, `/image`,
-and **Replace image**. The editor accepts one non-empty image file up to 10 MB
-per placeholder, from the file chooser or drag and drop. Add `image-picker` to
+and **Replace image**. The editor accepts one non-empty image file per placeholder,
+up to 10 MB by default, from the file chooser or drag and drop. Set
+`image-max-bytes` to change the limit. Add `image-picker` to
 show **Browse images** in the same placeholder. A picker can also run without
 an upload callback. Drop a file directly
 onto the editor to see its preview and confirm **Add image**. Drop onto an
@@ -203,6 +248,31 @@ drag or arrow keys. Imported custom pairs and layouts with other column counts
 remain unchanged until explicitly edited. Presets require unique pairs and
 increasing finite ratios between zero and one.
 
+`items` describes the repeated children of a container:
+
+```ts
+tabs: {
+  label: 'Tabs',
+  canvas: {
+    items: {
+      childTag: 'tab', labelProp: 'label', presentation: 'tabs', addLabel: 'Add tab',
+      template: '::tab{label="New tab"}\nWrite the tab content here.\n::',
+    },
+  },
+}
+```
+
+Set `childTag` for component items, or `childNode: 'codeBlock'` or
+`childNode: 'heading'` for code blocks and heading sections. `presentation` is
+`tabs`, `accordion`, `stack`, `grid`, `steps`, or `timeline`. `columnsProp` names
+a container property with the grid column count. The template must contain
+exactly one item. Adding, removing, and renaming items are single undoable
+changes that pass the Content policy. The selected tab and collapsed accordion
+items are view state and never enter the document.
+
+A `json` control edits a property whose policy allows `json`. The field accepts
+JSON text and applies it only when it is valid.
+
 Tables expose row, column, and alignment menus beside the active table. The first
 row is the Markdown header; another row can be promoted to that position.
 Merged cells and arbitrary header placement are outside the Markdown table
@@ -216,10 +286,14 @@ through `GinkoToolbar` slots, or render your toolbar with the editor
 `#toolbar="{ actions }"` slot. The same actions expose labels, active and disabled
 states, and guarded `run()` operations. `messages`, `shortcuts`, and
 `overlay-container` configure each editor independently. Compiled styles use
-shadcn semantic color tokens and work without Tailwind.
+public `--ginko-*` tokens with shadcn semantic variables as fallbacks, and work
+without Tailwind. All styles are in the `ginko` cascade layer, so unlayered host
+rules override them. Dark fallbacks apply below a `.dark` ancestor or with
+`data-ginko-theme="dark"` or `"auto"`.
 
 - [Customize the editor](docs/content/docs/1.getting-started/2.customize.md): Vue, Nuxt, toolbar actions, messages, shortcuts, and overlays.
-- [Component coverage](docs/content/docs/1.getting-started/4.component-coverage.md): current Docs tags, named slots, and source-mode limits.
+- [Layout blocks](docs/content/docs/1.getting-started/4.layout-blocks.md): the built-in layout kit and what each block can edit.
+- [Component coverage](docs/content/docs/1.getting-started/5.component-coverage.md): current Docs tags, named slots, and source-mode limits.
 
 ## Documentation
 
@@ -236,19 +310,14 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Maintain
 
 ### Local documentation playground
 
-The playground temporarily needs accepted local Content and Docs candidates
-because their required contracts are not published yet. Build both candidates,
-then start the playground with explicit absolute paths:
+Build the package, then start the documentation site with the playground:
 
 ```bash
-GINKO_CONTENT_CANDIDATE=/absolute/path/to/ginko-content/packages/content \
-GINKO_DOCS_CANDIDATE=/absolute/path/to/ginko-docs/layer \
-pnpm docs:dev
+pnpm dev
 ```
 
-The preparation script validates both inputs and creates only ignored files in
-`docs/.candidate`. Remove this setup after the matching package releases are
-published, as tracked in `internals/migrations.md`.
+The site uses the published Ginko Docs layer and the Content version of this
+workspace, so the playground and the Editor share one parser.
 
 ## Support and security
 

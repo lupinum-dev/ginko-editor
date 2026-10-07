@@ -1,0 +1,140 @@
+/*
+ * Public theme tokens. Each token uses the matching shadcn variable when the host
+ * defines it, and a neutral fallback otherwise. Tokens are declared once, on the
+ * outermost Ginko element; nested Ginko elements inherit them. Library rules live
+ * in the `ginko` cascade layer, so any unlayered host rule overrides them.
+ */
+@layer ginko {
+  :where(
+    .ginko-editor,
+    .ginko-overlay-root,
+    .ginko-node-popover-content,
+    .ginko-image-picker,
+    .ginko-toolbar
+  ):not(:where(.ginko-editor, .ginko-overlay-root, .ginko-image-picker) *) {
+    color-scheme: light;
+    --ginko-background: var(--background, #fff);
+    --ginko-foreground: var(--foreground, #171717);
+    --ginko-muted: var(--muted, #f5f5f5);
+    --ginko-muted-foreground: var(--muted-foreground, #737373);
+    --ginko-border: var(--border, #e5e5e5);
+    --ginko-input: var(--input, var(--ginko-border));
+    --ginko-accent: var(--accent, #f5f5f5);
+    --ginko-accent-foreground: var(--accent-foreground, var(--ginko-foreground));
+    --ginko-primary: var(--primary, #171717);
+    --ginko-primary-foreground: var(--primary-foreground, #fafafa);
+    --ginko-destructive: var(--destructive, #b42318);
+    --ginko-popover: var(--popover, var(--ginko-background));
+    --ginko-popover-foreground: var(--popover-foreground, var(--ginko-foreground));
+    --ginko-ring: var(--ring, #737373);
+    --ginko-radius: var(--radius, .625rem);
+    --ginko-warning: #e4a11b;
+    --ginko-warning-background: #fff8e6;
+    --ginko-warning-foreground: #5c4300;
+    --ginko-selection: color-mix(in srgb, #76a9d7 15%, var(--ginko-background));
+    --ginko-tone-neutral: #8c8c87;
+    --ginko-tone-info: #3786d7;
+    --ginko-tone-warning: #b9811a;
+    --ginko-tone-danger: #d15e51;
+    --ginko-tone-success: #4a9266;
+    --ginko-tone-idea: #9370c2;
+    --ginko-shadow-sm: 0 2px 8px rgb(0 0 0 / .08);
+    --ginko-shadow-md: 0 8px 28px rgb(0 0 0 / .13), 0 2px 6px rgb(0 0 0 / .05);
+    --ginko-shadow-lg: 0 12px 40px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .06);
+    --ginko-overlay-backdrop: rgb(0 0 0 / .32);
+    --ginko-z-menu: 50;
+    --ginko-z-floating: 100;
+    --ginko-z-popover: 200;
+    --ginko-z-dropdown: 250;
+    --ginko-z-tooltip: 300;
+  }
+
+  /*
+   * Dark fallbacks apply below a `.dark` ancestor, on `data-ginko-theme="dark"`,
+   * or on `data-ginko-theme="auto"` when the operating system prefers dark.
+   * Hosts that define shadcn variables for dark mode need no extra setup.
+   */
+  :where(.dark, [data-ginko-theme='dark']) :where(
+    .ginko-editor,
+    .ginko-overlay-root,
+    .ginko-node-popover-content,
+    .ginko-image-picker,
+    .ginko-toolbar
+  ):not(:where(.ginko-editor, .ginko-overlay-root, .ginko-image-picker) *),
+  :where(
+    .ginko-editor,
+    .ginko-overlay-root,
+    .ginko-node-popover-content,
+    .ginko-image-picker,
+    .ginko-toolbar
+  ):where(.dark, [data-ginko-theme='dark']) {
+    color-scheme: dark;
+    --ginko-background: var(--background, #0a0a0a);
+    --ginko-foreground: var(--foreground, #fafafa);
+    --ginko-muted: var(--muted, #262626);
+    --ginko-muted-foreground: var(--muted-foreground, #a3a3a3);
+    --ginko-border: var(--border, #333);
+    --ginko-accent: var(--accent, #262626);
+    --ginko-primary: var(--primary, #fafafa);
+    --ginko-primary-foreground: var(--primary-foreground, #171717);
+    --ginko-destructive: var(--destructive, #f97066);
+    --ginko-ring: var(--ring, #a3a3a3);
+    --ginko-warning: #f5b83d;
+    --ginko-warning-background: #2b2111;
+    --ginko-warning-foreground: #fbe3a8;
+    --ginko-selection: color-mix(in srgb, #76a9d7 25%, var(--ginko-background));
+    --ginko-tone-neutral: #a3a39e;
+    --ginko-tone-info: #5ea3eb;
+    --ginko-tone-warning: #d9a13a;
+    --ginko-tone-danger: #ec7d70;
+    --ginko-tone-success: #68b384;
+    --ginko-tone-idea: #ae8fdb;
+    --ginko-shadow-sm: 0 2px 8px rgb(0 0 0 / .4);
+    --ginko-shadow-md: 0 8px 28px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .3);
+    --ginko-shadow-lg: 0 12px 40px rgb(0 0 0 / .6), 0 2px 6px rgb(0 0 0 / .3);
+    --ginko-overlay-backdrop: rgb(0 0 0 / .6);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :where([data-ginko-theme='auto']) :where(
+      .ginko-editor,
+      .ginko-overlay-root,
+      .ginko-node-popover-content,
+      .ginko-image-picker,
+      .ginko-toolbar
+    ):not(:where(.ginko-editor, .ginko-overlay-root, .ginko-image-picker) *),
+    :where(
+      .ginko-editor,
+      .ginko-overlay-root,
+      .ginko-node-popover-content,
+      .ginko-image-picker,
+      .ginko-toolbar
+    ):where([data-ginko-theme='auto']) {
+      color-scheme: dark;
+      --ginko-background: var(--background, #0a0a0a);
+      --ginko-foreground: var(--foreground, #fafafa);
+      --ginko-muted: var(--muted, #262626);
+      --ginko-muted-foreground: var(--muted-foreground, #a3a3a3);
+      --ginko-border: var(--border, #333);
+      --ginko-accent: var(--accent, #262626);
+      --ginko-primary: var(--primary, #fafafa);
+      --ginko-primary-foreground: var(--primary-foreground, #171717);
+      --ginko-destructive: var(--destructive, #f97066);
+      --ginko-ring: var(--ring, #a3a3a3);
+      --ginko-warning: #f5b83d;
+      --ginko-warning-background: #2b2111;
+      --ginko-warning-foreground: #fbe3a8;
+      --ginko-selection: color-mix(in srgb, #76a9d7 25%, var(--ginko-background));
+      --ginko-tone-neutral: #a3a39e;
+      --ginko-tone-info: #5ea3eb;
+      --ginko-tone-warning: #d9a13a;
+      --ginko-tone-danger: #ec7d70;
+      --ginko-tone-success: #68b384;
+      --ginko-tone-idea: #ae8fdb;
+      --ginko-shadow-sm: 0 2px 8px rgb(0 0 0 / .4);
+      --ginko-shadow-md: 0 8px 28px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .3);
+      --ginko-shadow-lg: 0 12px 40px rgb(0 0 0 / .6), 0 2px 6px rgb(0 0 0 / .3);
+      --ginko-overlay-backdrop: rgb(0 0 0 / .6);
+    }
+  }
+}

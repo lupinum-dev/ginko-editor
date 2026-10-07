@@ -1,0 +1,128 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { ConvexClient, ConvexHttpClient } from 'convex/browser'
+import { Step, Transform } from '@tiptap/pm/transform'
+import { decodeCollaborationDocument, SetNodePropertyStep } from '@lupinum/ginko-editor/runtime'
+import { api } from './convex/_generated/api.js'
+import { config, token } from './auth.mjs'
+
+function user(name) {
+  const client = new ConvexHttpClient(config.url, { logger: false })
+  if (name) client.setAuth(token(name))
+  return client
+}
+const alice = user('alice'), bob = user('bob'), reader = user('reader'), outsider = user('outsider'), anonymous = user()
+const live = new ConvexClient(config.url, { logger: false })
+live.setAuth(async () => token('bob'))
+const unsubscribers = []
+async function until(check) {
+  const end = Date.now() + 10_000
+  while (!check()) {
+    if (Date.now() >= end) throw new Error('Timed out waiting for a realtime result.')
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+}
+function head(snapshot) {
+  return { epoch: snapshot.epoch, schemaRevision: snapshot.schemaRevision, policyRevision: snapshot.policyRevision, version: snapshot.version }
+}
+function wire(opened, roomId, step) {
+  return { roomId, ...head(opened.snapshot), clientId: opened.clientPrefix + randomUUID(), steps: [JSON.stringify(step.toJSON())] }
+}
+
+try {
+  await assert.rejects(() => anonymous.mutation(api.rooms.create, { source: 'Denied.' }))
+  const roomId = await alice.mutation(api.rooms.create, { source: '<note title="Original">\nBody.\n</note>' })
+  const bobIdentity = await bob.query(api.rooms.whoami, {})
+  const readerIdentity = await reader.query(api.rooms.whoami, {})
+  assert.equal(typeof bobIdentity, 'string')
+  await alice.mutation(api.rooms.grant, { roomId, identity: bobIdentity, role: 'editor' })
+  await alice.mutation(api.rooms.grant, { roomId, identity: readerIdentity, role: 'reader' })
+  await assert.rejects(() => outsider.query(api.rooms.open, { roomId }))
+  await assert.rejects(() => anonymous.query(api.rooms.open, { roomId }))
+  const a = await alice.query(api.rooms.open, { roomId }), b = await bob.query(api.rooms.open, { roomId })
+  const r = await reader.query(api.rooms.open, { roomId })
+  assert.equal(r.canWrite, false)
+  let observed = -1, revoked = false
+  unsubscribers.push(live.onUpdate(api.rooms.currentHead, { roomId }, value => { observed = value.version }, () => { revoked = true }))
+  await until(() => observed === 0)
+  const aStep = new SetNodePropertyStep(0, 'title', 'Alice title'), bStep = new SetNodePropertyStep(0, 'tone', 'warning')
+  const aBatch = wire(a, roomId, aStep), bBatch = wire(b, roomId, bStep)
+  await assert.rejects(() => reader.mutation(api.rooms.push, wire(r, roomId, bStep)))
+  await assert.rejects(() => bob.mutation(api.rooms.push, { ...bBatch, clientId: aBatch.clientId }))
+  const replies = await Promise.all([alice.mutation(api.rooms.push, aBatch), bob.mutation(api.rooms.push, bBatch)])
+  assert.equal(replies[0].status, 'ok'); assert.equal(replies[1].status, 'ok')
+  const first = replies[0].update.clientIds[0] === aBatch.clientId ? 0 : 1
+  const pending = first === 0 ? bStep : aStep
+  const accepted = new Transform(decodeCollaborationDocument(a.snapshot.document))
+  for (const encoded of replies[first].update.steps) accepted.step(Step.fromJSON(accepted.doc.type.schema, JSON.parse(encoded)))
+  const rebased = pending.map(accepted.mapping)
+  assert.ok(rebased)
+  const otherClient = first === 0 ? bob : alice, otherBatch = first === 0 ? bBatch : aBatch
+  await otherClient.mutation(api.rooms.push, { ...otherBatch, version: 1, steps: [JSON.stringify(rebased.toJSON())] })
+  await until(() => observed === 2)
+  const current = await alice.query(api.rooms.open, { roomId })
+  const doc = decodeCollaborationDocument(current.snapshot.document)
+  assert.equal(doc.firstChild.attrs.props.title, 'Alice title')
+  assert.equal(doc.firstChild.attrs.props.tone, 'warning')
+  const content = await alice.query(api.rooms.content, { roomId })
+  assert.equal(content.version, current.snapshot.version)
+  assert.match(content.markdown, /Alice title/)
+
+  // Presence records are short-lived, use the account name, and stay inside the room's access rules.
+  const cursorClient = a.clientPrefix + randomUUID()
+  const cursor = { protocolVersion: 1, clientId: cursorClient, user: { name: 'Forged name' }, epoch: current.snapshot.epoch,
+    version: current.snapshot.version, selection: { anchor: 1, head: 3 }, updatedAt: 0 }
+  await alice.mutation(api.rooms.publishPresence, { roomId, update: cursor })
+  const peers = await bob.query(api.rooms.presence, { roomId })
+  assert.equal(peers.length, 1)
+  assert.equal(peers[0].user.name, 'alice')
+  assert.ok(peers[0].updatedAt > 0)
+  await assert.rejects(() => bob.mutation(api.rooms.publishPresence, { roomId, update: cursor }))
+  await assert.rejects(() => outsider.query(api.rooms.presence, { roomId }))
+  await assert.rejects(() => alice.mutation(api.rooms.publishPresence, { roomId, update: { ...cursor, version: current.snapshot.version + 5 } }))
+  await alice.mutation(api.rooms.leavePresence, { roomId, clientId: cursorClient })
+  assert.equal((await bob.query(api.rooms.presence, { roomId })).length, 0)
+
+  const valid = wire(current, roomId, new SetNodePropertyStep(0, 'title', 'Later'))
+  await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, version: current.snapshot.version + 10 }))
+  await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, steps: [] }))
+  await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, steps: [JSON.stringify(new SetNodePropertyStep(0, 'title', undefined).toJSON())] }))
+  await assert.rejects(() => alice.mutation(api.rooms.push, { ...valid, steps: [JSON.stringify({ stepType: 'replace', from: 2.5, to: 3.5,
+    slice: { content: [{ type: 'text', text: 'Bad' }] } })] }))
+  assert.equal((await alice.query(api.rooms.open, { roomId })).snapshot.version, 2)
+
+  await alice.mutation(api.rooms.publish, { roomId, ...head(current.snapshot) })
+  await assert.rejects(() => reader.mutation(api.rooms.publish, { roomId, ...head(current.snapshot) }))
+  await assert.rejects(() => alice.mutation(api.rooms.publish, { roomId, ...head(current.snapshot), version: 1 }))
+  assert.equal((await alice.query(api.rooms.content, { roomId })).published, content.markdown)
+  assert.equal((await alice.query(api.rooms.content, { roomId })).publishedEpoch, content.epoch)
+  await assert.rejects(() => alice.mutation(api.rooms.replace, { roomId, ...head(current.snapshot), version: 0, source: 'Stale replacement.' }))
+
+  await alice.mutation(api.rooms.grant, { roomId, identity: bobIdentity, role: 'none' })
+  await until(() => revoked)
+  await assert.rejects(() => bob.mutation(api.rooms.push, { ...bBatch, version: 2 }))
+  await assert.rejects(() => bob.query(api.rooms.pull, { roomId, ...head(current.snapshot) }))
+
+  const replacement = await alice.mutation(api.rooms.replace, { roomId, ...head(current.snapshot), source: 'Replacement source.' })
+  assert.notEqual(replacement.epoch, current.snapshot.epoch)
+  assert.equal(replacement.version, 0)
+  assert.equal((await alice.mutation(api.rooms.push, valid)).status, 'stale')
+  const replacedContent = await alice.query(api.rooms.content, { roomId })
+  assert.equal(replacedContent.published, content.markdown)
+  assert.equal(replacedContent.publishedEpoch, content.epoch)
+  assert.notEqual(replacedContent.publishedEpoch, replacedContent.epoch)
+
+  const imageRoom = await alice.mutation(api.rooms.create, { source: '![Description](/image.png)' })
+  const imageOpen = await alice.query(api.rooms.open, { roomId: imageRoom })
+  await assert.rejects(() => alice.mutation(api.rooms.push, wire(imageOpen, imageRoom, new SetNodePropertyStep(0, 'secretUnsupported', 'discarded'))))
+  assert.equal((await alice.query(api.rooms.open, { roomId: imageRoom })).snapshot.version, 0)
+  await alice.mutation(api.rooms.push, wire(imageOpen, imageRoom, new SetNodePropertyStep(0, 'alt', 'Kept')))
+  await alice.mutation(api.rooms.prune, { roomId: imageRoom, throughVersion: 1 })
+  const pruned = await alice.query(api.rooms.pull, { roomId: imageRoom, ...head(imageOpen.snapshot) })
+  assert.equal(pruned.status, 'stale'); assert.equal(pruned.reason, 'history')
+  assert.match((await alice.query(api.rooms.content, { roomId: imageRoom })).markdown, /Kept/)
+  console.log('Verified local Convex JWT authentication, live subscriptions, concurrent updates, policy/schema limits, presence, checkpoints, publication, revocation, replacement and pruned-history recovery.')
+} finally {
+  for (const unsubscribe of unsubscribers) unsubscribe()
+  await live.close()
+}

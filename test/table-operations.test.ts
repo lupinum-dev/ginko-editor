@@ -6,7 +6,14 @@ import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table
 import { TableMap } from '@tiptap/pm/tables'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { applyTableOperation, canChangeTable, changeTable, selectedTableRect, selectTableRect, type TableOperation } from '../src/lib/nodeviews/table-operations'
+import {
+  applyTableOperation,
+  canChangeTable,
+  changeTable,
+  selectedTableRect,
+  selectTableRect,
+  type TableOperation,
+} from '../src/lib/nodeviews/table-operations'
 import { tableView } from '../src/lib/nodeviews/table'
 import { inlinePopover } from '../src/lib/nodeviews/popover'
 import { createEditorOverlayController, type EditorOverlayController } from '../src/ui/context'
@@ -14,19 +21,67 @@ import { createEditorOverlayController, type EditorOverlayController } from '../
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const editors: Editor[] = []
 afterEach(() => { editors.splice(0).forEach(editor => editor.destroy()); document.body.replaceChildren() })
 function setup(overlay?: EditorOverlayController) {
   const element = document.createElement('div'); element.className = 'ginko-editor'; document.body.append(element)
-  const editor = new Editor({ element, extensions: [StarterKit, Table.extend({ addNodeView() { return props => tableView(props, overlay) } }), TableRow, TableHeader.extend({ content: 'paragraph+' }), TableCell.extend({ content: 'paragraph+' })], content: {
-    type: 'doc', content: [{ type: 'table', content: [['Name', 'Value', 'Source'], ['Apple', '10', 'First'], ['Pear', '20', 'Second'], ['Plum', '30', 'Third']].map((values, row) => ({ type: 'tableRow', content: values.map((text, column) => ({ type: row === 0 ? 'tableHeader' : 'tableCell', attrs: { align: column === 1 ? 'right' : null }, content: [{ type: 'paragraph', content: [{ type: 'text', text, ...(text === 'Apple' ? { marks: [{ type: 'bold' }] } : {}) }] }] })) })) }],
-  } })
+  const editor = new Editor({
+    element,
+    extensions: [
+      StarterKit,
+      Table.extend({
+        addNodeView() {
+          return props => tableView(props, overlay)
+        },
+      }),
+      TableRow,
+      TableHeader.extend({ content: 'paragraph+' }),
+      TableCell.extend({ content: 'paragraph+' }),
+    ],
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            ['Name', 'Value', 'Source'],
+            ['Apple', '10', 'First'],
+            ['Pear', '20', 'Second'],
+            ['Plum', '30', 'Third'],
+          ].map((values, row) => ({
+            type: 'tableRow',
+            content: values.map((text, column) => ({
+              type: row === 0 ? 'tableHeader' : 'tableCell',
+              attrs: { align: column === 1 ? 'right' : null },
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text,
+                      ...(text === 'Apple' ? { marks: [{ type: 'bold' }] } : {}),
+                    },
+                  ],
+                },
+              ],
+            })),
+          })),
+        },
+      ],
+    },
+  })
   editor.view.dispatch(editor.state.tr)
   editors.push(editor); return editor
 }
-const rows = (editor: Editor) => editor.state.doc.firstChild!.content.content.map(row => row.content.content.map(cell => cell.textContent))
+const rows = (editor: Editor) =>
+  editor.state.doc.firstChild!.content.content.map(row => row.content.content.map(cell => cell.textContent))
 function textCell(editor: Editor, row: number, column: number) {
   const table = editor.state.doc.firstChild!, map = TableMap.get(table)
   editor.commands.setTextSelection(1 + map.map[row * map.width + column] + 2)
@@ -74,13 +129,17 @@ describe('portable table operations', () => {
     [{ type: 'duplicate', axis: 'row', from: 1, to: 3 }, ['Name', 'Apple', 'Pear', 'Apple', 'Pear', 'Plum']],
     [{ type: 'header', row: 2 }, ['Pear', 'Name', 'Apple', 'Plum']],
     [{ type: 'delete', axis: 'row', from: 1, to: 3 }, ['Name', 'Plum']],
-  ] satisfies [TableOperation, string[]][])('preserves row content and restores the full document in one Undo for %j', (operation, expected) => {
+  ] satisfies [TableOperation, string[]][])(
+    'preserves row content and restores the full document in one Undo for %j',
+    (operation, expected) => {
     const editor = setup(), before = editor.state.doc
     expect(applyTableOperation(editor, 0, operation)).toBe(true)
     expect(rows(editor).map(row => row[0])).toEqual(expected)
     const table = editor.state.doc.firstChild!
     expect(table.child(0).content.content.every(cell => cell.type.name === 'tableHeader')).toBe(true)
-    expect(table.content.content.slice(1).every(row => row.content.content.every(cell => cell.type.name === 'tableCell'))).toBe(true)
+    expect(
+      table.content.content.slice(1).every(row => row.content.content.every(cell => cell.type.name === 'tableCell')),
+    ).toBe(true)
     editor.commands.undo(); expect(editor.state.doc.eq(before)).toBe(true)
   })
 
@@ -96,7 +155,12 @@ describe('portable table operations', () => {
   it('moves and duplicates whole columns including their header and alignment', () => {
     const editor = setup(), before = editor.state.doc
     expect(applyTableOperation(editor, 0, { type: 'move', axis: 'column', from: 1, to: 2, direction: 1 })).toBe(true)
-    expect(rows(editor)).toEqual([['Name', 'Source', 'Value'], ['Apple', 'First', '10'], ['Pear', 'Second', '20'], ['Plum', 'Third', '30']])
+    expect(rows(editor)).toEqual([
+      ['Name', 'Source', 'Value'],
+      ['Apple', 'First', '10'],
+      ['Pear', 'Second', '20'],
+      ['Plum', 'Third', '30'],
+    ])
     expect(editor.state.doc.firstChild!.content.content.every(row => row.child(2).attrs.align === 'right')).toBe(true)
     expect(applyTableOperation(editor, 0, { type: 'duplicate', axis: 'column', from: 2, to: 3 })).toBe(true)
     expect(rows(editor)[1]).toEqual(['Apple', 'First', '10', '10'])
@@ -115,7 +179,9 @@ describe('portable table operations', () => {
 
   it('preserves mapped controls anchored after the table while rows change', () => {
     const editor = setup()
-    let anchors = DecorationSet.create(editor.state.doc, [Decoration.widget(editor.state.doc.firstChild!.nodeSize, () => document.createElement('span'), { side: -1 })])
+    let anchors = DecorationSet.create(editor.state.doc, [
+      Decoration.widget(editor.state.doc.firstChild!.nodeSize, () => document.createElement('span'), { side: -1 }),
+    ])
     editor.on('transaction', ({ transaction }) => { anchors = anchors.map(transaction.mapping, transaction.doc) })
     applyTableOperation(editor, 0, { type: 'duplicate', axis: 'row', from: 1, to: 2 })
     expect(anchors.find().map(anchor => anchor.from)).toEqual([editor.state.doc.firstChild!.nodeSize])
@@ -134,7 +200,9 @@ describe('portable table operations', () => {
       expect(canChangeTable(table, operation)).toBe(false)
       expect(changeTable(table, operation)).toBeUndefined()
     }
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(2, undefined, { ...table.firstChild!.firstChild!.attrs, colspan: 2 }))
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(2, undefined, { ...table.firstChild!.firstChild!.attrs, colspan: 2 }),
+    )
     expect(changeTable(editor.state.doc.firstChild!, { type: 'add', axis: 'row', index: 1 })).toBeUndefined()
   })
 
@@ -144,8 +212,17 @@ describe('portable table operations', () => {
     selectTableRect(editor, 0, { top: 1, bottom: 3, left: 1, right: 3 })
     expect(selectedTableRect(editor.state, 0)).toEqual({ top: 1, bottom: 3, left: 1, right: 3 })
     applyTableOperation(editor, 0, { type: 'align', from: 1, to: 3, value: 'center' })
-    expect(editor.state.doc.firstChild!.content.content.every(row => row.child(0).attrs.align === null && row.child(1).attrs.align === 'center' && row.child(2).attrs.align === 'center')).toBe(true)
-    expect(changeTable(editor.state.doc.firstChild!, { type: 'align', from: 1, to: 3, value: 'center' })).toBeUndefined()
+    expect(
+      editor.state.doc.firstChild!.content.content.every(
+        row =>
+          row.child(0).attrs.align === null
+          && row.child(1).attrs.align === 'center'
+          && row.child(2).attrs.align === 'center',
+      ),
+    ).toBe(true)
+    expect(
+      changeTable(editor.state.doc.firstChild!, { type: 'align', from: 1, to: 3, value: 'center' }),
+    ).toBeUndefined()
   })
 
   it('shows direct actions with the current scope and targets a row handle at its actual hovered row', async () => {

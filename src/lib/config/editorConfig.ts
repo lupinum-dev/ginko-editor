@@ -1,43 +1,20 @@
 import { ImageUpload } from '../extensions/image-upload'
-import type { ImageUploadHandler, ImagePicker, AssetInfo } from '../../types'
-import type { EditorMessages } from '../../ui/messages'
+import type { ImageUploadHandler, ImagePicker, EditorImage, LegacyImageUploadResult } from '../../types'
+import { createEditorText, type EditorMessages } from '../../ui/messages'
 import type { EditorOverlayController } from '../../ui/context'
 import type { ImageActions } from '../nodeviews/image'
-import type { Editor } from '@tiptap/core'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Table as TiptapTable } from '@tiptap/extension-table'
-import { TableCell as TiptapTableCell } from '@tiptap/extension-table-cell'
-import { TableHeader as TiptapTableHeader } from '@tiptap/extension-table-header'
-import { TableRow } from '@tiptap/extension-table-row'
-import StarterKit from '@tiptap/starter-kit'
 import { tableView } from '../nodeviews/table'
-
+import { componentView } from '../nodeviews/component'
+import { codeView } from '../nodeviews/code'
+import { imageView } from '../nodeviews/image'
+import { createDocumentExtensions } from './documentConfig'
 import type { AssetProvider, JsonRecord } from '../../types'
-import type { AuthoringKitV1 } from '../../authoring'
-import { editorDebug } from '../debug'
+import type { AuthoringKit } from '../../authoring'
 import type { TiptapToMDCOptions } from '../tiptapToMdc'
-import {
-  Binding,
-  CodeBlock,
-  EditorDebug,
-  Element,
-  File,
-  Heading,
-  Image,
-  InlineElement,
-  MarkdownClipboard,
-  Slot,
-  SpanStyle,
-  Video,
-} from '../extensions'
-
-const TableCell = TiptapTableCell.extend({
-  content: 'paragraph+',
-})
-
-const TableHeader = TiptapTableHeader.extend({
-  content: 'paragraph+',
-})
+import { MarkdownClipboard } from '../extensions'
+import { ComponentBoundary } from '../extensions/component-boundary'
+import { ContainerItems } from '../extensions/container-items'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -45,145 +22,78 @@ export interface CreateEditorExtensionsOptions {
   getImagePicker?: () => ImagePicker | undefined
   getImageDropTarget?: () => HTMLElement | undefined
   getImageUpload?: () => ImageUploadHandler | undefined
+  /** The largest accepted image upload, in bytes. */
+  getImageMaxBytes?: () => number
   canUploadImage?: () => boolean
-  insertUploadedImage?: (asset: Partial<AssetInfo>, pos: number, replaceSize?: number) => boolean
+  insertUploadedImage?: (asset: EditorImage | LegacyImageUploadResult, pos: number, replaceSize?: number) => boolean
   onImageUploadPending?: (count: number) => void
   imageActions?: ImageActions
   assetProvider?: AssetProvider
-  codeBlockTheme: string
-  enableDebug: boolean
-  enableFiles: boolean
-  enableVideo: boolean
-  fileOutput: 'markdown' | 'mdc'
-  imageOutput: 'markdown' | 'mdc'
-  getAuthoringKit?: () => AuthoringKitV1 | undefined
+  /** Initial value of the code block extension storage. */
+  codeBlockTheme?: string
+  getAuthoringKit?: () => AuthoringKit | undefined
   getOutputOptions?: () => TiptapToMDCOptions
   canPaste?: () => boolean
   onCopyError?: (message: string | undefined) => void
   onPasteError?: (message: string | undefined) => void
-  placeholder?: string
-  showMarkdownMarkers: boolean
-  videoOutput: 'html' | 'mdc'
+  /** Read on each placeholder render, so the text can change without a new editor. */
+  getPlaceholder?: () => string | undefined
+  /** Initial value of the heading extension storage. */
+  showMarkdownMarkers?: boolean
 }
 
-export function createEditorExtensions(options: CreateEditorExtensionsOptions) {
+export function createEditorExtensions(options: CreateEditorExtensionsOptions = {}) {
   const resolveAsset = (props: JsonRecord) => {
     const src = typeof props.src === 'string' ? props.src : undefined
     const id = typeof props.id === 'string' ? props.id : undefined
     return options.assetProvider?.buildUrl({ id: id ?? src, url: src })
   }
-  const {
-    codeBlockTheme,
-    enableDebug,
-    placeholder,
-    showMarkdownMarkers,
-  } = options
+  const text = options.overlay?.text ?? createEditorText(options.getMessages)
 
   return [
-    StarterKit.configure({
-      codeBlock: false,
-      heading: false,
-      underline: false,
-      link: {
-        HTMLAttributes: {
-          target: null,
-        },
-        openOnClick: false,
+    ...createDocumentExtensions({
+      getAuthoringKit: options.getAuthoringKit,
+      getOutputOptions: options.getOutputOptions,
+      showMarkdownMarkers: options.showMarkdownMarkers,
+      codeBlockTheme: options.codeBlockTheme,
+      resolveAsset,
+      nodeViews: {
+        table: props => tableView(props, options.overlay),
+        element: props => componentView(
+          props,
+          () => options.getAuthoringKit?.(),
+          () => options.getOutputOptions?.() ?? {},
+          options.overlay,
+        ),
+        codeBlock: props => codeView(props, options.overlay),
+        image: props => imageView(props, options.imageActions, options.overlay),
       },
     }),
-    Heading.configure({
-      levels: [1, 2, 3, 4, 5, 6],
-      showMarkers: showMarkdownMarkers,
-    }),
-    TiptapTable.extend({ addNodeView() { return props => tableView(props, options.overlay) } }).configure({
-      renderWrapper: true,
-      resizable: false,
-    }),
-    TableRow,
-    TableHeader,
-    TableCell,
     Placeholder.configure({
       emptyEditorClass: 'mdc-editor-empty',
-      placeholder: placeholder || 'Start writing...',
+      placeholder: () => options.getPlaceholder?.() || text('startWriting'),
     }),
     MarkdownClipboard.configure({
-      enableDebug,
       enabled: true,
-      fileOutput: options.fileOutput,
+      text,
       getAuthoringKit: options.getAuthoringKit,
       getOutputOptions: options.getOutputOptions,
       canPaste: options.canPaste,
       onPasteError: options.onPasteError,
       onCopyError: options.onCopyError,
-      imageOutput: options.imageOutput,
-      videoOutput: options.videoOutput,
     }),
-    ...(enableDebug ? [EditorDebug] : []),
-    Element.configure({ getAuthoringKit: options.getAuthoringKit, getOutputOptions: options.getOutputOptions, overlay: options.overlay }),
-    Slot.configure({ getAuthoringKit: options.getAuthoringKit }),
-    InlineElement,
-    CodeBlock.configure({
-      theme: codeBlockTheme,
+    ImageUpload.configure({
       overlay: options.overlay,
+      getMessages: options.getMessages,
+      dropTarget: options.getImageDropTarget,
+      upload: options.getImageUpload,
+      picker: options.getImagePicker,
+      maxBytes: options.getImageMaxBytes,
+      enabled: options.canUploadImage,
+      insert: options.insertUploadedImage,
+      onPendingChange: options.onImageUploadPending,
     }),
-    ImageUpload.configure({ overlay: options.overlay, getMessages: options.getMessages, dropTarget: options.getImageDropTarget, upload: options.getImageUpload, picker: options.getImagePicker, enabled: options.canUploadImage, insert: options.insertUploadedImage, onPendingChange: options.onImageUploadPending }),
-    Image.configure({ resolveSrc: resolveAsset, actions: options.imageActions, overlay: options.overlay }),
-    Video,
-    File.configure({ resolveSrc: resolveAsset }),
-    Binding,
-    SpanStyle,
+    ComponentBoundary,
+    ContainerItems.configure({ getAuthoringKit: options.getAuthoringKit }),
   ]
-}
-
-const normalizingEditors = new WeakSet<Editor>()
-
-export function isCurrentlyNormalizingTable(editor: Editor): boolean {
-  return normalizingEditors.has(editor)
-}
-
-export function normalizeTableCells(editorInstance: Editor | undefined): boolean {
-  if (!editorInstance) {
-    return false
-  }
-
-  const { state } = editorInstance
-  const { schema } = state
-  const cellTypes = new Set(['tableCell', 'tableHeader'])
-  let hasChanges = false
-
-  const tr = state.tr
-  state.doc.descendants((node, pos) => {
-    if (!cellTypes.has(node.type.name)) {
-      return
-    }
-
-    let hasInlineChild = false
-    node.content.forEach((child) => {
-      if (child.isInline) {
-        hasInlineChild = true
-      }
-    })
-
-    if (!hasInlineChild) {
-      return
-    }
-
-    const paragraphType = schema.nodes.paragraph
-    if (!paragraphType) {
-      return
-    }
-
-    const paragraph = paragraphType.create(null, node.content)
-    const updatedCell = node.type.create(node.attrs, paragraph, node.marks)
-    tr.replaceWith(pos, pos + node.nodeSize, updatedCell)
-    hasChanges = true
-  })
-
-  if (hasChanges) {
-    normalizingEditors.add(editorInstance)
-    try { editorInstance.view.dispatch(tr) } finally { normalizingEditors.delete(editorInstance) }
-    editorDebug.log('Normalized table cells in editor')
-  }
-
-  return hasChanges
 }

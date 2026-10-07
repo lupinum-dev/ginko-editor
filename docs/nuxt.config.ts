@@ -1,47 +1,32 @@
-import { existsSync, realpathSync } from 'node:fs'
-import { resolve } from 'node:path'
+// Nuxt loads this file before the package build exists, so it reads the policy source.
+import { ginkoLayoutComponentPolicy } from '../src/layout-kit'
+import { useNuxt } from 'nuxt/kit'
 
-const localDocsLayer = resolve(import.meta.dirname, '.candidate/ginko-docs')
-const localContentCandidate = realpathSync(
-  resolve(import.meta.dirname, 'node_modules/@lupinum/ginko-content'),
-)
-const usesLocalDocsCandidate = existsSync(resolve(localDocsLayer, 'authoring.ts'))
-if (!usesLocalDocsCandidate) {
-  throw new Error(
-    'The playground currently requires the accepted Ginko Docs candidate. Run pnpm docs:build from the repository root.',
-  )
-}
 const { hostComponentSources } = await import('./app/playground/authoring-sources')
-const rendererComponents = Object.fromEntries(
-  hostComponentSources.flatMap((source) => Object.entries(source.policy.components)),
-)
+
+/**
+ * The site renders the layout kit components through the Docs layer, plus
+ * the host example components. The layer's own policy uses an older format,
+ * so a hook replaces it with one version 2 policy before Content reads it.
+ */
+const componentPolicy = {
+  version: 2 as const,
+  components: {
+    ...ginkoLayoutComponentPolicy.components,
+    ...Object.fromEntries(hostComponentSources.flatMap(source => Object.entries(source.policy.components))),
+  },
+}
 
 export default defineNuxtConfig({
-  extends: [localDocsLayer],
-  alias: {
-    '@lupinum/ginko-content/agent-paths': resolve(
-      localContentCandidate,
-      'dist/public/agent-paths.js',
-    ),
-    '@lupinum/ginko-content/agent-registry': resolve(
-      localContentCandidate,
-      'dist/public/agent-registry.js',
-    ),
-    '@lupinum/ginko-content/client': resolve(localContentCandidate, 'dist/public/client.js'),
-    '@lupinum/ginko-content/cms-contract': resolve(
-      localContentCandidate,
-      'dist/cms-contract/index.js',
-    ),
-    '@lupinum/ginko-content/config': resolve(localContentCandidate, 'dist/config.mjs'),
-    '@lupinum/ginko-content/navigation': resolve(
-      localContentCandidate,
-      'dist/public/navigation.js',
-    ),
-    '@lupinum/ginko-content/server': resolve(localContentCandidate, 'dist/public/server.js'),
-    '@lupinum/ginko-docs/authoring': resolve(localDocsLayer, 'authoring.ts'),
+  extends: ['@lupinum/ginko-docs'],
+  hooks: {
+    // Replace the merged layer policy before any module reads it.
+    'modules:before'() {
+      const nuxt = useNuxt()
+      nuxt.options.content = { ...nuxt.options.content, componentPolicy }
+    },
   },
   content: {
-    componentPolicy: { version: 2, components: rendererComponents },
     markdown: {
       tags: {
         'learning-objective': 'LearningObjective',
@@ -50,6 +35,8 @@ export default defineNuxtConfig({
     },
   },
   css: ['@lupinum/ginko-editor/style.css'],
+  // The Editor and the site must share one Content parser instance.
+  vite: { resolve: { dedupe: ['@lupinum/ginko-content'] } },
   i18n: {
     locales: [{ code: 'en', language: 'en-US', name: 'English' }],
   },

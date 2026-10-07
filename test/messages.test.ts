@@ -9,7 +9,11 @@ import { createEditorText, translateEditorMessage, type EditorMessages } from '.
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { disconnect() {} observe() {} unobserve() {} }
   Range.prototype.getBoundingClientRect ??= () => new DOMRect()
-  Range.prototype.getClientRects ??= () => ({ item: () => null, length: 0, [Symbol.iterator]: function* () {} }) as DOMRectList
+  Range.prototype.getClientRects ??= () => ({
+    item: () => null,
+    length: 0,
+    [Symbol.iterator]: function* () {},
+  }) as DOMRectList
 })
 const cleanup: (() => void)[] = []
 afterEach(() => { cleanup.splice(0).forEach(dispose => dispose()); document.body.replaceChildren() })
@@ -20,7 +24,9 @@ const german: EditorMessages = {
   addRow: 'Zeile hinzufügen', duplicateRow: 'Zeile duplizieren', alignColumnCenter: 'Spalte zentrieren',
   chooseImage: 'Bild auswählen', chooseNamedImage: '{label} auswählen', searchImages: 'Bilder suchen',
   cancel: 'Abbrechen', noMatchingImages: 'Keine passenden Bilder.', loadingImages: 'Bilder werden geladen…',
-  uploadImage: 'Bild hochladen', imageUploadHint: 'Bilddatei bis 10 MB auswählen', invalidImageFile: 'Eine gültige Bilddatei auswählen.',
+  uploadImage: 'Bild hochladen',
+  imageUploadHint: 'Bilddatei bis 10 MB auswählen',
+  invalidImageFile: 'Eine gültige Bilddatei auswählen.',
 }
 
 describe('interface messages', () => {
@@ -36,18 +42,65 @@ describe('interface messages', () => {
   })
 
   it('translates native component and table controls without translating stored content or kit labels', async () => {
-    const authoringKit = await createAuthoringKit({ version: 1,
-      implementation: { notice: { componentName: 'Notice', props: { title: { types: ['string'], required: false }, tone: { types: ['string'], required: false } }, slots: ['default'] } },
-      policy: { version: 2, components: { notice: { kind: 'block', media: null, props: { title: { types: ['string'], required: false, allowedValues: null }, tone: { types: ['string'], required: false, allowedValues: ['soft', 'strong'] } }, slots: ['default'], allowedParents: null, allowedChildren: null } } },
-      authoring: { notice: { label: 'Hinweis', props: { title: { label: 'Titel', control: 'text' }, tone: { label: 'Appearance', control: 'select' } }, canvas: { titleProp: 'title' } } }, recipes: [],
+    const authoringKit = await createAuthoringKit({
+      version: 1,
+      implementation: {
+        notice: {
+          componentName: 'Notice',
+          props: {
+            title: { types: ['string'], required: false },
+            tone: { types: ['string'], required: false },
+          },
+          slots: ['default'],
+        },
+      },
+      policy: {
+        version: 2,
+        components: {
+          notice: {
+            kind: 'block',
+            media: null,
+            props: {
+              title: { types: ['string'], required: false, allowedValues: null },
+              tone: { types: ['string'], required: false, allowedValues: ['soft', 'strong'] },
+            },
+            slots: ['default'],
+            allowedParents: null,
+            allowedChildren: null,
+          },
+        },
+      },
+      authoring: {
+        notice: {
+          label: 'Hinweis',
+          props: {
+            title: { label: 'Titel', control: 'text' },
+            tone: { label: 'Appearance', control: 'select' },
+          },
+          canvas: { titleProp: 'title' },
+        },
+      },
+      recipes: [],
     })
-    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { messages: german, authoringKit, syncDebounceMs: 10000, modelValue: '<notice title="Do not translate">\nOriginal content\n</notice>\n\n| Name | Value |\n| --- | --- |\n| Apple | 10 |' } })
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        messages: german,
+        authoringKit,
+        syncDebounceMs: 10000,
+        modelValue:
+          '<notice title="Do not translate">\nOriginal content\n</notice>\n\n'
+            + '| Name | Value |\n| --- | --- |\n| Apple | 10 |',
+      },
+    })
     cleanup.push(() => wrapper.unmount()); await flushPromises()
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     expect(wrapper.get('input[aria-label="Hinweis Titel"]').attributes('placeholder')).toBe('Titel hinzufügen…')
     await wrapper.get('button[aria-label="Einstellungen für Hinweis"]').trigger('click'); await flushPromises()
     expect(wrapper.get('select[aria-label="Appearance"]').findAll('option')[0].text()).toBe('Standard')
-    expect((wrapper.get('input[aria-label="Hinweis Titel"]').element as HTMLInputElement).value).toBe('Do not translate')
+    expect(
+      (wrapper.get('input[aria-label="Hinweis Titel"]').element as HTMLInputElement).value,
+    ).toBe('Do not translate')
     expect(editor.state.doc).toBe(before)
     let pos = 0
     editor.state.doc.descendants((node, offset) => { if (!pos && node.type.name === 'tableCell') pos = offset + 2 })
@@ -66,7 +119,14 @@ describe('interface messages', () => {
 
   it('translates the controlled picker while keeping asset labels and payloads intact', async () => {
     const image = { id: 'asset-one', alt: 'Original alternative text' }
-    const wrapper = mount(GinkoImagePicker, { attachTo: document.body, props: { messages: german, open: true, images: [{ key: 'one', label: '<Forest>.jpg', image }] } })
+    const wrapper = mount(GinkoImagePicker, {
+      attachTo: document.body,
+      props: {
+        messages: german,
+        open: true,
+        images: [{ key: 'one', label: '<Forest>.jpg', image }],
+      },
+    })
     cleanup.push(() => wrapper.unmount()); await flushPromises()
     expect(document.querySelector('.ginko-image-picker__title')?.textContent?.trim()).toBe('Bild auswählen')
     expect(document.querySelector('[aria-label="Bilder suchen"]')).not.toBeNull()
@@ -80,9 +140,16 @@ describe('interface messages', () => {
   })
 
   it('translates upload controls and local validation without changing the document', async () => {
-    const wrapper = mount(GinkoEditor, { attachTo: document.body, props: { messages: german, modelValue: 'Keep this content', imageUpload: async () => ({ url: '/uploaded.png' }) } })
+    const wrapper = mount(GinkoEditor, {
+      attachTo: document.body,
+      props: {
+        messages: german,
+        modelValue: 'Keep this content',
+        imageUpload: async () => ({ url: '/uploaded.png' }),
+      },
+    })
     cleanup.push(() => wrapper.unmount()); await flushPromises()
-    const editor = wrapper.vm.editor!, before = editor.state.doc
+    const editor = wrapper.vm.getEditor()!, before = editor.state.doc
     editor.commands.insertImageUpload(); await flushPromises()
     expect(wrapper.get('button[aria-label="Bild hochladen"]').text()).toContain('Bilddatei bis 10 MB auswählen')
     const input = wrapper.get('input[type="file"]')

@@ -31,12 +31,11 @@ function actionReferences(workflow, path) {
 }
 
 const probeSha = '0'.repeat(40)
-const probe = actionReferences(
-  parse(
-    `jobs: { reusable: { uses: owner/workflows/.github/workflows/ci.yml@${probeSha} }, steps: { runs-on: ubuntu-latest, steps: [ { uses: owner/action@${probeSha} } ] } }`,
-  ),
-  '<parser probe>',
-)
+const probeDocument = 'jobs: { reusable: { uses:'
+  + ` owner/workflows/.github/workflows/ci.yml@${probeSha} },`
+  + ' steps: { runs-on: ubuntu-latest,'
+  + ` steps: [ { uses: owner/action@${probeSha} } ] } }`
+const probe = actionReferences(parse(probeDocument), '<parser probe>')
 if (probe.size !== 2) {
   throw new Error('Action verification must inspect flow-style steps and reusable workflows.')
 }

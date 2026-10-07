@@ -46,7 +46,7 @@ describe('accepted corpus through the mounted editor schema', () => {
         props: { modelValue: source, syncDebounceMs: 0 },
       })
       await flushPromises()
-      await waitFor(() => Boolean(wrapper.vm.editor))
+      await waitFor(() => Boolean(wrapper.vm.getEditor()))
       await new Promise((resolve) => globalThis.setTimeout(resolve, 50))
 
       if (fixture === 'angle-components.mdc') {
