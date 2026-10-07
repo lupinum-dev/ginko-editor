@@ -6,6 +6,8 @@ export default [
   {
     ignores: [
       'dist/**',
+      'release/**',
+      '.pack/**',
       'release-artifacts/**',
       '.preview-artifacts/**',
       'docs/.nuxt/**',

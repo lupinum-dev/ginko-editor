@@ -12,7 +12,8 @@ registerHooks({
 })
 
 const { createEditorSchema, prepareMarkdownForVisualEditing, convertTiptapDocToMarkdown,
-  SetNodePropertyStep, SetComponentVariantStep, SetNodeAttributeStep } =
+  SetNodePropertyStep, SetComponentVariantStep, SetNodeAttributeStep,
+  createCollaborationSnapshot, decodeCollaborationDocument, applyCollaborationSteps } =
   await import('@lupinum/ginko-editor/runtime')
 assert.equal(typeof document, 'undefined')
 const schema = createEditorSchema()
@@ -25,7 +26,7 @@ assert.equal(serialized.ok, true, JSON.stringify(serialized.issues))
 const reopened = await prepareMarkdownForVisualEditing(serialized.value, undefined, schema)
 assert.deepEqual(reopened.value, prepared.value)
 
-const { Step } = await import('@tiptap/pm/transform')
+const { Step, Transform } = await import('@tiptap/pm/transform')
 const component = schema.nodeFromJSON({ type: 'doc', content: [{ type: 'element',
   attrs: { tag: 'note', props: { title: 'Before' } }, content: [{ type: 'paragraph' }] }] })
 const property = Step.fromJSON(schema, new SetNodePropertyStep(0, 'title', 'After').toJSON())
@@ -37,3 +38,25 @@ const code = schema.nodeFromJSON({ type: 'doc', content: [{ type: 'codeBlock', a
 const attribute = Step.fromJSON(schema, new SetNodeAttributeStep(0, 'filename', 'after.ts').toJSON())
 assert.equal(attribute.apply(code).doc.firstChild.attrs.filename, 'after.ts')
 assert.equal(attribute.apply(code).doc.firstChild.attrs.language, 'ts')
+
+// The archive pair must preserve accepted pre-origin room JSON when Content's
+// implicit default changes. Parsing source first would conceal this regression.
+const options = { epoch: 'packed-legacy', policyRevision: 'notes-1', policy: { version: 2, components: {
+  note: { kind: 'block', props: {}, slots: ['default'], allowedParents: null, allowedChildren: null, media: null },
+} } }
+const seeded = await createCollaborationSnapshot('::note\nBody\n::\n\nAfter', options)
+const stored = schema.nodeFromJSON({ type: 'doc', content: [
+  { type: 'element', attrs: { tag: 'note', props: {} }, content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Body' }] },
+  ] },
+  { type: 'paragraph', content: [{ type: 'text', text: 'After' }] },
+] })
+const snapshot = { ...seeded.snapshot, document: JSON.stringify(stored.toJSON()) }
+const loaded = decodeCollaborationDocument(snapshot.document)
+const unrelated = new Transform(loaded).insert(loaded.firstChild.nodeSize + 1, loaded.type.schema.text('Unrelated '))
+const accepted = await applyCollaborationSteps(snapshot, { ...snapshot, clientId: 'packed/session',
+  steps: unrelated.steps.map(step => JSON.stringify(step.toJSON())),
+}, options)
+assert.equal(accepted.markdown, '::note\nBody\n::\n\nUnrelated After\n')
+assert.equal(accepted.snapshot.document, JSON.stringify(unrelated.doc.toJSON()))
+assert.deepEqual(JSON.parse(accepted.snapshot.document).content[0].attrs.props, {})

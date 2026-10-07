@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Refresh image URLs when a reactive asset provider replaces its URL methods,
+  without changing stored image identity or interrupting an upload.
+- Keep native image replacement and description controls after reopening a
+  canonical host-policy image. Restricted and extended image components retain
+  their own controls and authored properties.
+
 ### Breaking changes and migration
 
 - Install `@lupinum/ginko-content` in the host. It is now a peer dependency

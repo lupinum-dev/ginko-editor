@@ -4,17 +4,35 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { URL } from 'node:url'
+import { parse, stringify } from 'yaml'
 
-const release = JSON.parse(await readFile('release-artifacts/release.json', 'utf8'))
-const pkg = release.packages[0]
-const archive = resolve('release-artifacts', pkg.filename)
-// Remove the default candidate when Content 1.0.0-beta.10 is published (internals/migrations.md).
-const contentArchive = resolve(process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz')
+const pkg = JSON.parse(await readFile('package.json', 'utf8'))
+const policy = parse(await readFile('pnpm-workspace.yaml', 'utf8'))
+// Remove the default candidate after the registry cutover (internals/migrations.md).
+const contentCandidate = process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz'
+const contentDependency = contentCandidate ? `file:${resolve(contentCandidate)}` : pkg.devDependencies['@lupinum/ginko-content']
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
+let archive
 
-const packageInputs = [...(contentArchive ? [contentArchive] : []), archive]
-// Content is a peer. Hosts install it; a candidate archive replaces the registry version.
-const contentPeer = { '@lupinum/ginko-content': '1.0.0-beta.10' }
+async function install(consumer, { runtimeOnly = false } = {}) {
+  const manifest = JSON.parse(await readFile(join(consumer, 'package.json'), 'utf8'))
+  manifest.packageManager = pkg.packageManager
+  manifest.dependencies['@lupinum/ginko-editor'] = `file:${archive}`
+  await write(join(consumer, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  await write(join(consumer, 'pnpm-workspace.yaml'), stringify({
+    packages: [],
+    minimumReleaseAge: policy.minimumReleaseAge,
+    minimumReleaseAgeStrict: policy.minimumReleaseAgeStrict,
+    minimumReleaseAgeIgnoreMissingTime: policy.minimumReleaseAgeIgnoreMissingTime,
+    allowBuilds: policy.allowBuilds,
+    // The backend intentionally installs no optional UI peers.
+    ...(runtimeOnly ? { autoInstallPeers: false } : {}),
+    overrides: { ...policy.overrides, '@lupinum/ginko-content': contentDependency },
+  }))
+  run('pnpm', ['install', '--ignore-scripts'], consumer)
+}
+
+const contentPeer = { '@lupinum/ginko-content': contentDependency }
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -52,6 +70,9 @@ async function verifyDeclarations(consumer) {
   const packageRoot = join(consumer, 'node_modules', '@lupinum', 'ginko-editor')
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
   if (manifest.exports?.['./style.css'] !== './dist/style.css') throw new Error('The packed CSS export is missing.')
+  if (manifest.exports?.['./agent-docs'] !== './dist/agent/AGENTS.md') throw new Error('The packed agent docs export is missing.')
+  const agentDocs = await readFile(join(packageRoot, 'dist/agent/AGENTS.md'), 'utf8')
+  if (!agentDocs.includes(pkg.version) || !agentDocs.includes('./pages/')) throw new Error('The packed agent docs are empty or from another version.')
   const entryTypes = await readFile(join(packageRoot, 'dist', 'index.d.ts'), 'utf8')
   const publicNames = [
     'GinkoEditor',
@@ -94,24 +115,24 @@ async function verifyDeclarations(consumer) {
   await write(join(consumer, 'editor-types.ts'),
     await readFile(new URL('../test/fixtures/packed-consumer/editor-types.ts.fixture', import.meta.url), 'utf8'))
   for (const file of ['runtime-types.ts', 'editor-types.ts']) {
-    run('npm', ['exec', '--', 'tsc', '--noEmit', '--skipLibCheck', '--strict', '--target', 'ESNext',
+    run('pnpm', ['exec', 'tsc', '--noEmit', '--skipLibCheck', '--strict', '--target', 'ESNext',
       '--module', 'NodeNext', '--moduleResolution', 'NodeNext', file], consumer)
   }
 }
 
-// A backend installs only the document runtime peers. Other packages declare
-// Vue as a peer, so legacy peer resolution keeps npm from adding it. The
-// runtime entry must then load and round trip a document without Vue.
+// A backend installs only the document runtime peers. Disable automatic peer
+// installation in this fixture so importing the runtime proves that neither
+// Vue nor its DOM integration is needed.
 async function verifyNodeRuntimeConsumer(consumer) {
   await write(
     join(consumer, 'package.json'),
     `${JSON.stringify({
       private: true,
       type: 'module',
-      dependencies: { ...contentPeer, '@tiptap/core': '3.31.3', '@tiptap/pm': '3.31.3' },
+      dependencies: { ...contentPeer, '@tiptap/core': '3.31.4', '@tiptap/pm': '3.31.4' },
     }, null, 2)}\n`,
   )
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--legacy-peer-deps', ...packageInputs], consumer)
+  await install(consumer, { runtimeOnly: true })
   for (const name of ['vue', '@tiptap/vue-3']) {
     if (existsSync(join(consumer, 'node_modules', name))) {
       throw new Error(`The runtime consumer unexpectedly installed ${name}.`)
@@ -142,9 +163,10 @@ async function verifyVueConsumer(consumer) {
       scripts: { build: 'vite build', typecheck: 'vue-tsc --noEmit' },
       dependencies: {
         ...contentPeer,
-        '@tiptap/core': '3.31.3',
-        '@tiptap/pm': '3.31.3',
-        '@tiptap/vue-3': '3.31.3',
+        '@tiptap/core': '3.31.4',
+        '@tiptap/pm': '3.31.4',
+        '@tiptap/vue-3': '3.31.4',
+        'reka-ui': pkg.dependencies['reka-ui'],
         vue: '3.5.42',
       },
       devDependencies: {
@@ -189,13 +211,9 @@ async function verifyVueConsumer(consumer) {
     join(consumer, 'tsconfig.json'),
     `${JSON.stringify({ compilerOptions: vueCompilerOptions, include: ['*.ts', '*.vue'] }, null, 2)}\n`,
   )
-  run(
-    'npm',
-    ['install', '--ignore-scripts', '--no-audit', '--no-fund', ...packageInputs],
-    consumer,
-  )
-  run('npm', ['run', 'typecheck'], consumer)
-  run('npm', ['run', 'build'], consumer)
+  await install(consumer)
+  run('pnpm', ['run', 'typecheck'], consumer)
+  run('pnpm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
   for (const marker of cssMarkers) {
     if (!(await containsCss(join(consumer, 'dist'), marker))) {
@@ -213,9 +231,10 @@ async function verifyNuxtConsumer(consumer) {
       scripts: { build: 'nuxt build', prepare: 'nuxt prepare', typecheck: 'nuxt typecheck' },
       dependencies: {
         ...contentPeer,
-        '@tiptap/core': '3.31.3',
-        '@tiptap/pm': '3.31.3',
-        '@tiptap/vue-3': '3.31.3',
+        '@tiptap/core': '3.31.4',
+        '@tiptap/pm': '3.31.4',
+        '@tiptap/vue-3': '3.31.4',
+        'reka-ui': pkg.dependencies['reka-ui'],
         nuxt: '4.5.2',
         vue: '3.5.42',
       },
@@ -228,10 +247,10 @@ async function verifyNuxtConsumer(consumer) {
   )
   await writeEditorExample(consumer, 'app.vue')
   await write(join(consumer, 'tsconfig.json'), '{ "extends": "./.nuxt/tsconfig.json" }\n')
-  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', ...packageInputs], consumer)
-  run('npm', ['run', 'prepare'], consumer)
-  run('npm', ['run', 'typecheck'], consumer)
-  run('npm', ['run', 'build'], consumer)
+  await install(consumer)
+  run('pnpm', ['run', 'prepare'], consumer)
+  run('pnpm', ['run', 'typecheck'], consumer)
+  run('pnpm', ['run', 'build'], consumer)
   await verifyDeclarations(consumer)
   for (const marker of cssMarkers) {
     if (!(await containsCss(join(consumer, '.output'), marker))) {
@@ -241,8 +260,17 @@ async function verifyNuxtConsumer(consumer) {
 }
 
 try {
+  const destination = join(root, 'package')
+  await mkdir(destination)
+  run('pnpm', ['pack', '--pack-destination', destination], process.cwd())
+  const archives = (await readdir(destination)).filter(name => name.endsWith('.tgz'))
+  if (archives.length !== 1) throw new Error('Expected one Editor package archive.')
+  archive = join(destination, archives[0])
+  console.log('Checking the packed Vue consumer…')
   await verifyVueConsumer(join(root, 'vue'))
+  console.log('Checking the packed Nuxt consumer…')
   await verifyNuxtConsumer(join(root, 'nuxt'))
+  console.log('Checking the packed backend consumer without Vue…')
   await verifyNodeRuntimeConsumer(join(root, 'node-runtime'))
 } finally {
   await rm(root, { recursive: true, force: true })

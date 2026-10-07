@@ -55,7 +55,7 @@ export const Element = Node.create<ElementOptions>({
         ({ chain, state }) => {
           const { from } = state.selection
           const value: Content = {
-            attrs: { tag },
+            attrs: { tag, props: { $: { syntax: 'angle', block: 1, sourceName: tag.charAt(0).toUpperCase() + tag.slice(1) } } },
             type: 'element',
           }
 
@@ -84,7 +84,7 @@ export const Element = Node.create<ElementOptions>({
         find: ELEMENT_BLOCK_TRIGGER,
         handler: ({ chain, match, range }) => {
           const value: Content = {
-            attrs: { tag: match[1] },
+            attrs: { tag: match[1], props: { $: { syntax: 'colon', block: 1, sourceName: match[1] } } },
             content: [
               {
                 attrs: { name: 'default' },

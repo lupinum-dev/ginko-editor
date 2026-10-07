@@ -22,6 +22,11 @@ process.exit(
     "package.json",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
-    "tsconfig.json",
+    "tsconfig*.json",
+    "vite.config.*",
+    "scripts",
+    "internals/candidates",
+    ".node-version",
+    ".npmrc",
   ]),
 );

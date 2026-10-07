@@ -19,12 +19,12 @@ document's parsed meaning. Unsupported or invalid documents stay in source mode.
 ## Requirements
 
 - A bundler that resolves package `exports`, such as Vite or Nuxt, on Node.js 22.18 or later.
-- Vue 3.5.40 or later and TipTap 3.31.3 or a later 3.x version in the application.
+- Vue 3.5.40 or later and TipTap 3.31.4 or a later 3.x version in the application.
   The root entry needs `vue` and `@tiptap/vue-3`.
-- `@lupinum/ginko-content` 1.0.0-beta.9 or a later 1.x version. It is a peer
+- `@lupinum/ginko-content` 1.0.0-beta.10 or a later 1.x version. It is a peer
   dependency and supplies the shared CMS contract.
 
-Repository development has separate requirements. Read [MAINTAINING.md](MAINTAINING.md).
+Repository development has separate requirements. Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Installation
 
@@ -175,7 +175,11 @@ const uploadImage: ImageUploadHandler = async (file, { signal }) => {
 
 Return a durable URL, or an `id` with an `asset-provider` that resolves it for
 display. The provider's safe display URL takes precedence over the stored image
-source. Match stored references to the consuming Content policy; native image
+source. A host-policy `image` keeps native controls after reload when its stable
+`id` equals `src` and its complete property and media contract matches native
+image editing. Restricted or extended image policies keep component controls so
+native actions cannot write unsupported properties.
+Match stored references to the consuming Content policy; native image
 URLs support site-relative paths such as `/images/photo.png`. Use
 `image-output="markdown"` for native Markdown; the default MDC output also
 preserves supported image dimensions and crop/focal metadata.
@@ -306,7 +310,7 @@ Root Directory because the documentation build uses this package.
 
 ## Contributing and development
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Maintainers use [MAINTAINING.md](MAINTAINING.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
 ### Local documentation playground
 
