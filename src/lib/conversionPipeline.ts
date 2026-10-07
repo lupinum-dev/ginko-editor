@@ -21,6 +21,7 @@ import type {
 } from './conversionTypes'
 import { adaptMdcDocument, stringifyMdc } from './markdown'
 import { mdcToTiptap } from './mdcToTiptap'
+import { profileExemptMeta } from './profiles'
 import type { TiptapToMDCOptions } from './tiptapToMdc'
 import { tiptapToMDC } from './tiptapToMdc'
 
@@ -351,10 +352,8 @@ function normalizeComarkNodes(nodes: unknown[]): unknown[] {
       // Component identity and inline/block placement carry the meaning.
       props.$ = { component: 1, block: metadata.block }
     }
-    if (tag === 'a' && props.target === '_blank' && props.rel === 'noopener noreferrer nofollow') {
-      delete props.target
-      delete props.rel
-    }
+    // The serializer omits the schema's default `rel`.
+    if (tag === 'a' && props.rel === 'noopener noreferrer nofollow') delete props.rel
     const normalizedChildren = normalizeComarkNodes(children)
     if (
       tag === 'p' &&
@@ -469,6 +468,7 @@ export function applyTiptapDocToEditor(
     const tr = editor.state.tr
       .replaceWith(0, editor.state.doc.content.size, nextDoc.content)
       .setMeta('addToHistory', false)
+      .setMeta(profileExemptMeta, true)
     tr.setSelection(
       TextSelection.between(
         tr.doc.resolve(Math.min(from, tr.doc.content.size)),

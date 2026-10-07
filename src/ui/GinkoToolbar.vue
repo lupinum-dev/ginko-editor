@@ -52,10 +52,17 @@ const error = ref('')
 const rows = ref(3)
 const columns = ref(3)
 
+/** A menu needs a command that changes something. "Paragraph" alone has no alternative to switch to. */
+function menuAvailable(commands: readonly EditorCommand[]) {
+  return commands.some(command => command.kind !== 'paragraph' && props.actions.get(command).available)
+}
+
 const groups = computed(() =>
-  (props.items ?? defaultToolbarItems).map(group =>
-    group.filter(item => item.kind === 'menu' || props.actions.get(item).available),
-  ),
+  (props.items ?? defaultToolbarItems)
+    .map(group => group.filter(item => item.kind === 'menu'
+      ? menuAvailable(item.items)
+      : props.actions.get(item).available))
+    .filter(group => group.length),
 )
 
 function setOpen(id: string, open: boolean, command?: EditorCommand) {

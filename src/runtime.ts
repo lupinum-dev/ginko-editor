@@ -1,5 +1,8 @@
 /** Runtime-neutral conversion boundary. No Vue views, styles, or host persistence. */
 export { createEditorSchema } from './lib/config/documentConfig'
+// Content profiles, for enforcing the editor's profile where documents are stored.
+export { editorProfiles, findProfileViolations, sanitizeFragment } from './lib/profiles'
+export type { EditorProfile, EditorProfileName, EditorProfileViolation } from './lib/profiles'
 export { SetNodePropertyStep, SetComponentVariantStep, SetNodeAttributeStep } from './lib/property-step'
 // Collaboration protocol and server validation. Each export below is experimental.
 export { applyCollaborationSteps, createCollaborationSnapshot, decodeCollaborationDocument, decodeCollaborationSteps } from './lib/collaboration/validation'

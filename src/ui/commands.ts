@@ -4,6 +4,13 @@ import type { Editor } from '@tiptap/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { commitEditorTransaction, type EditorOperationContext } from '../lib/editor-operations'
+import {
+  editorProfiles,
+  profileAllowsBlocks,
+  profileAllowsMark,
+  profileAllowsNode,
+  type EditorProfile,
+} from '../lib/profiles'
 
 export type EditorCommand =
   | {
@@ -91,6 +98,47 @@ export const defaultToolbarItems: readonly EditorToolbarGroup[] = [
     },
   ],
 ]
+
+/** Formatting that the floating selection toolbar offers by default. */
+export const defaultSelectionToolbarItems: readonly EditorToolbarGroup[] = [[
+  { kind: 'mark', mark: 'bold' },
+  { kind: 'mark', mark: 'italic' },
+  { kind: 'mark', mark: 'strike' },
+  { kind: 'mark', mark: 'code' },
+  { kind: 'link' },
+]]
+
+const commandNodes: Partial<Record<EditorCommand['kind'], string>> = {
+  paragraph: 'paragraph',
+  bulletList: 'bulletList',
+  orderedList: 'orderedList',
+  blockquote: 'blockquote',
+  codeBlock: 'codeBlock',
+  divider: 'horizontalRule',
+  image: 'image',
+  file: 'file',
+  video: 'video',
+  table: 'table',
+}
+
+/** Whether a command can create content that the profile allows. */
+export function profileAllowsCommand(profile: EditorProfile, command: EditorCommand): boolean {
+  switch (command.kind) {
+    case 'undo':
+    case 'redo':
+      return true
+    case 'mark':
+      return profileAllowsMark(profile, command.mark)
+    case 'link':
+      return profileAllowsMark(profile, 'link')
+    case 'heading':
+      return profileAllowsNode(profile, 'heading', { level: command.level })
+    case 'insert':
+      return profileAllowsBlocks(profile)
+    default:
+      return profileAllowsNode(profile, commandNodes[command.kind] ?? command.kind)
+  }
+}
 
 export function formatShortcut(
   value: string,
@@ -292,7 +340,10 @@ export function useEditorActions(editor: Ref<Editor | undefined>, options: Comma
   messages: () => EditorMessages | undefined
   shortcuts: () => EditorShortcuts | undefined
   context: EditorOperationContext
+  /** The content profile. Commands outside it are unavailable. */
+  profile?: EditorProfile
 }) {
+  const profile = options.profile ?? editorProfiles.full
   const revision = ref(0)
   const pendingAction = ref<string>()
   watch(editor, (instance, _, cleanup) => {
@@ -327,12 +378,14 @@ export function useEditorActions(editor: Ref<Editor | undefined>, options: Comma
         const label = command.kind === 'heading' ? `${text('heading')} ${command.level}` : text(key)
         const active = isActive(instance, command)
         const disabled = !!pendingAction.value
+          || !profileAllowsCommand(profile, command)
           || !instance
           || !isCurrent()
           || !options.enabled()
           || !execute(instance, command, true, undefined, options)
-        const available = !(['image', 'file', 'video'] as string[]).includes(command.kind)
-          || options.mediaEnabled(command.kind as 'image' | 'file' | 'video')
+        const available = profileAllowsCommand(profile, command)
+          && (!(['image', 'file', 'video'] as string[]).includes(command.kind)
+            || options.mediaEnabled(command.kind as 'image' | 'file' | 'video'))
 
         return {
           id: command.kind === 'heading' ? `heading-${command.level}` : key,
@@ -350,6 +403,7 @@ export function useEditorActions(editor: Ref<Editor | undefined>, options: Comma
             if (
               !current
               || pendingAction.value
+              || !profileAllowsCommand(profile, command)
               || !isCurrent()
               || !options.enabled()
               || !execute(current, command, true, undefined, options)

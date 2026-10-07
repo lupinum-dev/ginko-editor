@@ -9,7 +9,7 @@ export { default as GinkoEditor } from './GinkoEditor.vue'
 export { default as GinkoToolbar } from './ui/GinkoToolbar.vue'
 export { default as GinkoImagePicker } from './GinkoImagePicker.vue'
 export type { GinkoEditorProps } from './editorProps'
-export { defaultToolbarItems, formatShortcut } from './ui/commands'
+export { defaultSelectionToolbarItems, defaultToolbarItems, formatShortcut } from './ui/commands'
 export type {
   EditorAction,
   EditorActions,
@@ -20,6 +20,9 @@ export type {
   EditorShortcuts,
 } from './ui/commands'
 export { defaultMessages } from './ui/messages'
+export { germanMessages } from './ui/messages.de'
+export { editorProfiles, findProfileViolations, sanitizeFragment } from './lib/profiles'
+export type { EditorProfile, EditorProfileName, EditorProfileViolation } from './lib/profiles'
 export type { EditorMessageKey, EditorMessageParams } from './ui/messages'
 export {
   composeAuthoringKits,

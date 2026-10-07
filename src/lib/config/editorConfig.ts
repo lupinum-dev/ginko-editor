@@ -15,6 +15,8 @@ import type { TiptapToMDCOptions } from '../tiptapToMdc'
 import { MarkdownClipboard } from '../extensions'
 import { ComponentBoundary } from '../extensions/component-boundary'
 import { ContainerItems } from '../extensions/container-items'
+import { ProfileGuard } from '../extensions/profile'
+import { editorProfiles, type EditorProfile } from '../profiles'
 
 export interface CreateEditorExtensionsOptions {
   overlay?: EditorOverlayController
@@ -40,6 +42,8 @@ export interface CreateEditorExtensionsOptions {
   getPlaceholder?: () => string | undefined
   /** Initial value of the heading extension storage. */
   showMarkdownMarkers?: boolean
+  /** The content profile. Fixed for the lifetime of the editor. */
+  profile?: EditorProfile
 }
 
 export function createEditorExtensions(options: CreateEditorExtensionsOptions = {}) {
@@ -49,6 +53,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions = 
     return options.assetProvider?.buildUrl({ id: id ?? src, url: src })
   }
   const text = options.overlay?.text ?? createEditorText(options.getMessages)
+  const profile = options.profile ?? editorProfiles.full
 
   return [
     ...createDocumentExtensions({
@@ -56,6 +61,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions = 
       getOutputOptions: options.getOutputOptions,
       showMarkdownMarkers: options.showMarkdownMarkers,
       codeBlockTheme: options.codeBlockTheme,
+      headingLevels: profile.headingLevels,
       resolveAsset,
       nodeViews: {
         table: props => tableView(props, options.overlay),
@@ -78,6 +84,7 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions = 
       text,
       getAuthoringKit: options.getAuthoringKit,
       getOutputOptions: options.getOutputOptions,
+      profile,
       canPaste: options.canPaste,
       onPasteError: options.onPasteError,
       onCopyError: options.onCopyError,
@@ -95,5 +102,6 @@ export function createEditorExtensions(options: CreateEditorExtensionsOptions = 
     }),
     ComponentBoundary,
     ContainerItems.configure({ getAuthoringKit: options.getAuthoringKit }),
+    ProfileGuard.configure({ profile }),
   ]
 }

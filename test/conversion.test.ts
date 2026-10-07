@@ -116,6 +116,21 @@ describe('editor conversion contract', () => {
     editor.destroy()
   })
 
+  it('keeps links clean through an edit and a new link', async () => {
+    const source = 'See [the menu](https://example.com/menu) and [a tab](https://example.com/tab){target="_blank"}.\n'
+    const parsed = await convertMarkdownToTiptapDoc(source)
+    if (!parsed.ok || !parsed.value) throw new Error('Expected valid source.')
+    const editor = createEditor()
+    applyTiptapDocToEditor(editor, parsed.value)
+    editor.commands.insertContentAt(1, 'Now: ')
+    editor.chain().setTextSelection({ from: 1, to: 4 }).setLink({ href: 'https://example.com/now' }).run()
+    const output = await convertTiptapDocToMarkdown(editor.getJSON())
+    expect(output.value).toBe(
+      '[Now](https://example.com/now): See [the menu](https://example.com/menu) and [a tab](https://example.com/tab){target="_blank"}.\n',
+    )
+    editor.destroy()
+  })
+
   it('round-trips host component props and named slots through a real edit', async () => {
     const source = [
       '<learning-objective level="advanced" assessed>',

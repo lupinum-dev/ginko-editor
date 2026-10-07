@@ -17,6 +17,12 @@ export const Heading = TiptapHeading.extend<HeadingOptions>({
     }
   },
 
+  // Parse every level, so a profile with fewer levels can still move pasted
+  // headings to its nearest level instead of losing them as paragraphs.
+  parseHTML() {
+    return [1, 2, 3, 4, 5, 6].map(level => ({ tag: `h${level}`, attrs: { level } }))
+  },
+
   addStorage() {
     return {
       showMarkers: this.options.showMarkers,

@@ -8,8 +8,9 @@ import {
   type BlockOperationResult,
 } from '../lib/editor-operations'
 import { prepareMarkdownForVisualEditing } from '../lib/conversionPipeline'
-import { buildEditorCommandTransaction, type EditorCommand } from './commands'
-import { writingRecipes } from './writingRecipes'
+import { isRestrictedProfile, profileAllowsNode, type EditorProfile } from '../lib/profiles'
+import { buildEditorCommandTransaction, profileAllowsCommand, type EditorCommand } from './commands'
+import { isImageRecipe, writingRecipes } from './writingRecipes'
 
 const nativeCommands: Record<string, EditorCommand> = {
   'ginko.heading-1': { kind: 'heading', level: 1 },
@@ -21,6 +22,17 @@ const nativeCommands: Record<string, EditorCommand> = {
   'ginko.code': { kind: 'codeBlock' },
   'ginko.divider': { kind: 'divider' },
   'ginko.table': { kind: 'table', rows: 3, columns: 3 },
+}
+
+/**
+ * Built-in recipes follow their command. Host recipes insert arbitrary
+ * content, so only the unrestricted profile offers them.
+ */
+export function profileAllowsRecipe(profile: EditorProfile, recipe: AuthoringRecipe) {
+  if (!writingRecipes.includes(recipe)) return !isRestrictedProfile(profile)
+  if (isImageRecipe(recipe)) return profileAllowsNode(profile, 'image')
+  const command = nativeCommands[recipe.id]
+  return !!command && profileAllowsCommand(profile, command)
 }
 
 /** Slash insertion shares toolbar commands and Content's final-document gate. */
