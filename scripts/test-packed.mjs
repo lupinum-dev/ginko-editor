@@ -8,8 +8,7 @@ import { parse, stringify } from 'yaml'
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'))
 const policy = parse(await readFile('pnpm-workspace.yaml', 'utf8'))
-// Remove the default candidate after the registry cutover (internals/migrations.md).
-const contentCandidate = process.env.GINKO_CONTENT_TARBALL ?? 'internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz'
+const contentCandidate = process.env.GINKO_CONTENT_TARBALL
 const contentDependency = contentCandidate ? `file:${resolve(contentCandidate)}` : pkg.devDependencies['@lupinum/ginko-content']
 const root = await mkdtemp(join(tmpdir(), 'ginko-editor-packed-consumers-'))
 let archive
@@ -22,12 +21,13 @@ async function install(consumer, { runtimeOnly = false } = {}) {
   await write(join(consumer, 'pnpm-workspace.yaml'), stringify({
     packages: [],
     minimumReleaseAge: policy.minimumReleaseAge,
+    minimumReleaseAgeExclude: policy.minimumReleaseAgeExclude,
     minimumReleaseAgeStrict: policy.minimumReleaseAgeStrict,
     minimumReleaseAgeIgnoreMissingTime: policy.minimumReleaseAgeIgnoreMissingTime,
     allowBuilds: policy.allowBuilds,
     // The backend intentionally installs no optional UI peers.
     ...(runtimeOnly ? { autoInstallPeers: false } : {}),
-    overrides: { ...policy.overrides, '@lupinum/ginko-content': contentDependency },
+    overrides: { ...policy.overrides, ...(contentCandidate ? { '@lupinum/ginko-content': contentDependency } : {}) },
   }))
   run('pnpm', ['install', '--ignore-scripts'], consumer)
 }

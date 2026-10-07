@@ -18,12 +18,14 @@
   recovery contract is in the public collaboration guide. A local Convex
   fixture is retained under `test/fixtures/convex-collaboration`; historical
   reports in Git history are not current acceptance evidence.
-- **2026-09-28 — Keep the Content candidate until registry adoption.** The
-  required beta.10 contracts are not published. The existing archive and
-  override stay under `internals/migrations.md`; no own-scope quarantine
-  exemption is active. Content must publish before the normal Editor release.
-  Docs' reusable authoring kit is a separate pending cutover: keep Editor's
-  existing layout kit until the Docs package is published and consumed.
+- **2026-10-07 — Use registry Content beta.11.** Root, Docs, and packed
+  consumers use the published package. Remove the local candidate and its
+  defaults together. Matthias approved the temporary `@lupinum/*` quarantine
+  exemption; third-party dependencies retain the 24-hour quarantine.
+- **2026-10-07 — Prepare the first Editor release with Changesets.** Editor is
+  not on npm yet. Use an unpublished `0.0.0` preparation base so the pending
+  minor Changesets generate `0.1.0`. Leave the Version packages PR open; the
+  maintainer owns bootstrap, provider protection, and publication.
 - **2026-09-28 — Complete provider cutover before release.** Configure the main
   ruleset to require `ci` from GitHub Actions and verify CodeQL default setup,
   secret scanning and push protection. Verify that the `npm` environment needs
@@ -33,7 +35,9 @@
   publication is changed by this source work. Do not reuse pre-cutover workflow
   runs for release approval. Local workflow tests do not prove live scheduling,
   environment approval or OIDC behavior.
-- **2026-09-28 — Reject stale approved releases.** Publication is serialized and
-  checks current main after approval immediately before npm. Stale runs fail and
-  must restart from current main. Registry lookup failures must fail closed;
-  only a confirmed JSON E404 means the package version is absent.
+- **2026-10-07 — Use the current OSS release starter verbatim.** The workflow
+  requires successful CI on the released commit and rejects a version older
+  than the current npm dist-tag. Pending Changesets or an open version PR do
+  not offer publication. Release helpers follow the same starter. The local
+  workflow tests exercise its CI and registry boundaries; starter tests own
+  the shared workflow's pending-version condition.

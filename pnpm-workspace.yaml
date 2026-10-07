@@ -3,6 +3,8 @@ packages:
   - docs
 
 minimumReleaseAge: 1440
+# Temporary Lupinum scope exemption approved by Matthias for the baseline cutover.
+minimumReleaseAgeExclude: ['@lupinum/*']
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
 
@@ -13,8 +15,6 @@ allowBuilds:
   vue-demi: true
 
 overrides:
-  # Remove when Content 1.0.0-beta.10 is published. See internals/migrations.md.
-  '@lupinum/ginko-content': file:internals/candidates/lupinum-ginko-content-1.0.0-beta.10.tgz
   # Remove when fontless requires esbuild 0.28.1 or newer.
   'fontless>esbuild': 0.28.2
   # Remove when Vite requires esbuild 0.28.1 or newer.

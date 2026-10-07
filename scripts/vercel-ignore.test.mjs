@@ -23,7 +23,7 @@ test('Vercel rebuilds for package inputs and fails open when the previous commit
     for (const [path, expected] of [
       ['vite.config.ts', 1], ['scripts/fix-declaration-imports.mjs', 1],
       ['.node-version', 1], ['tsconfig.build.json', 1], ['.npmrc', 1],
-      ['internals/candidates/content.tgz', 1], ['src/index.ts', 1],
+      ['src/index.ts', 1],
       ['docs/content/index.md', 1], ['pnpm-lock.yaml', 1], ['test/example.test.ts', 0],
     ]) {
       const previous = git('rev-parse', 'HEAD')

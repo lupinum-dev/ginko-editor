@@ -25,7 +25,6 @@ process.exit(
     "tsconfig*.json",
     "vite.config.*",
     "scripts",
-    "internals/candidates",
     ".node-version",
     ".npmrc",
   ]),
