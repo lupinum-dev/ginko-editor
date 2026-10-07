@@ -65,7 +65,8 @@
     "test:packed": "node scripts/test-packed.mjs",
     "test:compat": "pnpm build:library && pnpm typecheck && pnpm test",
     "typecheck": "vue-tsc --noEmit",
-    "verify": "pnpm audit --audit-level=high && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:packed"
+    "verify": "pnpm audit:all && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:packed",
+    "audit:all": "node scripts/audit.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "0.7.0",
